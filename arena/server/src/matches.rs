@@ -115,38 +115,14 @@ impl MatchRuntime {
         self.state.lock().unwrap().rec.clone()
     }
 
-    /// Deal number and rotation of the `hand_no`-th hand (1-based). Duplicate hands are numbered
-    /// block-major: within a block of `block_deals` deals, rotation 0 of every deal, then rotation 1, ...
+    /// Deal number and rotation of the `hand_no`-th hand (1-based). See [`locate`].
     fn locate(&self, hand_no: u32) -> (Option<u32>, u32) {
-        if !self.duplicate {
-            return (None, 0);
-        }
-        let k = hand_no - 1;
-        let deals = self.planned / 6;
-        let b = self.block_deals;
-        let blk = k / (6 * b);
-        let within = k % (6 * b);
-        let blk_deals = b.min(deals - blk * b);
-        (Some(blk * b + within % blk_deals), within / blk_deals)
+        locate(self.duplicate, self.planned, self.block_deals, hand_no)
     }
 
-    /// The `c`-th (0-based) hand of a lane. Lane `L` of `N` plays blocks `L, L+N, L+2N, ...`.
+    /// The `c`-th (0-based) hand of a lane. See [`lane_hand_no`].
     fn lane_hand_no(&self, lane: usize, c: u32) -> Option<u32> {
-        if !self.duplicate {
-            return (c < self.planned).then_some(c + 1);
-        }
-        let deals = self.planned / 6;
-        let nblocks = (deals + self.block_deals - 1) / self.block_deals;
-        let (mut rem, mut b) = (c, lane as u32);
-        while b < nblocks {
-            let sz = 6 * self.block_deals.min(deals - b * self.block_deals);
-            if rem < sz {
-                return Some(b * 6 * self.block_deals + rem + 1);
-            }
-            rem -= sz;
-            b += self.lanes as u32;
-        }
-        None
+        lane_hand_no(self.duplicate, self.planned, self.block_deals, self.lanes, lane, c)
     }
 
     /// Player at each physical seat for `hand_no` (participant `p` sits in seat `(p + r) mod 6`).
@@ -231,49 +207,12 @@ impl MatchRuntime {
         Some(self.progress_value(b, &s, &st))
     }
 
-    /// Stats key per participant slot: the player id, with `#slot` on repeats (a house bot may fill
-    /// several seats), so every slot is scored separately and the first occurrence keeps the plain id.
     fn slot_keys(&self) -> Vec<String> {
-        let mut seen: Vec<&String> = Vec::new();
-        self.participants
-            .iter()
-            .enumerate()
-            .map(|(i, p)| {
-                if seen.contains(&p) {
-                    format!("{p}#{i}")
-                } else {
-                    seen.push(p);
-                    p.clone()
-                }
-            })
-            .collect()
+        slot_keys_of(&self.participants)
     }
 
     fn build(&self, s: &MatchState) -> (Vec<Standing>, Vec<(String, StoredResult)>) {
-        let keys = self.slot_keys();
-        let mut b = Builder::new(self.bb, self.duplicate);
-        for rec in &s.recs {
-            let (deal, r) = self.locate(rec.hand_no);
-            let key = deal.unwrap_or(rec.hand_no);
-            b.add_hand(key);
-            let av = s.aivat.as_ref().and_then(|m| m.get(&rec.hand_no));
-            for seat in 0..6usize {
-                let slot = (seat + 6 - r as usize) % 6;
-                b.add(&keys[slot], key, rec.nets[seat], av.map(|a| a[seat]));
-            }
-        }
-        let names: HashMap<String, String> =
-            keys.iter().enumerate().map(|(i, k)| (k.clone(), self.names.get(&self.participants[i]).cloned().unwrap_or_default())).collect();
-        let (mut st, rows) = b.finish(&names);
-        for x in st.iter_mut() {
-            x.slot = keys.iter().position(|k| *k == x.player_id).unwrap_or(0) as u8;
-            if let Some((p, _)) = x.player_id.split_once('#') {
-                x.player_id = p.to_string();
-            }
-        }
-        // stored results only for the first occurrence of each player id
-        let rows = rows.into_iter().filter(|(k, _)| !k.contains('#')).collect();
-        (st, rows)
+        build_standings(&self.slot_keys(), &self.participants, &self.names, self.bb, self.duplicate, self.planned, self.block_deals, &s.recs, s.aivat.as_ref())
     }
 
     pub fn standings(&self) -> Vec<Standing> {
@@ -284,6 +223,98 @@ impl MatchRuntime {
     pub fn set_status(&self, status: &str) {
         self.state.lock().unwrap().rec.status = status.to_string();
     }
+}
+
+/// Deal number and rotation of the `hand_no`-th hand (1-based). Duplicate hands are numbered
+/// block-major: within a block of `block_deals` deals, rotation 0 of every deal, then rotation 1, ...
+/// Shared by the table server and the headless match worker (`worker.rs`).
+pub fn locate(duplicate: bool, planned: u32, block_deals: u32, hand_no: u32) -> (Option<u32>, u32) {
+    if !duplicate {
+        return (None, 0);
+    }
+    let k = hand_no - 1;
+    let deals = planned / 6;
+    let b = block_deals;
+    let blk = k / (6 * b);
+    let within = k % (6 * b);
+    let blk_deals = b.min(deals - blk * b);
+    (Some(blk * b + within % blk_deals), within / blk_deals)
+}
+
+/// The `c`-th (0-based) hand of a lane. Lane `L` of `N` plays blocks `L, L+N, L+2N, ...`.
+pub fn lane_hand_no(duplicate: bool, planned: u32, block_deals: u32, lanes: usize, lane: usize, c: u32) -> Option<u32> {
+    if !duplicate {
+        return (c < planned).then_some(c + 1);
+    }
+    let deals = planned / 6;
+    let nblocks = (deals + block_deals - 1) / block_deals;
+    let (mut rem, mut b) = (c, lane as u32);
+    while b < nblocks {
+        let sz = 6 * block_deals.min(deals - b * block_deals);
+        if rem < sz {
+            return Some(b * 6 * block_deals + rem + 1);
+        }
+        rem -= sz;
+        b += lanes as u32;
+    }
+    None
+}
+
+/// Standings from per-hand nets (and AIVAT-corrected payoffs when available). `keys` are the stats
+/// keys per participant slot (see `MatchRuntime::slot_keys`).
+#[allow(clippy::too_many_arguments)]
+pub fn build_standings(
+    keys: &[String],
+    participants: &[String],
+    names: &HashMap<String, String>,
+    bb: i64,
+    duplicate: bool,
+    planned: u32,
+    block_deals: u32,
+    recs: &[HandRec],
+    aivat: Option<&HashMap<u32, [f64; 6]>>,
+) -> (Vec<Standing>, Vec<(String, StoredResult)>) {
+    let mut b = Builder::new(bb, duplicate);
+    for rec in recs {
+        let (deal, r) = locate(duplicate, planned, block_deals, rec.hand_no);
+        let key = deal.unwrap_or(rec.hand_no);
+        b.add_hand(key);
+        let av = aivat.and_then(|m| m.get(&rec.hand_no));
+        for seat in 0..6usize {
+            let slot = (seat + 6 - r as usize) % 6;
+            b.add(&keys[slot], key, rec.nets[seat], av.map(|a| a[seat]));
+        }
+    }
+    let names: HashMap<String, String> =
+        keys.iter().enumerate().map(|(i, k)| (k.clone(), names.get(&participants[i]).cloned().unwrap_or_default())).collect();
+    let (mut st, rows) = b.finish(&names);
+    for x in st.iter_mut() {
+        x.slot = keys.iter().position(|k| *k == x.player_id).unwrap_or(0) as u8;
+        if let Some((p, _)) = x.player_id.split_once('#') {
+            x.player_id = p.to_string();
+        }
+    }
+    // stored results only for the first occurrence of each player id
+    let rows = rows.into_iter().filter(|(k, _)| !k.contains('#')).collect();
+    (st, rows)
+}
+
+/// Stats key per participant slot: the player id, with `#slot` on repeats (a house bot may fill
+/// several seats), so every slot is scored separately and the first occurrence keeps the plain id.
+pub fn slot_keys_of(participants: &[String]) -> Vec<String> {
+    let mut seen: Vec<&String> = Vec::new();
+    participants
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if seen.contains(&p) {
+                format!("{p}#{i}")
+            } else {
+                seen.push(p);
+                p.clone()
+            }
+        })
+        .collect()
 }
 
 pub struct NewMatch {
@@ -455,7 +486,7 @@ fn compute_aivat(app: &AppState, rt: &MatchRuntime, mode: &str) -> Result<HashMa
         }
         after = page.last().unwrap().hand_no;
         let res: Vec<(u32, Option<[f64; 6]>)> =
-            page.par_iter().map(|h| (h.hand_no, aivat_hand(app, h, &est, mode))).collect();
+            page.par_iter().map(|h| (h.hand_no, aivat_hand(&app.house, h, &est, mode))).collect();
         for (n, v) in res {
             if let Some(v) = v {
                 out.insert(n, v);
@@ -468,15 +499,15 @@ fn compute_aivat(app: &AppState, rt: &MatchRuntime, mode: &str) -> Result<HashMa
 /// Replay one stored hand through the bench AIVAT tracker. House bots that expose their action
 /// probabilities get decision-node corrections; everyone gets chance-node corrections.
 /// Returns the corrected payoff per physical seat.
-pub fn aivat_hand(app: &AppState, h: &HandHistory, est: &dyn ValueEstimator, mode: Mode) -> Option<[f64; 6]> {
+pub fn aivat_hand(house: &crate::house::HouseRegistry, h: &HandHistory, est: &dyn ValueEstimator, mode: Mode) -> Option<[f64; 6]> {
     let (ecfg, deal, order, actions) = crate::hand::replay_parts(h).ok()?;
     let n = order.len();
     let seed = seed64(&h.hand_id);
     let mut players: Vec<Option<Box<dyn Player>>> = (0..n)
         .map(|i| {
             let pid = &h.players.iter().find(|p| p.seat as usize == order[i])?.player_id;
-            let key = app.house.key_of(pid)?;
-            let p = app.house.get(&key)?.new_player(i, &ecfg, mix(seed, i as u64));
+            let key = house.key_of(pid)?;
+            let p = house.get(&key)?.new_player(i, &ecfg, mix(seed, i as u64));
             p.exposes_probs().then_some(p)
         })
         .collect();

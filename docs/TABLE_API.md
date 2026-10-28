@@ -493,3 +493,120 @@ left of the button, and a fold when check is free is treated as a check. The Ope
 
 **What we need from you:** the `wss://` URL, one bot token per seat we run, and a `match_id` with
 `stack_mode:"reset"`, `starting_stack:10000`, `sb:50`, `bb:100` and `decision_time_ms ≥ 3000`.
+
+---
+
+## 14. Pipe protocol and the match worker (high-throughput evals)
+
+Over WebSocket a bot plays about 200 hands/s; in-process about 4,800. For evals at scale a job runs in one isolated
+sandbox that holds the engine, the reference bots and the user's bot as a **subprocess**. The worker
+(`sharingan-arena run`) plays the duplicate benchmark of a track and talks to the bot over its **stdin/stdout**.
+Same payloads as the WebSocket protocol, no sockets, no server, no database.
+
+### 14.1 Transport
+
+Newline-delimited JSON, UTF-8, one object per line, at most 4 MiB per line. Every line is an envelope as in §4.1
+(`{v:1, type, table_id?, hand_id?, seq?, table_seq?, t_ms, data}`). The bot reads **stdin** and writes **only protocol
+lines** to **stdout**; its stderr goes to the worker's stderr (use it for logs). Lines on stdout that are not JSON
+objects are ignored and counted (`noise_lines`), so a stray `print()` cannot break a run (the Python SDK moves it to stderr
+anyway). One bot process per lane; a process sees exactly one table (`lane-<L>`) and plays its hands one after the other.
+Bots are started with `sh -c "<command>"` in their own process group, with `SHARINGAN_PIPE=1`, `SHARINGAN_LANE`, `SHARINGAN_LANES` in the environment.
+
+### 14.2 Handshake and messages
+
+1. Bot to worker, first line: `hello` `{client, protocol: 1, bot?}`. The worker waits `--startup-timeout-ms` (default 30 s) for it.
+2. Worker to bot: `welcome` `{player_id: "bot", name, protocol: 1, mode: "benchmark", tables: ["lane-<L>"], lane, lanes, track, decision_time_ms, server}`.
+3. Then, per hand, **benchmark mode only** (§12b item 12):
+
+| dir | type | data |
+|---|---|---|
+| worker to bot | `your_turn` | exactly §5.3 `YourTurn` (`decision_id`, `hole_cards`, `history`, `players`, `legal`, `deadline_ms`, `time_bank_ms: 0`, ...). `deadline_ms` = now + decision timeout. |
+| bot to worker | `act` | exactly §4.2 `act`: `{hand_id, decision_id, type, to?}`. One per `decision_id`. |
+| worker to bot | `error` | `{code, message, decision_id, details}` after an illegal `act` (`illegal_action`, `bad_amount`). The worker then **re-sends the same `your_turn`** (same `decision_id`, same `table_seq`); the bot may retry until the deadline. A fold when check is free is converted to a check, as on the server. |
+| worker to bot | `hand_end` | §5.4 `HandEnd`, redacted like a `reveal: "match_end"` benchmark run (only cards shown at showdown, no `runout`, `deck_reveal: null`). No answer. |
+| worker to bot | `bye` | end of this lane: exit. The worker closes stdin, waits 1.5 s, then kills the process group. |
+| bot to worker | `bye` | optional; the bot quits early, the rest of its lane is forfeited (14.3). |
+
+There is no `hand_start`, `hole_cards`, `action` or `street` event (the information is in `your_turn.history`), and no `ping`/`pong`.
+`table_seq` counts the messages delivered to the bot, gap-free, +1 each (a re-sent `your_turn` repeats its number, an `error` consumes one).
+Unknown message types and unknown fields are ignored in both directions. A bot must key any state by `hand_id`/`table_id`, as for lanes (§12b item 12).
+
+### 14.3 Failure handling (what a result means)
+
+* **Decision timeout** (`--decision-timeout-ms`, default 5000, measured from sending `your_turn`): the decision is played as check-if-free-else-fold with
+  `timeout: true`, the bot's process group is **killed** and a **fresh process** takes over for the next decision (hello/welcome again; it has lost its state).
+  After `--max-restarts` (default 3) restarts the lane is dead.
+* **Crash** (exit, EOF, broken pipe, `bye`, a line over 4 MiB, no `hello` in time, spawn failure): the lane is dead at once. A dead lane is a **forfeit**: the
+  bot checks when it is free and folds otherwise on every remaining decision. Those hands are still dealt, played through the engine and AIVAT-scored,
+  so `hands == hands_planned` and the score is that of a bot that stopped playing; they are counted in `forfeit_hands` (per lane too, with the reason in `per_lane[].crashed`).
+  Other lanes are unaffected. A result with `forfeit_hands > 0` is still signed and accepted; the control plane decides what to do with it.
+* `hand_end` is not sent to a process that was restarted during that hand, nor to a dead lane.
+
+### 14.4 `sharingan-arena run`
+
+```
+sharingan-arena run --bot "<command>" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S]
+    [--out result.json] [--sign-key-file F] [--player-id ID] [--decision-timeout-ms 5000] [--startup-timeout-ms 30000]
+    [--max-restarts 3] [--aivat full|cards|off] [--hands-out FILE] [--quiet]
+```
+
+Headless: no HTTP server, no database. Env `ARENA_BLUEPRINT`/`ARENA_BUCKETS`/`ARENA_SIZING` configure the `sharingan-1` house bot exactly as for the server
+(both tracks need it). The worker uses the **same code path as server benchmark runs** for the schedule, the dealing and the scoring: the
+track's frozen panel and seed (`bench:<track>:v<version>`), deal `d` with its button at seat `d mod 6` and the six rotations played in blocks of 12
+deals, house-bot randomness `mix(mix(seed, hand_no), seat)` and the common-random-number stream per deal, `hands` rounded up to whole deals (default 20,000 -> 20,004), AIVAT with the bench
+`EquityEstimator` as in §9. A server run of a remote bot that checks/calls and a worker run of the same bot give the identical chips and duplicate score (tested);
+the AIVAT estimate differs only by the preflop Monte-Carlo noise of the equity sampler. Results do not depend on `--lanes` (a lane plays blocks `L, L+N, ...`), nor
+on the bot's language. `--seed S` replaces the track seed (other deals: for experiments, not comparable, and refused by `POST /v1/results`).
+`--hands-out` writes one JSON line per hand (`hand_no, deal_no, rotation, deck_digest, nets`).
+
+`sharingan-arena pipe-house <name>` is a reference bot on the pipe protocol (any house bot; `sharingan-1` with `ARENA_BLUEPRINT`): it rebuilds the engine state from each `your_turn`.
+
+### 14.5 `result.json`
+
+```json
+{"schema":"sharingan-worker-result/1","run_id":"w_3f9a1c22b7d4","track":"ladder-v1","panel_version":"1",
+ "panel":["house:random","house:calling_station","house:tight_aggressive","house:tight_aggressive","house:sharingan-1"],
+ "seed":"bench:ladder-v1:v1","player_id":"p_...|null","hands":20004,"hands_planned":20004,"deals":3334,"lanes":8,
+ "mbb_per_game":-8051.7,"ci95_mbb":580.4,"method":"aivat","bb_per_100":...,"net_chips":...,"duplicate_mbb_per_hand":...,
+ "forfeit_hands":0,"crashed_lanes":0,"timeouts":0,"blueprint_fingerprint":"5576e691d99d02ef","deals_digest":"<sha256>",
+ "bot":{"command_sha256":"<sha256 of the --bot string>"},
+ "worker":{"name":"sharingan-arena","version":"0.1.0","protocol":1,"aivat":"full","decision_timeout_ms":5000,"max_restarts":3},
+ "per_lane":[{"lane":0,"hands":..,"decisions":..,"timeouts":..,"restarts":..,"illegal_actions":..,"forfeit_hands":..,"noise_lines":..,"anomalies":..,"crashed":null,"wall_ms":..,"bot_wait_ms":..,"aivat_ms":..}],
+ "timings":{"wall_ms":4300,"hands_per_sec":4650.0,"bot_wait_ms_total":..,"aivat_ms_total":..},
+ "started_at":"...","finished_at":"...",
+ "signature":{"alg":"HMAC-SHA256","key_id":"w1","value":"<hex>"}}
+```
+`mbb_per_game`/`ci95_mbb` are the luck-corrected score of the bot as in §9 (milli-big-blinds per hand, 95% CI), rounded to 6 decimals.
+
+**Signature.** With `--sign-key-file F` (contents `key_id=secret` or just `secret`, key id `default`) the worker adds `signature`: HMAC-SHA256 (hex) keyed with the secret over the
+**canonical JSON** of the result without its `signature` member: UTF-8, object keys sorted recursively, no whitespace, integers as integers, other numbers with exactly 6 decimals (`{:.6}`; so
+two JSON parsers that differ by one ulp still agree), strings escaped as `serde_json` does. Any change to any member, including added members, invalidates it.
+
+### 14.6 `POST /v1/results` (control plane)
+
+Auth: the runner token (`ARENA_RUNNER_TOKEN`) or the admin token; a bot token is `403`, no/bad token `401`. Body: the signed `result.json` as is (its `player_id`, set with `--player-id`, names the bot),
+or `{"result": {...signed...}, "player_id": "..."}` (must match a signed `player_id` if there is one). Keys come from env `ARENA_WORKER_KEYS=id1=secret1,id2=secret2` (several keys allow rotation);
+unset means no result is ever accepted.
+
+| status | when |
+|---|---|
+| `401 invalid_signature` | unsigned, wrong key, unknown `key_id`, any member changed after signing, no keys configured |
+| `400` | wrong `schema`, `panel_version`, `panel` or `seed` (a verified result is played on the frozen deals), bad `run_id`, `hands != hands_planned`, non-finite score, no `player_id` |
+| `404` | unknown track or player |
+| `409 duplicate_result` | `run_id` already accepted (replay) |
+| `409 blueprint_mismatch` | this arena has a SHARINGAN-1 blueprint and the worker's `blueprint_fingerprint` differs |
+| `201` | stored as a finished benchmark run: `verified: true, hosted: true`, `mbb_per_game`, `ci95_mbb`, `method`, `hands_done`; the response adds `key_id` and `forfeit_hands` |
+
+The run is readable at `GET /v1/benchmarks/{track}/runs/{run_id}` and the leaderboard (§12b item 15) counts it like any run (`tracks[track].verified`, `vs_ladder_v1`, `?track=`; the latest finished run per bot and track counts).
+
+### 14.7 Measured throughput (box with a saturated training job, `nice -n 19`, worker <= 16 threads, 20,004 hands, `ladder-v1`, full AIVAT)
+
+| bot | lanes | hands/s |
+|---|---|---|
+| Python, `call_or_check` (`sharingan pipe`) | 8 | 4,600-4,700 |
+| Python, `call_or_check` | 16 | 8,300 |
+| Rust `pipe-house calling_station` | 16 | 11,400-11,700 |
+| Rust `pipe-house tight_aggressive` | 16 | 15,500-16,400 |
+| Rust `pipe-house sharingan-1` (tiny blueprint) | 16 | 16,700-16,900 |
+
+The panel and the AIVAT pass run in the lane thread; AIVAT is about a third of the time (`--aivat off` roughly doubles the rate; not valid for a verified result).

@@ -235,7 +235,7 @@ enum Decision {
     Timeout(u64),
 }
 
-fn engine_legal(st: &nlhe::State, a: Action) -> bool {
+pub(crate) fn engine_legal(st: &nlhe::State, a: Action) -> bool {
     let l = st.legal();
     match a {
         Action::Fold => l.can_fold,
@@ -733,7 +733,7 @@ impl TableTask {
 
 /// Drop hole cards, runout and deck from a `hand_end` payload (match `reveal: "match_end"`):
 /// only the cards shown at showdown stay public.
-fn redact_hand_end(d: &mut Value) {
+pub(crate) fn redact_hand_end(d: &mut Value) {
     let shown: Vec<(String, Value)> = d["showdown"]
         .as_array()
         .map(|a| a.iter().filter(|x| x["shown"] == json!(true)).map(|x| (x["seat"].to_string(), x["cards"].clone())).collect())

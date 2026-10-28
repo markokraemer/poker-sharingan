@@ -1,12 +1,21 @@
 use arena_server::config::ServerConfig;
 
 fn usage() -> ! {
-    eprintln!("usage: sharingan-arena [--port N] [--bind HOST:PORT] [--db PATH] [--database-url postgres://...]   (env: see arena/server/README.md)");
+    eprintln!("usage: sharingan-arena [--port N] [--bind HOST:PORT] [--db PATH] [--database-url postgres://...]   (env: see arena/server/README.md)\n       sharingan-arena run --bot \"<cmd>\" --track ladder-v1 ...   (headless match worker, see `run --help`)");
     std::process::exit(2)
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(|s| s.as_str()) {
+        Some("run") => std::process::exit(arena_server::worker::cli_run(args[1..].to_vec())),
+        Some("pipe-house") => std::process::exit(arena_server::pipe_bot::cli_pipe_house(args[1..].to_vec())),
+        _ => {}
+    }
+    tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime").block_on(serve());
+}
+
+async fn serve() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();

@@ -19,6 +19,9 @@ pub mod util;
 pub mod benchmarks;
 pub mod webhook;
 pub mod writer;
+pub mod worker;
+pub mod pipe_bot;
+pub mod results;
 pub mod ws;
 
 use config::ServerConfig;

@@ -56,7 +56,7 @@ fn track_json(app: &AppState, t: &Track) -> Value {
            "blueprint_fingerprint": app.house.blueprint_fp})
 }
 
-fn seed_of(t: &Track) -> String {
+pub fn seed_of(t: &Track) -> String {
     format!("bench:{}:v{}", t.id, t.version)
 }
 

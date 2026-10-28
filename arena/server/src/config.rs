@@ -36,6 +36,9 @@ pub struct ServerConfig {
     pub db_pool: usize,
     /// `ARENA_RUNNER_TOKEN`: bearer token of the trusted eval runner (hosted attestation). Unset = no runner.
     pub runner_token: Option<String>,
+    /// `ARENA_WORKER_KEYS`: `id=secret,id2=secret2` HMAC keys of match workers (`sharingan-arena run --sign-key-file`);
+    /// `POST /v1/results` accepts only results signed with one of them. Unset = the endpoint refuses everything (401).
+    pub worker_keys: Vec<(String, String)>,
     /// `ARENA_RATE_LIMIT_RPS` (default 50, 0 = off): sustained requests/s per bearer token (per IP when anonymous).
     pub rate_limit_rps: f64,
     /// `ARENA_RATE_LIMIT_BURST` (default 100).
@@ -79,6 +82,7 @@ impl Default for ServerConfig {
             database_schema: None,
             db_pool: 8,
             runner_token: None,
+            worker_keys: Vec::new(),
             rate_limit_rps: 50.0,
             rate_limit_burst: 100.0,
             trust_proxy: false,
@@ -126,6 +130,7 @@ impl ServerConfig {
             database_schema: env("ARENA_DATABASE_SCHEMA"),
             db_pool: num("ARENA_DB_POOL", d.db_pool),
             runner_token: env("ARENA_RUNNER_TOKEN"),
+            worker_keys: env("ARENA_WORKER_KEYS").map(|v| crate::worker::parse_keys(&v)).unwrap_or_default(),
             rate_limit_rps: num("ARENA_RATE_LIMIT_RPS", d.rate_limit_rps),
             rate_limit_burst: num("ARENA_RATE_LIMIT_BURST", d.rate_limit_burst),
             trust_proxy: flag("ARENA_TRUST_PROXY", d.trust_proxy),

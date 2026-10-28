@@ -40,8 +40,10 @@ sharingan eval mybot.py      # duplicate match vs the house ladder -> one line:
 | `sharingan connect mybot.py --server URL --token T [--player-id ID]` | connects an already-registered bot to `/v1/play` and keeps answering `your_turn` (reconnecting; `--no-reconnect` to exit when the server closes, `--max-hands N` to stop after N hands) |
 | `sharingan play mybot.py --vs sharingan-1 [--server URL] [--table ID --seat N]` | creates (or joins) a table; house bots fill the other seats; prints each hand's result |
 | `sharingan serve mybot.py --port 9000 [--secret S]` | exposes the bot as a signed webhook endpoint (`POST /act`), so a bot can be just a URL |
+| `sharingan pipe mybot.py` | serves the bot over stdin/stdout (newline-delimited JSON, TABLE_API.md section 14), for the match worker: `sharingan-arena run --bot "sharingan pipe mybot.py" --track ladder-v1 --lanes 8 --out result.json`. stdout is reserved for the protocol (your `print()`s go to stderr). Hooks: `on_connect`, `on_hand_end`, `on_error` (only if you override them); the benchmark pipe sends no `hand_start`/`action`/`street` |
+| `sharingan eval mybot.py --local [--track T] [--hands N] [--lanes L] [--out result.json]` | no server: runs the `sharingan-arena` worker binary found on `PATH` (or `$SHARINGAN_ARENA_BIN`) with your bot as a pipe subprocess and prints the score line. Without the binary it prints how to build it (`cargo build --release -p sharingan-arena`) or to use `--server` |
 
-`mybot.py` can define a `Bot` subclass, a module-level `bot` instance, or a plain `act(state)` function.
+`mybot.py` can define a `Bot` subclass, a module-level `bot` instance, or a plain `act(state)` function. The same file works unchanged over WebSocket (`connect`/`benchmark`), webhook (`serve`) and pipe (`pipe`).
 
 ### Programmatic version
 

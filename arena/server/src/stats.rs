@@ -15,7 +15,7 @@ struct PlayerAcc {
     net: i64,
     per_hand: Acc,
     /// sample key -> (sum raw, sum av, count, av missing)
-    samples: HashMap<u32, (f64, f64, u32, bool)>,
+    samples: BTreeMap<u32, (f64, f64, u32, bool)>,
 }
 
 pub struct Builder {

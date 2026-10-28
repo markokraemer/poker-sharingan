@@ -28,6 +28,7 @@ The first start logs a generated admin token (set `ARENA_ADMIN_TOKEN` to pin it)
 | `ARENA_DATABASE_URL` | unset | `postgres://...` selects Postgres (TLS via rustls unless `sslmode=disable`); `ARENA_DB` is then ignored |
 | `ARENA_DATABASE_SCHEMA` / `ARENA_DB_POOL` | unset / `8` | Postgres schema for all tables; connections |
 | `ARENA_RUNNER_TOKEN` | unset | bearer token of the trusted eval runner: may start/attest hosted (verified) benchmark runs (TABLE_API.md 12b item 16) |
+| `ARENA_WORKER_KEYS` | unset | `id=secret,id2=secret2` HMAC keys of match workers; `POST /v1/results` (runner/admin only) accepts a worker result signed with one of them as `verified` + `hosted` (TABLE_API.md 14.6) |
 | `ARENA_RATE_LIMIT_RPS` / `ARENA_RATE_LIMIT_BURST` | `50` / `100` | per-token (anonymous: per-IP) request bucket; `0` = off. `ARENA_TRUST_PROXY=true` keys anonymous requests by `X-Forwarded-For` |
 | `ARENA_MAX_TABLES_PER_PLAYER` | `10` | open free tables a player owns or sits at |
 | `ARENA_MAX_MATCHES_PER_PLAYER` | `4` | unfinished matches/benchmark runs per player |
@@ -83,12 +84,28 @@ python3 arena/server/scripts/throughput.py --mode benchmark --lanes 4 --hands 60
 Fast path: `"mode":"benchmark"` (tables and matches), `"lanes":N` for parallel blocks of a duplicate match, hand histories written in
 batches by a background thread, TCP_NODELAY on all sockets. See TABLE_API.md 12b items 11-15.
 
+## Match worker: high-throughput evals (`sharingan-arena run`)
+
+Headless, no server, no database: plays the duplicate benchmark of a track against a bot that runs as a **subprocess** speaking newline-delimited JSON on
+stdin/stdout (the "pipe protocol", TABLE_API.md section 14). Same frozen panels, seeds, deals and AIVAT as the server's benchmark runs, one bot process per lane.
+
+```bash
+export ARENA_BLUEPRINT=... ARENA_BUCKETS=... ARENA_SIZING=...      # as for the server (both tracks need SHARINGAN-1)
+sharingan-arena run --bot "sharingan pipe mybot.py" --track ladder-v1 --hands 20000 --lanes 8 \
+    --out result.json --sign-key-file worker.key --player-id p_abc   # signed result
+sharingan-arena run --bot "sharingan-arena pipe-house tight_aggressive" --lanes 16 --out r.json   # Rust reference bot
+# control plane: accept it (ARENA_WORKER_KEYS=id=secret on the server, runner token)
+curl -s $H/v1/results -H "authorization: Bearer $RUNNER" -H 'content-type: application/json' -d @result.json
+```
+Timeouts kill and fold, crashes forfeit the lane's remaining hands (TABLE_API.md 14.3). Measured: 4.6k hands/s for a trivial Python bot on 8 lanes, 11-17k hands/s for a Rust bot on 16 lanes.
+Code: `src/worker.rs` (schedule, lanes, pipes, signing), `src/pipe_bot.rs` (reference Rust pipe bot), `src/results.rs` (intake); tests in `tests/worker.rs`.
+
 ## What is where
 
 - `src/hand.rs`: one hand on top of `nlhe::State` (seat mapping, payloads, side-pot results, history). No I/O.
 - `src/table.rs`: per-table task, decision loop, timeouts, reconnect, house bots, webhook seats.
 - `src/matches.rs`: duplicate schedule, AIVAT replay (bench `Tracker` over stored hands), finalize.
-- `src/benchmarks.rs`: tracks, runs, verified flag. `src/writer.rs`: batched hand writer.
+- `src/benchmarks.rs`: tracks, runs, verified flag. `src/worker.rs`, `src/pipe_bot.rs`, `src/results.rs`: match worker (above). `src/writer.rs`: batched hand writer.
 - `src/stats.rs`: standings (deal as the sample) and leaderboard (inverse-variance combine).
 - `src/api.rs`, `src/ws.rs`: REST and WebSocket. `src/deck.rs`: HMAC-SHA256 + ChaCha20 Fisher-Yates dealing.
 

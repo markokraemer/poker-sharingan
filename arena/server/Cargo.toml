@@ -27,6 +27,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
+libc = "0.2"
 rand_chacha = "0.9"
 uuid = { version = "1", features = ["v4"] }
 postgres = "0.19"

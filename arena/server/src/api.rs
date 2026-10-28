@@ -28,6 +28,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/livez", get(|| async { "ok" }))
         .route("/readyz", get(readyz))
         .route("/v1/runner/hosted", post(runner_hosted))
+        .route("/v1/results", post(crate::results::post_result))
         .route("/v1/bots", post(register).get(list_players))
         .route("/v1/players", post(register).get(list_players))
         .route("/v1/bots/{id}", get(get_player))

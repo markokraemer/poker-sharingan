@@ -5,6 +5,8 @@
     sharingan connect mybot.py --server URL --token T [--player-id ID]        # answer your_turn until the server closes
     sharingan play mybot.py --vs sharingan-1 [--server URL]
     sharingan serve mybot.py --port 9000 [--secret S]
+    sharingan pipe mybot.py                                                   # stdin/stdout, for `sharingan-arena run --bot "sharingan pipe mybot.py"`
+    sharingan eval mybot.py --local [--track T] [--hands N] [--lanes L]       # run the local worker binary, no server
 
 `mybot.py` may define a `Bot` subclass (first one defined in the file is used), a module-level `bot`
 instance, or a plain `act(state)` function.
@@ -283,6 +285,8 @@ async def _connect(args: argparse.Namespace) -> int:
 
 
 async def _eval(args: argparse.Namespace) -> int:
+    if getattr(args, "local", False):
+        return await asyncio.to_thread(_eval_local, args)
     bot = load_bot(args.bot)
     api = ArenaClient(args.server)
     # Default: the ladder-v1 benchmark track (AIVAT-corrected, shows up on the leaderboard) when the server has it.
@@ -378,6 +382,67 @@ async def _play(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pipe(args: argparse.Namespace) -> int:
+    """`sharingan pipe mybot.py`: serve the bot over stdin/stdout for `sharingan-arena run --bot "sharingan pipe mybot.py"`."""
+    from .pipe import claim_stdio, run_pipe
+    r, w = claim_stdio()  # before importing the bot: its import-time prints must not reach the protocol stream
+    return run_pipe(load_bot(args.bot), r, w)
+
+
+def find_worker() -> Optional[str]:
+    """The match-worker binary: $SHARINGAN_ARENA_BIN, else `sharingan-arena` on PATH."""
+    import shutil
+    exe = os.environ.get("SHARINGAN_ARENA_BIN")
+    if exe and os.access(exe, os.X_OK):
+        return exe
+    return shutil.which("sharingan-arena")
+
+
+NO_WORKER_MSG = ("sharingan: --local needs the match worker binary `sharingan-arena` on PATH (or SHARINGAN_ARENA_BIN=/path).\n"
+                 "Build it with:  cargo build --release -p sharingan-arena   (then put target/release on PATH),\n"
+                 "or evaluate against a server instead:  sharingan eval mybot.py --server URL")
+
+
+def _eval_local(args: argparse.Namespace) -> int:
+    """Run the worker binary locally: the bot plays as a pipe subprocess, no server needed."""
+    import json
+    import shlex
+    import subprocess
+    import tempfile
+    exe = find_worker()
+    if not exe:
+        print(NO_WORKER_MSG, file=sys.stderr)
+        return 2
+    path = os.path.abspath(args.bot)
+    if not os.path.isfile(path):
+        print(f"sharingan: no such file: {path}", file=sys.stderr)
+        return 2
+    track = args.track or DEFAULT_TRACK
+    env = dict(os.environ)
+    pkg_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env["PYTHONPATH"] = pkg_parent + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    bot_cmd = f"{shlex.quote(sys.executable)} -m sharingan.cli pipe {shlex.quote(path)}"
+    out = args.out or os.path.join(tempfile.mkdtemp(prefix="sharingan-"), "result.json")
+    cmd = [exe, "run", "--bot", bot_cmd, "--track", track, "--hands", str(max(6, args.hands)), "--out", out,
+           "--decision-timeout-ms", str(args.decision_ms)]
+    if args.lanes:
+        cmd += ["--lanes", str(args.lanes)]
+    if args.seed_set:
+        cmd += ["--seed", args.seed]
+    if args.quiet:
+        cmd += ["--quiet"]
+    rc = subprocess.call(cmd, env=env)
+    if rc != 0:
+        return rc
+    with open(out) as f:
+        res = json.load(f)
+    print(f"{os.path.splitext(os.path.basename(path))[0]}: {float(res['mbb_per_game']):+.1f} ± {float(res['ci95_mbb']):.1f} mbb/game "
+          f"(95% CI, {res.get('method')}) over {res['hands']} hands on {res['track']} [local, unverified; "
+          f"{res['timings']['hands_per_sec']:.0f} hands/s, result: {out}]"
+          + (f" WARNING {res['forfeit_hands']} forfeit hands (bot crashed or timed out)" if res.get("forfeit_hands") else ""))
+    return 0
+
+
 def _serve(args: argparse.Namespace) -> int:
     from .webhook import serve_webhook
     bot = load_bot(args.bot)
@@ -406,6 +471,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     e.add_argument("--seed", default="sharingan-eval", help="match seed (same seed = same decks)")
     e.add_argument("--timeout", type=float, default=0, help="give up after N seconds (0 = wait)")
     e.add_argument("--quiet", action="store_true")
+    e.add_argument("--local", action="store_true",
+                   help="no server: run the `sharingan-arena` worker binary from PATH and play the bot as a pipe subprocess")
+    e.add_argument("--track", choices=TRACKS, default=None, help="with --local: ladder-v1 (default) | sharingan-1")
+    e.add_argument("--lanes", type=int, default=0, help="with --local: parallel bot processes (default: worker decides)")
+    e.add_argument("--out", default=None, help="with --local: where to write result.json")
+    pp = sub.add_parser("pipe", help="serve the bot over stdin/stdout (pipe protocol) for `sharingan-arena run --bot \"sharingan pipe mybot.py\"`")
+    pp.add_argument("bot")
     b = sub.add_parser("benchmark", help="run a benchmark track (ladder-v1 | sharingan-1) and print mbb/game ± CI")
     b.add_argument("bot")
     b.add_argument("--track", choices=TRACKS, default=DEFAULT_TRACK)
@@ -433,7 +505,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     s.add_argument("--host", default="0.0.0.0")
     s.add_argument("--secret", default=os.environ.get("SHARINGAN_WEBHOOK_SECRET"))
     a = p.parse_args(argv)
+    if a.cmd == "eval":
+        a.seed_set = any(x == "--seed" or x.startswith("--seed=") for x in (argv if argv is not None else sys.argv[1:]))
     try:
+        if a.cmd == "pipe":
+            return _pipe(a)
         if a.cmd == "eval":
             return asyncio.run(_eval(a))
         if a.cmd == "benchmark":
