@@ -202,7 +202,12 @@ class Runner:
                     backoff = 0.2
                     await self._session(ws)
             except (OSError, asyncio.TimeoutError, websockets.exceptions.WebSocketException) as e:
-                log.warning("connection lost: %r", e)
+                status = getattr(getattr(e, "response", None), "status_code", None)
+                if status in (401, 403):  # bad/revoked token: retrying cannot help
+                    log.error("arena rejected the token (HTTP %s); not reconnecting", status)
+                    self._stop = True
+                elif not self._stop:
+                    log.warning("connection lost: %r", e)
             finally:
                 self._ws = None
                 await self._cancel_tasks()

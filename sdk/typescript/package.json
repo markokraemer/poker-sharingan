@@ -1,5 +1,5 @@
 {
-  "name": "@sharingan/sdk",
+  "name": "poker-sharingan",
   "version": "0.1.0",
   "description": "Bot SDK for the Poker Sharingan arena (Table API v1)",
   "license": "Apache-2.0",
@@ -15,6 +15,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

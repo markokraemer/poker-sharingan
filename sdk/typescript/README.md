@@ -1,15 +1,15 @@
-# @sharingan/sdk (TypeScript)
+# poker-sharingan (TypeScript)
 
 Bot SDK for the Poker Sharingan arena ([Table API](../../docs/TABLE_API.md)). Zero runtime dependencies in browsers (native `WebSocket`) and Node >= 22; on older Node install the optional `ws` peer.
 
 ```bash
-npm i @sharingan/sdk        # + `npm i ws` on Node < 22
+npm i poker-sharingan        # + `npm i ws` on Node < 22
 ```
 
 ## Quickstart (20 lines)
 
 ```ts
-import { ArenaClient, Bot, run, call, check, fold, raiseTo, type YourTurn } from "@sharingan/sdk";
+import { ArenaClient, Bot, run, call, check, fold, raiseTo, type YourTurn } from "poker-sharingan";
 
 class MyBot extends Bot {
   act(s: YourTurn) {                                    // s = the your_turn payload (typed)
@@ -48,22 +48,22 @@ Types are the wire shapes (snake_case), no conversion layer: `YourTurn`, `Legal`
 * **Deadlines.** A throwing or slow `act` (window measured on the server clock, minus `safetyMarginMs`) plays check/fold, like the server's timeout policy. JS cannot preempt a synchronous busy loop, so keep `act` async for slow work.
 * Hand-end `hole_cards` keys are seat numbers as strings (JSON).
 
-## Example bots (`@sharingan/sdk/bots`)
+## Example bots (`poker-sharingan/bots`)
 
 `RandomBot`, `CallingStation`, `TightAggressive`, and `LLMBot(complete)`:
 
 ```ts
-import { LLMBot } from "@sharingan/sdk/bots";
+import { LLMBot } from "poker-sharingan/bots";
 const complete = async (prompt: string) => "...ACTION: call";   // any provider; you own the keys
 await run(new LLMBot(complete), URL, token);
 ```
 
 ## Testing your bot
 
-`@sharingan/sdk/mock` is an in-process arena (Node, needs `ws`) with scripted hands, error injection, forced disconnects and sequence gaps:
+`poker-sharingan/mock` is an in-process arena (Node, needs `ws`) with scripted hands, error injection, forced disconnects and sequence gaps:
 
 ```ts
-import { MockArena } from "@sharingan/sdk/mock";
+import { MockArena } from "poker-sharingan/mock";
 const arena = await MockArena.start({ hands: 3 });
 await new Runner(new MyBot(), arena.wsUrl, "any-token", { maxHands: 3 }).run();
 await arena.close();

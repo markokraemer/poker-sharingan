@@ -31,18 +31,19 @@ def test_format_score():
     assert "[duplicate]" in format_score("x", {"duplicate_bb_per_100": 1.0}, 6, "ladder")
 
 
-def test_eval_prints_one_line(tmp_path, capsys):
-    bot = tmp_path / "mybot.py"
-    bot.write_text("def act(s):\n    return None\n")
+import contextlib
+import threading
 
-    # main() uses asyncio.run itself, so drive the mock from a background loop thread instead
-    import threading
+
+@contextlib.contextmanager
+def mock_server(**kw):
+    """MockArena on a background loop thread (main() runs its own asyncio.run)."""
     ready, stop, box = threading.Event(), threading.Event(), {}
 
     def serve():
         async def run():
-            async with MockArena() as arena:
-                box["url"] = arena.http_url
+            async with MockArena(**kw) as arena:
+                box["arena"] = arena
                 ready.set()
                 while not stop.is_set():
                     await asyncio.sleep(0.05)
@@ -51,10 +52,23 @@ def test_eval_prints_one_line(tmp_path, capsys):
     t.start()
     assert ready.wait(10)
     try:
-        rc = main(["eval", str(bot), "--server", box["url"], "--hands", "600"])
+        yield box["arena"]
     finally:
         stop.set()
         t.join(5)
+
+
+def _bot(tmp_path):
+    bot = tmp_path / "mybot.py"
+    bot.write_text("def act(s):\n    return None\n")
+    return str(bot)
+
+
+def test_eval_prints_one_line(tmp_path, capsys):
+    bot = tmp_path / "mybot.py"
+    bot.write_text("def act(s):\n    return None\n")
+    with mock_server() as arena:  # no /v1/benchmarks -> falls back to the duplicate match
+        rc = main(["eval", str(bot), "--server", arena.url, "--hands", "600"])
     out = capsys.readouterr().out.strip().splitlines()
     assert rc == 0 and out == ["mybot: +40.0 ± 25.0 mbb/game (95% CI) over 600 hands vs ladder [duplicate]"]
 
@@ -64,3 +78,92 @@ def test_unreachable_prints_start_command(tmp_path, capsys):
     bot.write_text("def act(s):\n    return None\n")
     rc = main(["eval", str(bot), "--server", "http://127.0.0.1:1"])
     assert rc == 2 and "cargo run --release -p sharingan-arena" in capsys.readouterr().err
+
+
+def test_eval_defaults_to_ladder_benchmark(tmp_path, capsys):
+    with mock_server(benchmarks=True) as arena:
+        rc = main(["eval", _bot(tmp_path), "--server", arena.url, "--hands", "600"])
+        assert arena.run_requests == [{"hands": 600}]
+    out = capsys.readouterr().out.strip().splitlines()
+    assert rc == 0 and out == ["mybot: +42.5 ± 12.0 mbb/game (95% CI, aivat) over 600 hands on ladder-v1 [unverified]"]
+
+
+def test_eval_match_flag_forces_duplicate_match(tmp_path, capsys):
+    with mock_server(benchmarks=True) as arena:
+        rc = main(["eval", _bot(tmp_path), "--server", arena.url, "--hands", "600", "--match"])
+        assert arena.run_requests == []
+    assert rc == 0 and "[duplicate]" in capsys.readouterr().out
+
+
+def test_benchmark_prints_score_and_leaderboard(tmp_path, capsys):
+    with mock_server(benchmarks=True, bench_result=(-7.25, 3.0)) as arena:
+        rc = main(["benchmark", _bot(tmp_path), "--track", "sharingan-1", "--hands", "100", "--server", arena.url])
+        assert arena.run_requests == [{"hands": 100}] and arena.runs
+        run = next(iter(arena.runs.values()))
+        assert run["track"] == "sharingan-1" and run["hands_total"] == 102  # rounded up to whole deals
+    cap = capsys.readouterr()
+    assert rc == 0
+    assert cap.out.strip().splitlines() == [
+        "mybot: -7.2 ± 3.0 mbb/game (95% CI, aivat) over 102 hands on sharingan-1 [unverified]",
+        f"leaderboard: {arena.url}/v1/leaderboard?track=sharingan-1"]
+    assert "sharingan-1: 100% 102/102 hands" in cap.err  # progress lines (stderr is not a tty here)
+
+
+def test_benchmark_reuses_token_and_quiet(tmp_path, capsys):
+    import json
+    import urllib.request
+    with mock_server(benchmarks=True) as arena:
+        req = urllib.request.Request(arena.url + "/v1/players", data=json.dumps({"name": "pre"}).encode(), method="POST")
+        reg = json.loads(urllib.request.urlopen(req).read())
+        rc = main(["benchmark", _bot(tmp_path), "--token", reg["token"], "--quiet", "--server", arena.url])
+        assert len(arena.players) == 1  # no second registration
+        assert next(iter(arena.runs.values()))["player_id"] == reg["player_id"]
+        assert arena.run_requests == [{}]  # server default hands
+    cap = capsys.readouterr()
+    assert rc == 0 and "hands on ladder-v1" in cap.out and cap.err == ""
+
+
+def test_benchmark_unreachable(tmp_path, capsys):
+    rc = main(["benchmark", _bot(tmp_path), "--server", "http://127.0.0.1:1"])
+    assert rc == 2 and "arena server not reachable" in capsys.readouterr().err
+
+
+def test_connect_answers_until_max_hands(tmp_path, capsys):
+    import json
+    import urllib.request
+    with mock_server(hands=5) as arena:
+        req = urllib.request.Request(arena.url + "/v1/players", data=json.dumps({"name": "pre"}).encode(), method="POST")
+        reg = json.loads(urllib.request.urlopen(req).read())
+        rc = main(["connect", _bot(tmp_path), "--server", arena.url, "--token", reg["token"],
+                   "--player-id", reg["player_id"], "--max-hands", "3"])
+        assert rc == 0 and len(arena.hand_ends) == 3 and len(arena.acts) >= 3
+    err = capsys.readouterr().err
+    assert f"connected as {reg['player_id']}" in err and "warning" not in err and "disconnected after 3 hands" in err
+
+
+def test_connect_warns_on_wrong_player_id_and_bad_token(tmp_path, capsys):
+    with mock_server(hands=1) as arena:
+        import json
+        import urllib.request
+        req = urllib.request.Request(arena.url + "/v1/players", data=json.dumps({"name": "pre"}).encode(), method="POST")
+        reg = json.loads(urllib.request.urlopen(req).read())
+        assert main(["connect", _bot(tmp_path), "--server", arena.url, "--token", reg["token"],
+                     "--player-id", "someone-else", "--max-hands", "1"]) == 0
+        assert "warning: token belongs to" in capsys.readouterr().err
+        assert main(["connect", _bot(tmp_path), "--server", arena.url, "--token", "nope", "--no-reconnect"]) == 1
+        assert "never connected" in capsys.readouterr().err
+
+
+def test_launch_bot_wrapper_maps_env(tmp_path, monkeypatch):
+    """deploy/platinum/bot/launch_bot.py is a thin wrapper over `sharingan connect`."""
+    import importlib.util
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "deploy", "platinum", "bot", "launch_bot.py")
+    spec = importlib.util.spec_from_file_location("launch_bot", path)
+    lb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lb)
+    monkeypatch.setenv("BOT_FILE", "/x/bot.py")
+    monkeypatch.setenv("ARENA_URL", "https://a")
+    monkeypatch.setenv("ARENA_TOKEN", "T")
+    monkeypatch.setenv("MAX_HANDS", "7")
+    assert lb.argv_from_env() == ["connect", "/x/bot.py", "--server", "https://a", "--token", "T", "--max-hands", "7"]

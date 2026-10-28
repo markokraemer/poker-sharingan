@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sharingan"
+name = "poker-sharingan"
 version = "0.1.0"
 description = "Bot SDK for the Poker Sharingan arena (Table API v1)"
 readme = "README.md"

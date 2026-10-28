@@ -31,8 +31,15 @@ def _now() -> int:
 
 class MockArena:
     def __init__(self, hands: int = 3, drop_on_turns: Optional[Set[int]] = None, decision_ms: int = 5000,
-                 emit_gap_at: Optional[int] = None):
+                 emit_gap_at: Optional[int] = None, benchmarks: bool = False,
+                 bench_result: tuple = (42.5, 12.0)):
         self.hands = hands
+        self.benchmarks = benchmarks          # serve /v1/benchmarks + /runs (scripted run; progress over the bot's socket)
+        self.bench_result = bench_result      # (mbb_per_game, ci95_mbb) of a finished run
+        self.runs: Dict[str, dict] = {}
+        self.run_requests: List[dict] = []    # bodies of POST /v1/benchmarks/{track}/runs
+        self._sockets: Dict[str, Any] = {}    # player_id -> live bot websocket
+        self._loop: Any = None
         self.drop_on_turns = set(drop_on_turns or ())  # 1-based counts of your_turn sends after which to drop the socket
         self.decision_ms = decision_ms
         self.emit_gap_at = emit_gap_at  # skip a table_seq number once (tests gap resync)
@@ -57,6 +64,7 @@ class MockArena:
         self._ws_server: Any = None
         self._http: Optional[ThreadingHTTPServer] = None
         self.http_url = ""
+        self.url = ""                         # REST + WebSocket on ONE port (what `--server` takes)
         self.ws_url = ""
         self.finished: Optional[asyncio.Event] = None  # set in __aenter__
 
@@ -64,13 +72,41 @@ class MockArena:
     async def __aenter__(self) -> "MockArena":
         import websockets
         self.finished = asyncio.Event()
+        self._loop = asyncio.get_running_loop()
         self._ws_server = await websockets.serve(self._ws_handler, "127.0.0.1", 0)
         port = self._ws_server.sockets[0].getsockname()[1]
         self.ws_url = f"ws://127.0.0.1:{port}/v1/play"
         self._start_http()
+        self._front = await asyncio.start_server(self._front_handler, "127.0.0.1", 0)
+        self.url = f"http://127.0.0.1:{self._front.sockets[0].getsockname()[1]}"
         return self
 
+    async def _front_handler(self, r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+        """Single-port front (like the real server): WebSocket upgrades go to the ws server, the rest to REST."""
+        try:
+            head = await r.readuntil(b"\r\n\r\n")
+            ws_port = self._ws_server.sockets[0].getsockname()[1]
+            port = ws_port if b"upgrade: websocket" in head.lower() else self._http.server_address[1]
+            ur, uw = await asyncio.open_connection("127.0.0.1", port)
+            uw.write(head)
+
+            async def pipe(src: asyncio.StreamReader, dst: asyncio.StreamWriter) -> None:
+                try:
+                    while chunk := await src.read(65536):
+                        dst.write(chunk)
+                        await dst.drain()
+                except (ConnectionError, asyncio.CancelledError):
+                    pass
+                finally:
+                    dst.close()
+            await asyncio.gather(pipe(r, uw), pipe(ur, w))
+        except (asyncio.IncompleteReadError, ConnectionError):
+            pass
+        finally:
+            w.close()
+
     async def __aexit__(self, *exc: Any) -> None:
+        self._front.close()
         self._ws_server.close()
         await self._ws_server.wait_closed()
         if self._http:
@@ -106,9 +142,22 @@ class MockArena:
                     arena.players[pid] = rec
                     arena.tokens[tok] = pid
                     return self._send(201, {**rec, "token": tok})
+                if arena.benchmarks and method == "GET" and path == "/v1/benchmarks":
+                    return self._send(200, [{"track": t, "version": 1, "available": True, "default_hands": 20000,
+                                             "panel": [], "seed": f"bench:{t}:v1"} for t in ("ladder-v1", "sharingan-1")])
                 auth = (self.headers.get("Authorization") or "").replace("Bearer ", "")
                 if auth not in arena.tokens:
                     return self._err(401, "unauthorized", "bad token")
+                if arena.benchmarks and parts[:2] == ["v1", "benchmarks"]:
+                    pid = arena.tokens[auth]
+                    if len(parts) == 4 and parts[3] == "runs" and method == "POST":
+                        if pid not in arena._sockets:
+                            return self._err(409, "not_connected", "connect to /v1/play first")
+                        arena.run_requests.append(body)
+                        return self._send(201, arena._start_run(parts[2], pid, int(body.get("hands") or 20000)))
+                    if len(parts) == 5 and parts[3] == "runs" and method == "GET":
+                        r = arena.runs.get(parts[4])
+                        return self._send(200, dict(r)) if r else self._err(404, "not_found")
                 if method == "POST" and path == "/v1/tables":
                     tid = "t-" + uuid.uuid4().hex[:6]
                     arena.tables[tid] = {"table_id": tid, "config": body, "status": "waiting", "button_seat": None,
@@ -160,6 +209,38 @@ class MockArena:
         self.http_url = f"http://127.0.0.1:{self._http.server_address[1]}"
         threading.Thread(target=self._http.serve_forever, daemon=True).start()
 
+    # ------------------------------------------------------------------ benchmark runs
+    def _start_run(self, track: str, player_id: str, hands: int) -> dict:
+        total = (hands + 5) // 6 * 6
+        rid = "r-" + uuid.uuid4().hex[:6]
+        run = {"run_id": rid, "track": track, "player_id": player_id, "status": "running", "hands_planned": total,
+               "hands_total": total, "hands_done": 0, "verified": False, "mbb_per_game": None, "ci95_mbb": None,
+               "method": None, "running_mbb_per_game": None, "running_ci95_mbb": None}
+        self.runs[rid] = run
+        asyncio.run_coroutine_threadsafe(self._play_run(run), self._loop)
+        return dict(run)
+
+    async def _play_run(self, run: dict) -> None:
+        """Scripted run: benchmark_progress at 25/50/75% then a final 100% (status finished)."""
+        total, (mbb, ci) = run["hands_total"], self.bench_result
+        for step in (1, 2, 3, 4):
+            await asyncio.sleep(0.1)
+            last = step == 4
+            done = total if last else total * step // 4
+            if last:
+                run.update(status="finished", mbb_per_game=mbb, ci95_mbb=ci, method="aivat")
+            run["hands_done"] = done
+            run.update(running_mbb_per_game=mbb * done / total, running_ci95_mbb=ci)
+            ws = self._sockets.get(run["player_id"])
+            if ws is not None:
+                data = {"run_id": run["run_id"], "track": run["track"], "match_id": "m-bench", "status": run["status"],
+                        "hands_done": done, "hands_total": total, "mbb_per_game": run["mbb_per_game"] if last else None,
+                        "ci95_mbb": ci if last else None, "method": run["method"], "verified": False}
+                try:
+                    await ws.send(json.dumps({"v": 1, "type": "benchmark_progress", "t_ms": _now(), "data": data}))
+                except Exception:
+                    pass
+
     # ------------------------------------------------------------------ WS
     def _env(self, type_: str, data: dict, hand: bool = True, with_seq: bool = True) -> str:
         self.table_seq += 1
@@ -184,6 +265,7 @@ class MockArena:
             return
         self.connections += 1
         self.player_id = self.tokens.get(token, "p0")
+        self._sockets[self.player_id] = ws
         try:
             async for raw in ws:
                 msg = json.loads(raw)
@@ -196,6 +278,8 @@ class MockArena:
                 elif t == "act":
                     await self._on_act(ws, msg["data"])
         except Exception as e:  # connection closed etc.
+            if self._sockets.get(self.player_id) is ws:
+                del self._sockets[self.player_id]
             if type(e).__name__ not in ("ConnectionClosedOK", "ConnectionClosedError", "ConnectionClosed"):
                 raise
 

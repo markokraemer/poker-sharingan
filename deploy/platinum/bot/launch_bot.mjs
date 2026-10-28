@@ -3,7 +3,7 @@
 // Runs under node 22 with --experimental-strip-types (set via NODE_OPTIONS in the image), so .ts bots load directly
 // (type-stripping only: no enums, no namespaces, no path aliases).
 import { pathToFileURL } from "node:url";
-import { run } from "@sharingan/sdk";
+import { run } from "poker-sharingan";
 
 const mod = await import(pathToFileURL(process.env.BOT_FILE).href);
 let bot = mod.bot ?? mod.default;

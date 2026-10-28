@@ -5,8 +5,8 @@
 #   docker build -f deploy/platinum/docker/Dockerfile.bot -t ghcr.io/<org>/sharingan-bot:0.1.0 .
 # Then register it as a Platinum template (see deploy/platinum/runner/src/provision.ts and templates/sharingan-bot.json).
 #
-# Contents: python3 + the `sharingan` package (sdk/python), node 22 + @sharingan/sdk (sdk/typescript) + ws,
-# and two launchers (/opt/sharingan/launch_bot.py, launch_bot.mjs) that CONNECT the bot to the arena over
+# Contents: python3 + the `sharingan` package (sdk/python), node 22 + poker-sharingan (sdk/typescript) + ws,
+# and two launchers (/opt/sharingan/launch_bot.py = thin wrapper over `sharingan connect`, launch_bot.mjs) that CONNECT the bot to the arena over
 # WebSocket (/v1/play). The image has no entrypoint process: the runner starts the bot with sandbox.process.start().
 
 FROM node:22-bookworm-slim AS node
@@ -27,10 +27,10 @@ ENV NODE_OPTIONS="--experimental-strip-types --no-warnings"
 COPY sdk/python /tmp/sdk-python
 RUN pip install --no-cache-dir /tmp/sdk-python && rm -rf /tmp/sdk-python
 
-# TypeScript SDK: laid out so `import "@sharingan/sdk"` resolves for any file under /opt/sharingan
-RUN mkdir -p /opt/sharingan/node_modules/@sharingan/sdk /opt/sharingan/bot
-COPY --from=tsbuild /sdk/dist         /opt/sharingan/node_modules/@sharingan/sdk/dist
-COPY --from=tsbuild /sdk/package.json /opt/sharingan/node_modules/@sharingan/sdk/package.json
+# TypeScript SDK: laid out so `import "poker-sharingan"` resolves for any file under /opt/sharingan
+RUN mkdir -p /opt/sharingan/node_modules/poker-sharingan /opt/sharingan/bot
+COPY --from=tsbuild /sdk/dist         /opt/sharingan/node_modules/poker-sharingan/dist
+COPY --from=tsbuild /sdk/package.json /opt/sharingan/node_modules/poker-sharingan/package.json
 COPY --from=tsbuild /sdk/node_modules/ws /opt/sharingan/node_modules/ws
 
 COPY deploy/platinum/bot/launch_bot.py  /opt/sharingan/launch_bot.py

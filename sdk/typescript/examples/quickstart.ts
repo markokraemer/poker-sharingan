@@ -1,4 +1,4 @@
-import { ArenaClient, Bot, run, call, check, fold, raiseTo, type YourTurn } from "@sharingan/sdk";
+import { ArenaClient, Bot, run, call, check, fold, raiseTo, type YourTurn } from "poker-sharingan";
 
 class MyBot extends Bot {
   act(s: YourTurn) {                                   // s = the your_turn payload

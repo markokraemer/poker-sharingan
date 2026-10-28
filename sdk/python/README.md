@@ -1,15 +1,17 @@
-# sharingan (Python SDK)
+# poker-sharingan (Python SDK)
+
+PyPI distribution `poker-sharingan`; import package `sharingan`; CLI `sharingan`.
 
 Bot SDK for the Poker Sharingan arena ([Table API](../../docs/TABLE_API.md)). Stdlib + `websockets`.
 
 ```bash
-pip install -e sdk/python          # or: pip install sharingan
+pip install -e sdk/python          # or: pip install poker-sharingan
 ```
 
 ## Quickstart
 
 ```bash
-pip install sharingan
+pip install poker-sharingan
 ```
 
 ```python
@@ -33,7 +35,9 @@ sharingan eval mybot.py      # duplicate match vs the house ladder -> one line:
 
 | command | what it does |
 |---|---|
-| `sharingan eval mybot.py [--hands 3000] [--vs ladder\|sharingan-1\|random\|calling_station\|tight_aggressive] [--server URL] [--seed S]` | registers your bot, runs a 6-rotation duplicate match, prints ONE score line (mbb/game, 95% CI, hands). If no arena is reachable it prints the command to start one (`cargo run --release -p sharingan-arena -- --port 8080`). Default server `http://localhost:8080` or `$SHARINGAN_SERVER` |
+| `sharingan eval mybot.py [--hands 3000] [--server URL] [--match]` | registers your bot and runs the `ladder-v1` benchmark track when the server has it (AIVAT-corrected; falls back to a 6-rotation duplicate match vs the house ladder on older servers, or with `--match`), prints ONE score line (mbb/game, 95% CI, hands). If no arena is reachable it prints the command to start one (`cargo run --release -p sharingan-arena -- --port 8080`). Default server `http://localhost:8080` or `$SHARINGAN_SERVER` |
+| `sharingan benchmark mybot.py --track ladder-v1\|sharingan-1 [--hands N] [--server URL] [--token T]` | registers (or reuses `--token`), connects, starts `POST /v1/benchmarks/{track}/runs`, shows a live progress bar from `benchmark_progress`, then prints the final `mbb/game ± CI` and the leaderboard URL |
+| `sharingan connect mybot.py --server URL --token T [--player-id ID]` | connects an already-registered bot to `/v1/play` and keeps answering `your_turn` (reconnecting; `--no-reconnect` to exit when the server closes, `--max-hands N` to stop after N hands) |
 | `sharingan play mybot.py --vs sharingan-1 [--server URL] [--table ID --seat N]` | creates (or joins) a table; house bots fill the other seats; prints each hand's result |
 | `sharingan serve mybot.py --port 9000 [--secret S]` | exposes the bot as a signed webhook endpoint (`POST /act`), so a bot can be just a URL |
 
@@ -95,4 +99,4 @@ async with MockArena(hands=3) as arena:
     assert arena.errors_sent == []
 ```
 
-Run the SDK's own suite: `pip install -e '.[dev]' && pytest`.
+Run the SDK's own suite: `pip install -e '.[dev]' && pytest`. Against a real arena (needs `ARENA_BLUEPRINT`): `SHARINGAN_E2E_SERVER=http://localhost:8080 pytest tests/test_e2e.py`.

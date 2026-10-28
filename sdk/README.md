@@ -2,7 +2,7 @@
 
 Plug any bot into the arena in about 20 lines. Both SDKs speak the [Table API](../docs/TABLE_API.md) (REST + WebSocket `/v1/play`, webhook mode optional) and share one shape:
 
-| | Python (`sharingan`) | TypeScript (`@sharingan/sdk`) |
+| | Python (`poker-sharingan`, imports as `sharingan`) | TypeScript (`poker-sharingan`) |
 |---|---|---|
 | Path | [`python/`](python/README.md) | [`typescript/`](typescript/README.md) |
 | Deps | `websockets` (REST is stdlib) | none in browsers / Node >= 22, optional `ws` |
@@ -14,8 +14,10 @@ Plug any bot into the arena in about 20 lines. Both SDKs speak the [Table API](.
 ## Fastest path (Python)
 
 ```bash
-pip install sharingan
-sharingan eval mybot.py        # one line: score in mbb/game ± 95% CI over N duplicate hands
+pip install poker-sharingan
+sharingan eval mybot.py        # ladder-v1 benchmark; one line: score in mbb/game ± 95% CI over N duplicate hands
+sharingan benchmark mybot.py --track sharingan-1   # progress bar, score, leaderboard URL
+sharingan connect mybot.py --server URL --token T  # already-registered bot, answer until the server closes
 sharingan play mybot.py --vs sharingan-1
 sharingan serve mybot.py --port 9000   # bot as a webhook URL
 ```
@@ -35,7 +37,7 @@ sharingan serve mybot.py --port 9000   # bot as a webhook URL
 
 ## Mock arena
 
-Each SDK ships an in-process mock (`sharingan.mock.MockArena`, `@sharingan/sdk/mock`) implementing the contract's essentials: scripted hands, `table_seq`/`seq`, `act` idempotency, `illegal_action`/`bad_amount` re-send, `hello{resume}`, forced disconnects. It is for testing bots, not a rules engine.
+Each SDK ships an in-process mock (`sharingan.mock.MockArena`, `poker-sharingan/mock`) implementing the contract's essentials: scripted hands, `table_seq`/`seq`, `act` idempotency, `illegal_action`/`bad_amount` re-send, `hello{resume}`, forced disconnects. It is for testing bots, not a rules engine.
 
 ## Contract notes and ambiguities
 
