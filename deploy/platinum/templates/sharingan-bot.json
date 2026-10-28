@@ -1,0 +1,9 @@
+{
+  "_comment": "Template for uploaded-bot sandboxes. Fits today's limits. entrypoint 'none' = pure code runner (docs/templates.md).",
+  "name": "sharingan-bot-0-1-0",
+  "image": "ghcr.io/REPLACE_ORG/sharingan-bot:0.1.0",
+  "default_cpu": 1,
+  "default_ram_mb": 1024,
+  "default_disk_gb": 5,
+  "entrypoint": "none"
+}

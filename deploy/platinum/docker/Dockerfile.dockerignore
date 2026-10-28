@@ -1,0 +1,12 @@
+.git
+target
+site
+.wrangler
+data/buckets-200
+data/pokerbench
+data/run-*
+data/probe-*
+logs
+deploy
+**/__pycache__
+**/node_modules

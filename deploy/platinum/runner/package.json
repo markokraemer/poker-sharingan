@@ -1,0 +1,20 @@
+{
+  "name": "sharingan-eval-runner",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Runs uploaded Sharingan bots in isolated Platinum sandboxes and drives an arena benchmark run. UNTESTED skeleton.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/server.ts",
+    "provision": "node --experimental-strip-types src/provision.ts"
+  },
+  "dependencies": {
+    "@platinum-dev/sdk": "0.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6"
+  }
+}

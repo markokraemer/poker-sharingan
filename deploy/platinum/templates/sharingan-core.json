@@ -1,0 +1,8 @@
+{
+  "_comment": "PRODUCTION arena + serve with the ~140 GB blueprint. REJECTED BY PLATINUM TODAY: ram_mb max 32768, disk_gb max 100 (apps/api/src/api/sandboxes.ts:473-475, templates.ts:876). Needs the gaps G1/G2 in DESIGN.md. Place with pool 'bigmem'.",
+  "name": "sharingan-core-0-1-0",
+  "image": "ghcr.io/REPLACE_ORG/sharingan-core:0.1.0",
+  "default_cpu": 32,
+  "default_ram_mb": 262144,
+  "default_disk_gb": 400
+}

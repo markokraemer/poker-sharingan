@@ -1,0 +1,8 @@
+{
+  "_comment": "POST /v1/templates/from-image body (apps/api/src/api/templates.ts:866). Arena WITHOUT blueprint fits today's limits.",
+  "name": "sharingan-arena-0-1-0",
+  "image": "ghcr.io/REPLACE_ORG/sharingan-arena:0.1.0",
+  "default_cpu": 4,
+  "default_ram_mb": 8192,
+  "default_disk_gb": 20
+}

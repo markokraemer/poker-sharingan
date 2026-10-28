@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1.7
+# Sandbox template image for UPLOADED USER BOTS (Python and TypeScript). UNTESTED (never built).
+#
+# Build from the repo root:
+#   docker build -f deploy/platinum/docker/Dockerfile.bot -t ghcr.io/<org>/sharingan-bot:0.1.0 .
+# Then register it as a Platinum template (see deploy/platinum/runner/src/provision.ts and templates/sharingan-bot.json).
+#
+# Contents: python3 + the `sharingan` package (sdk/python), node 22 + @sharingan/sdk (sdk/typescript) + ws,
+# and two launchers (/opt/sharingan/launch_bot.py, launch_bot.mjs) that CONNECT the bot to the arena over
+# WebSocket (/v1/play). The image has no entrypoint process: the runner starts the bot with sandbox.process.start().
+
+FROM node:22-bookworm-slim AS node
+FROM node:22-bookworm-slim AS tsbuild
+WORKDIR /sdk
+COPY sdk/typescript/ ./
+RUN npm install --no-audit --no-fund && npm run build \
+ && npm prune --omit=dev --no-audit --no-fund && npm install --no-save --omit=dev --no-audit --no-fund ws@8
+
+FROM python:3.12-slim-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tar util-linux && rm -rf /var/lib/apt/lists/*
+
+# node 22 runtime (copied from the official image; no apt repo needed)
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+ENV NODE_OPTIONS="--experimental-strip-types --no-warnings"
+
+# Python SDK
+COPY sdk/python /tmp/sdk-python
+RUN pip install --no-cache-dir /tmp/sdk-python && rm -rf /tmp/sdk-python
+
+# TypeScript SDK: laid out so `import "@sharingan/sdk"` resolves for any file under /opt/sharingan
+RUN mkdir -p /opt/sharingan/node_modules/@sharingan/sdk /opt/sharingan/bot
+COPY --from=tsbuild /sdk/dist         /opt/sharingan/node_modules/@sharingan/sdk/dist
+COPY --from=tsbuild /sdk/package.json /opt/sharingan/node_modules/@sharingan/sdk/package.json
+COPY --from=tsbuild /sdk/node_modules/ws /opt/sharingan/node_modules/ws
+
+COPY deploy/platinum/bot/launch_bot.py  /opt/sharingan/launch_bot.py
+COPY deploy/platinum/bot/launch_bot.mjs /opt/sharingan/launch_bot.mjs
+RUN chmod -R a+rX /opt/sharingan && chmod 1777 /opt/sharingan/bot
+
+# Unprivileged user the bot process runs as (the VM is the real boundary; this just keeps run-time tokens out of root's reach).
+RUN useradd -u 10002 -m -s /usr/sbin/nologin bot
+WORKDIR /opt/sharingan/bot
+CMD ["sleep", "infinity"]
