@@ -31,6 +31,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/v1/results", post(crate::results::post_result))
         .route("/v1/bots", post(register).get(list_players))
         .route("/v1/players", post(register).get(list_players))
+        .route("/v1/me", get(whoami))
         .route("/v1/bots/{id}", get(get_player))
         .route("/v1/players/{id}", get(get_player))
         .route("/v1/house", get(list_house))
@@ -252,6 +253,14 @@ async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterR
 async fn list_players(State(app): App) -> Res<Json<Value>> {
     let v: Vec<Value> = app.store.list_players(500)?.iter().map(public_player).collect();
     Ok(Json(json!(v)))
+}
+
+/// Who does this bearer token belong to? Used by the hosted runner to authenticate public users with their bot token.
+async fn whoami(State(app): App, headers: HeaderMap) -> Res<Json<Value>> {
+    match app.authenticate(&headers)? {
+        Principal::Player(p) => Ok(Json(public_player(&p))),
+        _ => Ok(Json(json!({"player_id": "admin", "name": "admin", "admin": true}))),
+    }
 }
 
 async fn get_player(State(app): App, Path(id): Path<String>) -> Res<Json<Value>> {

@@ -1,16 +1,22 @@
-// Cloudflare Worker: serve arena.sharingan.poker from the Platinum app URL (or the big-RAM box). Not deployed or tested. INTERIM ONLY.
-// Platinum has no custom-domain support (only <slug>.apps.<domain> and <port>-<id>.sbx.<domain>; see DESIGN.md G3),
-// so we terminate arena.sharingan.poker on Cloudflare (the repo already deploys site/ with wrangler) and forward.
-// WebSocket upgrades pass through fetch() unchanged. Set UPSTREAM to the app URL, e.g. https://sharingan-arena.apps.platinum.dev
-export interface Env { UPSTREAM: string }
+// Cloudflare Worker `sharingan-arena-edge`: serves https://arena.sharingan.poker by forwarding every request (REST, WebSocket
+// /v1/play, runner job API, inference) to the origin, which does the path routing (Caddy: runner / serve / arena).
+//
+// The origin only accepts traffic that carries the shared secret header, so the Worker is the only way in:
+//   wrangler secret put EDGE_SECRET       (same value as EDGE_SECRET in /srv/sharingan/secrets/caddy.env on the host)
+//   vars.UPSTREAM                          e.g. https://51-158-203-112.sslip.io
+// WebSocket upgrades pass through fetch() unchanged.
+export interface Env { UPSTREAM: string; EDGE_SECRET: string }
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     const target = new URL(url.pathname + url.search, env.UPSTREAM);
     const headers = new Headers(req.headers);
-    headers.set("x-forwarded-host", url.host);          // arena ignores it today; useful in logs
     headers.delete("host");
+    headers.set("x-edge-secret", env.EDGE_SECRET);
+    headers.set("x-forwarded-host", url.host);
+    const ip = req.headers.get("cf-connecting-ip");
+    if (ip) headers.set("x-client-ip", ip);   // Caddy turns it into X-Forwarded-For (the arena rate-limits anonymous callers per IP)
     return fetch(new Request(target, { method: req.method, headers, body: req.body, redirect: "manual" }));
   },
 };

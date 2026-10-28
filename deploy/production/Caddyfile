@@ -1,0 +1,38 @@
+# Origin TLS + path routing for the production host. All proxied traffic must carry the Cloudflare Worker's shared secret
+# (X-Edge-Secret); ACME (Let's Encrypt) is handled by Caddy itself before any of this.
+51-158-203-112.sslip.io {
+	encode zstd gzip
+
+	@denied not header X-Edge-Secret {$EDGE_SECRET}
+	handle @denied {
+		respond "forbidden" 403
+	}
+
+	# hosted runner API (job submission, quota). Public players use their arena bot token as the bearer.
+	@runner path /v1/jobs /v1/jobs/* /v1/quota /v1/credits /v1/credits/* /v1/webhooks/*
+	handle @runner {
+		reverse_proxy 127.0.0.1:8090 {
+			header_up X-Forwarded-For {http.request.header.X-Client-IP}
+			header_up -X-Edge-Secret
+		}
+	}
+
+	# SHARINGAN-1 inference (sharingan-serve): needs a serve API key
+	@serve path /v1/act /v1/act/* /v1/info /v1/health
+	handle @serve {
+		reverse_proxy 127.0.0.1:8081 {
+			header_up X-Forwarded-For {http.request.header.X-Client-IP}
+			header_up -X-Edge-Secret
+		}
+	}
+
+	# everything else: arena REST + WebSocket /v1/play
+	handle {
+		reverse_proxy 127.0.0.1:8080 {
+			header_up X-Forwarded-For {http.request.header.X-Client-IP}
+			header_up -X-Edge-Secret
+			stream_timeout 24h
+			stream_close_delay 5s
+		}
+	}
+}

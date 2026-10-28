@@ -1,0 +1,9 @@
+{
+  // Cloudflare Worker for https://arena.sharingan.poker (proxy to the production host). Secret: `wrangler secret put EDGE_SECRET`.
+  "name": "sharingan-arena-edge",
+  "main": "arena-proxy-worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "vars": { "UPSTREAM": "https://51-158-203-112.sslip.io" },
+  "routes": [{ "pattern": "arena.sharingan.poker", "custom_domain": true }]
+}

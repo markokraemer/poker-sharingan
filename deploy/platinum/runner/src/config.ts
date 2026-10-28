@@ -15,6 +15,12 @@ export interface Config {
   host: string;
   port: number;
   authToken: string;
+  /**
+   * BILLING_MODE=paid (default): credits are reserved/settled in the ledger, Stripe tops them up.
+   * BILLING_MODE=free: jobs cost nothing; per-player quotas apply; public players authenticate with their ARENA bot token
+   * (validated against GET /v1/me on the arena). RUNNER_AUTH_TOKEN stays the trusted service token.
+   */
+  billing: { mode: "paid" | "free"; freeMaxHandsPerDay: number; freeMaxConcurrent: number; authCacheS: number };
   storage: "postgres" | "memory";
   databaseUrl?: string;
 
@@ -114,6 +120,8 @@ export function loadConfig(env: Env = process.env): Config {
   const defaultMode = (str("DEFAULT_JOB_MODE", "worker") as string);
   if (defaultMode !== "worker" && defaultMode !== "connect") bad("DEFAULT_JOB_MODE must be worker|connect");
 
+  const billingMode = str("BILLING_MODE", "paid") as string;
+  if (billingMode !== "paid" && billingMode !== "free") bad("BILLING_MODE must be paid|free");
   const arenaUrl = req("ARENA_URL");
   const packs = json<Array<{ id: string; price_usd: number; credit_usd: number; label?: string }>>("CREDIT_PACKS", [
     { id: "starter", price_usd: 10, credit_usd: 10, label: "$10" },
@@ -126,6 +134,12 @@ export function loadConfig(env: Env = process.env): Config {
     host: str("HOST", "0.0.0.0") as string,
     port: num("PORT", 8090),
     authToken: req("RUNNER_AUTH_TOKEN"),
+    billing: {
+      mode: billingMode,
+      freeMaxHandsPerDay: num("FREE_MAX_HANDS_PER_DAY", 1_000_000),
+      freeMaxConcurrent: num("FREE_MAX_CONCURRENT_JOBS", 2),
+      authCacheS: num("ARENA_AUTH_CACHE_S", 60),
+    },
     storage: storage as Config["storage"],
     databaseUrl,
 
@@ -199,7 +213,7 @@ export function loadConfig(env: Env = process.env): Config {
     },
 
     stripe: {
-      webhookSecret: req("STRIPE_WEBHOOK_SECRET"),
+      webhookSecret: billingMode === "free" ? (str("STRIPE_WEBHOOK_SECRET") ?? "") : req("STRIPE_WEBHOOK_SECRET"),
       secretKey: str("STRIPE_SECRET_KEY"),
       apiBase: str("STRIPE_API_BASE", "https://api.stripe.com") as string,
       publicBaseUrl: str("PUBLIC_BASE_URL", "http://localhost:3000") as string,

@@ -44,9 +44,12 @@ Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](do
 
 ```bash
 pip install poker-sharingan
-sharingan eval mybot.py                         # score vs the ladder, with an error bar
-sharingan benchmark mybot.py --track sharingan-1  # the hard test
+sharingan eval mybot.py --server https://arena.sharingan.poker                      # score vs the ladder, with an error bar
+sharingan benchmark mybot.py --track sharingan-1 --server https://arena.sharingan.poker  # the hard test
+sharingan submit mybot.py --server https://arena.sharingan.poker                    # hosted job: our machines play it, VERIFIED score (free for now)
 ```
+
+Play SHARINGAN-1 live at [sharingan.poker/play](https://sharingan.poker/play), see the [leaderboard](https://sharingan.poker/leaderboard). The public arena is `https://arena.sharingan.poker` (REST, WebSocket `/v1/play`, hosted jobs `/v1/jobs`); how it is deployed: [deploy/production](deploy/production/README.md).
 
 `mybot.py` is just an `act(state)` function. SDKs: [sdk/](sdk/) · Self-host the arena: [arena/server](arena/server) · Train SHARINGAN-1: [docs/TRAINING.md](docs/TRAINING.md)
 

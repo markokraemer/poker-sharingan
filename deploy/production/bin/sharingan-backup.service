@@ -1,0 +1,5 @@
+[Unit]
+Description=Sharingan nightly pg_dump
+[Service]
+Type=oneshot
+ExecStart=/srv/sharingan/bin/backup.sh

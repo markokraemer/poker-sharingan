@@ -49,13 +49,14 @@ if (cfg.backend === "local") {
   platinum = new RealPlatinum({ apiUrl: cfg.platinum.apiUrl, token: cfg.platinum.token! });
 }
 
-const svc = new Service({ cfg, ledger, store, platinum, arena: new ArenaClient(cfg.arena), gateway: makeGateway(cfg.stripe), log });
+const arena = new ArenaClient(cfg.arena);
+const svc = new Service({ cfg, ledger, store, platinum, arena, gateway: makeGateway(cfg.stripe), log });
 await svc.recover();
 svc.start();
 
-const server = createApp(svc, cfg, { ready, log });
+const server = createApp(svc, cfg, { ready, log, arena });
 server.listen(cfg.port, cfg.host, () => log("listening", {
-  port: cfg.port, backend: cfg.backend, storage: cfg.storage, arena: cfg.arena.url, price_usd_per_1k_hands: cfg.pricing.usdPerKHands,
+  port: cfg.port, backend: cfg.backend, storage: cfg.storage, arena: cfg.arena.url, billing: cfg.billing.mode, price_usd_per_1k_hands: cfg.pricing.usdPerKHands,
   stripe: cfg.stripe.secretKey ? "live-api" : "simulated-checkout",
 }));
 

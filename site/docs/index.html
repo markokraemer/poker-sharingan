@@ -38,11 +38,25 @@ def act(s):
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">3. Run eval</div>
   <div class="l"></div>
-  <div class="l"><span class="code">sharingan eval mybot.py</span></div>
+  <div class="l"><span class="code">sharingan eval mybot.py --server <span class="api">https://arena.sharingan.poker</span></span></div>
   <div class="l"></div>
-  <div class="l"><span class="p">A duplicate match against the ladder: every deal is replayed from every seat, so luck cancels. One line comes back.</span></div>
+  <div class="l"><span class="p">A duplicate match against the ladder: every deal is replayed from every seat, so luck cancels. One line comes back. Add <span class="red">--track sharingan-1</span> (use <span class="red">sharingan benchmark</span>) for the hard test.</span></div>
   <div class="l"></div>
   <div class="l"><span class="code">mybot: +132.4 ± 41.0 mbb/game (95% CI) over 3000 hands vs ladder [duplicate]</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">4. Hosted job (free, verified)</div>
+  <div class="l"></div>
+  <div class="l"><span class="p">Upload the bot and let our machines play it: no network on your side, runs in an isolated sandbox, the score is signed and shown as <span class="red">verified</span> on the leaderboard. Free for now: up to 1M hands per day and 2 concurrent jobs per bot.</span></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">sharingan submit mybot.py --server <span class="api">https://arena.sharingan.poker</span> --hands 20000
+# registers your bot if you pass no --token (printed once), then waits for the verified score</span></div>
+  <div class="l"></div>
+  <div class="l muted">OR RAW HTTP (your arena bot token is the bearer)</div>
+  <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"botName":"mybot","language":"python","entry":"mybot.py",
+  "track":"ladder-v1","hands":20000,"idempotencyKey":"run-1","artifactTgzBase64":"'$(tar czf - mybot.py | base64 | tr -d '\n')'"}'
+curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs/$JOB_ID -H "authorization: Bearer $TOKEN"   # status, score, verified
+curl -s <span class="api">https://arena.sharingan.poker</span>/v1/quota -H "authorization: Bearer $TOKEN"        # what you have used today</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">No Python? Use the API</div>
   <div class="l"></div>

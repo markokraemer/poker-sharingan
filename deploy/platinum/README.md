@@ -15,6 +15,10 @@ The hosting design and the full Platinum gap analysis are in [DESIGN.md](DESIGN.
 | `templates/`, `bot/`, `edge/` | Platinum template specs, in-sandbox launchers, Cloudflare Worker for `arena.sharingan.poker` |
 | `../local/` | `compose.yml` (postgres + arena + runner), `e2e.sh`, the example bot |
 
+> **Production** (single bare-metal host, free mode, `BILLING_MODE=free`: no Stripe, per-player quotas, arena bot token as the credential) is
+> documented in [../production/README.md](../production/README.md). New env: `BILLING_MODE`, `FREE_MAX_HANDS_PER_DAY`, `FREE_MAX_CONCURRENT_JOBS`, `ARENA_AUTH_CACHE_S`;
+> new endpoints: `GET /v1/quota` (runner), `GET /v1/me` (arena: who owns this bearer token); SDK: `sharingan submit`.
+
 ## Run it locally
 
 Needs podman (rootless is fine) or docker, a compose (docker-compose v2, `docker compose` or podman-compose), curl, openssl, python3.

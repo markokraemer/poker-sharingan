@@ -13,6 +13,7 @@
 //   GET  /v1/jobs/:id                     status, progress, result, cost
 //   POST /v1/jobs/:id/abort
 import { createHash, timingSafeEqual } from "node:crypto";
+import type { ArenaClient } from "./arena.ts";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Config } from "./config.ts";
 import type { Logger } from "./log.ts";
@@ -75,10 +76,26 @@ async function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promise<void>; log?: Logger } = {}): Server {
+export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promise<void>; log?: Logger; arena?: ArenaClient } = {}): Server {
   const jobBodyLimit = Math.ceil(cfg.limits.maxArtifactBytes * 1.4) + 64 * 1024;
   const want = digest(cfg.authToken);
-  const authed = (req: IncomingMessage) => timingSafeEqual(digest((req.headers.authorization ?? "").replace(/^Bearer /i, "")), want);
+  const bearerOf = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer /i, "").trim();
+  const authed = (req: IncomingMessage) => timingSafeEqual(digest(bearerOf(req)), want);
+  // FREE mode: a public player authenticates with their arena bot token; validated against the arena (GET /v1/me), cached briefly.
+  const tokenCache = new Map<string, { playerId: string | null; exp: number }>();
+  const playerOf = async (req: IncomingMessage): Promise<string | undefined> => {
+    if (cfg.billing.mode !== "free" || !opts.arena) return undefined;
+    const tok = bearerOf(req);
+    if (!tok || tok.length > 200) return undefined;
+    const key = digest(tok).toString("hex");
+    const hit = tokenCache.get(key);
+    if (hit && hit.exp > Date.now()) return hit.playerId ?? undefined;
+    const who = await opts.arena.whoami(tok).catch(() => undefined);
+    const playerId = who && !who.admin ? who.playerId : null;
+    if (tokenCache.size > 5000) tokenCache.clear();
+    tokenCache.set(key, { playerId, exp: Date.now() + (playerId ? cfg.billing.authCacheS : 10) * 1000 });
+    return playerId ?? undefined;
+  };
 
   const send = (res: ServerResponse, code: number, body: unknown) => {
     const text = JSON.stringify(body);
@@ -101,20 +118,29 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
         try { await opts.ready?.(); return send(res, 200, { ok: true }); } catch (e) { return send(res, 503, { ok: false, error: String(e) }); }
       }
 
-      if (path === "/v1/webhooks/stripe" && method === "POST") {
+      if (path === "/v1/webhooks/stripe" && method === "POST" && !(cfg.billing.mode === "free" && !cfg.stripe.webhookSecret)) {
         const raw = await readBody(req, 1024 * 1024);
         const out = await svc.stripeWebhook(raw, req.headers["stripe-signature"] as string | undefined);
         return send(res, 200, { received: true, ...out });
       }
 
-      if (!authed(req)) return send(res, 401, { error: { code: "unauthorized", message: "bad or missing bearer token" } });
+      // service token = trusted backend (any userId); in FREE mode an arena bot token = that one player, scoped to their own jobs
+      let player: string | undefined;
+      if (!authed(req)) {
+        player = await playerOf(req);
+        if (!player) return send(res, 401, { error: { code: "unauthorized", message: "bad or missing bearer token (use your arena bot token)" } });
+      }
+      const own = (userId: string) => { if (player && player !== userId) throw new ServiceError(403, "forbidden", "not your account"); };
 
       let m: RegExpMatchArray | null;
-      if (method === "GET" && (m = path.match(/^\/v1\/credits\/([^/]+)$/))) return send(res, 200, await svc.credits(decodeURIComponent(m[1]!)));
+      if (method === "GET" && path === "/v1/quota") return send(res, 200, await svc.quota(player ?? (url.searchParams.get("userId") ?? "")));
+      if (method === "GET" && (m = path.match(/^\/v1\/credits\/([^/]+)$/))) { own(decodeURIComponent(m[1]!)); return send(res, 200, await svc.credits(decodeURIComponent(m[1]!))); }
       if (method === "GET" && (m = path.match(/^\/v1\/credits\/([^/]+)\/entries$/))) {
+        own(decodeURIComponent(m[1]!));
         return send(res, 200, { entries: await svc.entries(decodeURIComponent(m[1]!), Number(url.searchParams.get("limit") ?? 50)) });
       }
       if (method === "POST" && path === "/v1/credits/checkout") {
+        if (player) throw new ServiceError(403, "forbidden", "service token only");
         const s = await svc.checkout(await json(req));
         return send(res, 201, { id: s.id, url: s.url, simulated: s.simulated, price_cents: s.plan.priceCents, credit_micro: s.plan.creditMicro });
       }
@@ -124,19 +150,21 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
         return send(res, 200, svc.quote(hands));
       }
       if (method === "POST" && path === "/v1/jobs") {
-        const { job, deduped } = await svc.submit(await json(req, jobBodyLimit));
+        const { job, deduped } = await svc.submit(await json(req, jobBodyLimit), player);
         return send(res, deduped ? 200 : 202, { id: job.id, status: job.status, deduped, reserved_micro: job.reservedMicro });
       }
       if (method === "GET" && path === "/v1/jobs") {
-        const userId = url.searchParams.get("userId");
+        const userId = player ?? url.searchParams.get("userId");
         if (!userId) throw new ServiceError(400, "bad_request", "userId required");
         return send(res, 200, { jobs: (await svc.listJobs(userId, Number(url.searchParams.get("limit") ?? 20))).map(jobView) });
       }
       if (method === "GET" && (m = path.match(/^\/v1\/jobs\/([\w-]+)$/))) {
         const j = await svc.getJob(m[1]!);
+        if (j && player && j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } });
         return j ? send(res, 200, jobView(j)) : send(res, 404, { error: { code: "not_found", message: "no such job" } });
       }
       if (method === "POST" && (m = path.match(/^\/v1\/jobs\/([\w-]+)\/abort$/))) {
+        if (player) { const j = await svc.getJob(m[1]!); if (!j || j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } }); }
         const aborted = await svc.abort(m[1]!);
         return send(res, 202, { ok: true, aborted });
       }

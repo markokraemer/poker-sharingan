@@ -1,0 +1,4 @@
+# internal = no route out. Worker-mode sandboxes join no network at all; this exists for the (disabled for public users) connect mode.
+[Network]
+NetworkName=sharingan-botnet
+Internal=true

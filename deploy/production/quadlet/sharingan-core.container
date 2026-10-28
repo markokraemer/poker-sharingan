@@ -1,0 +1,31 @@
+[Unit]
+Description=Sharingan core (arena :8080 + sharingan-serve :8081 in one container, one page cache)
+Requires=sharingan-postgres.service
+After=sharingan-postgres.service
+
+[Container]
+ContainerName=sharingan-core
+Image=localhost/sharingan-core:prod
+Pull=never
+EnvironmentFile=/srv/sharingan/secrets/core.env
+Environment=ROLE=core ASSETS_DIR=/models BLUEPRINT_FILE=sharingan-1.plcp SIZING=medium WARM=1
+Environment=ARENA_OPEN_REGISTRATION=true ARENA_TRUST_PROXY=true ARENA_RATE_LIMIT_RPS=50 ARENA_RATE_LIMIT_BURST=100
+Environment=SHARINGAN_SEARCH_THREADS=16 SHARINGAN_SEARCH_CONCURRENCY=2
+# model: read-only, shared with every sandbox through the host page cache
+Volume=/srv/sharingan/models:/models:ro
+Volume=/srv/sharingan/arena-data:/data
+Network=sharingan.network
+PublishPort=127.0.0.1:8080:8080
+PublishPort=127.0.0.1:8081:8081
+HealthCmd=curl -fsS http://127.0.0.1:8080/readyz
+HealthInterval=10s
+HealthStartPeriod=120s
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=900
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -81,8 +81,20 @@ export class Service {
 
   // ------------------------------------------------------------------------------------------ credits
 
+  /** FREE mode: what this player has used of the rolling-24h quota. */
+  async quota(userId: string) {
+    const b = this.d.cfg.billing;
+    const jobs = await this.d.store.listByUser(userId, 1000);
+    const since = Date.now() - 24 * 3600_000;
+    const used = jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass !== "bot"))
+      .reduce((n, j) => n + (TERMINAL.has(j.status) ? (j.handsDone ?? 0) : j.input.hands), 0);
+    return { user_id: userId, billing: b.mode, hands_per_day_limit: b.freeMaxHandsPerDay, hands_used_24h: used,
+      concurrent_limit: b.freeMaxConcurrent, concurrent_active: jobs.filter((j) => !TERMINAL.has(j.status)).length };
+  }
+
   async credits(userId: string) {
     if (!SAFE_ID.test(userId)) throw new ServiceError(400, "bad_request", "bad userId");
+    if (this.d.cfg.billing.mode === "free") return { ...(await this.quota(userId)), balance_micro: 0, balance_usd: 0, reserved_micro: 0, reserved_usd: 0, price_usd_per_1k_hands: 0 };
     const b = await this.d.ledger.balance(userId);
     return {
       user_id: userId,
@@ -99,6 +111,7 @@ export class Service {
   }
 
   async checkout(req: TopupRequest): Promise<CheckoutSession> {
+    if (this.d.cfg.billing.mode === "free") throw new ServiceError(400, "billing_disabled", "runs are free right now; there is nothing to buy");
     let plan;
     try { plan = planTopup(this.d.cfg.stripe, req); } catch (e) {
       if (e instanceof TopupRequestError) throw new ServiceError(400, "bad_request", e.message);
@@ -113,6 +126,7 @@ export class Service {
 
   /** Stripe webhook: verify the signature over the RAW body, then credit. Never makes a network call. */
   async stripeWebhook(rawBody: Buffer, signature: string | undefined): Promise<EventOutcome> {
+    if (this.d.cfg.billing.mode === "free" && !this.d.cfg.stripe.webhookSecret) throw new ServiceError(404, "not_found", "billing is disabled");
     try {
       verifyStripeSignature(rawBody, signature, this.d.cfg.stripe.webhookSecret, { toleranceS: this.d.cfg.stripe.toleranceS });
     } catch (e) {
@@ -132,6 +146,9 @@ export class Service {
   quote(hands: number) {
     const p = this.d.cfg.pricing;
     const n = roundHands(hands);
+    if (this.d.cfg.billing.mode === "free") {
+      return { hands: n, price_micro: 0, price_usd: 0, price_usd_per_1k_hands: 0, billing: "free", note: `free: up to ${this.d.cfg.billing.freeMaxHandsPerDay} hands per rolling 24 h, ${this.d.cfg.billing.freeMaxConcurrent} concurrent jobs per player` };
+    }
     const reserve = reserveMicro(p, n);
     return { hands: n, price_micro: reserve, price_usd: microToUsd(reserve), price_usd_per_1k_hands: p.usdPerKHands, note: "charged by hands actually played; the unused part of the hold is released" };
   }
@@ -179,10 +196,54 @@ export class Service {
     return { input: { userId, botName, language, entry, requirementsFile, track, hands, lanes, idempotencyKey, mode }, artifact };
   }
 
-  async submit(req: SubmitRequest): Promise<{ job: Job; deduped: boolean }> {
+  private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
+
+  /** FREE mode: per-player quotas (rolling 24 h hands, concurrent jobs). Called under the submit lock. */
+  private async checkFreeQuota(userId: string, hands: number): Promise<void> {
+    const b = this.d.cfg.billing;
+    const jobs = await this.d.store.listByUser(userId, 1000);
+    const since = Date.now() - 24 * 3600_000;
+    const active = jobs.filter((j) => !TERMINAL.has(j.status)).length;
+    if (active >= b.freeMaxConcurrent) {
+      throw new ServiceError(429, "quota_concurrent", `at most ${b.freeMaxConcurrent} jobs at once; wait for one to finish`, { limit: b.freeMaxConcurrent, active });
+    }
+    const used = jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass !== "bot"))
+      .reduce((n, j) => n + (TERMINAL.has(j.status) ? (j.handsDone ?? 0) : j.input.hands), 0);
+    if (used + roundHands(hands) > b.freeMaxHandsPerDay) {
+      throw new ServiceError(429, "quota_hands_per_day", `daily quota of ${b.freeMaxHandsPerDay} hands (rolling 24 h) would be exceeded: used ${used}, requested ${roundHands(hands)}`,
+        { limit: b.freeMaxHandsPerDay, used, requested: roundHands(hands) });
+    }
+  }
+
+  /**
+   * `asUser`: set for a public player authenticated with an arena bot token. The job is forced onto that player and its
+   * idempotency key is namespaced, so one player can never read or dedupe into another's jobs.
+   */
+  async submit(req: SubmitRequest, asUser?: string): Promise<{ job: Job; deduped: boolean }> {
+    // public players only get worker mode (no network at all); connect mode needs the sandbox on the arena's network
+    if (asUser) req = { ...req, mode: "worker", userId: asUser, idempotencyKey: typeof req.idempotencyKey === "string" ? `${asUser}:${req.idempotencyKey}`.slice(0, 200) : req.idempotencyKey };
     const { input, artifact } = this.validate(req);
     const existing = await this.d.store.byKey(input.idempotencyKey);
     if (existing) return { job: existing, deduped: true };
+
+    if (this.d.cfg.billing.mode === "free") {
+      // serialise quota check + insert so two parallel submits cannot both pass the check
+      const run = this.submitLock.p.then(async () => {
+        await this.checkFreeQuota(input.userId, input.hands);
+        const job: Job = { id: `job_${randomBytes(8).toString("hex")}`, input, status: "queued", createdAt: Date.now(), reservedMicro: 0, settled: false };
+        const put = await this.d.store.put(job);
+        return put;
+      });
+      this.submitLock.p = run.catch(() => {});
+      const put = await run;
+      if (!put.created) return { job: put.job, deduped: true };
+      const job = put.job;
+      this.d.log("job_accepted", { job: job.id, user: input.userId, track: input.track, hands: input.hands, mode: input.mode, billing: "free" });
+      const p = this.run(job.id, artifact).catch((e) => this.d.log("job_run_crashed", { job: job.id, error: String(e) }));
+      this.running.set(job.id, p);
+      void p.finally(() => this.running.delete(job.id));
+      return { job, deduped: false };
+    }
 
     const amount = reserveMicro(this.d.cfg.pricing, input.hands);
     try {
@@ -231,6 +292,7 @@ export class Service {
 
   /** What this job costs the player. Pure policy: hands played x price, unless WE failed. */
   chargeFor(job: Job): number {
+    if (this.d.cfg.billing.mode === "free") return 0;
     const p = this.d.cfg.pricing;
     if (job.status === "failed" && job.errorClass !== "bot") return 0;           // our fault (or unknown): refund in full
     const hands = job.handsDone ?? 0;
@@ -243,6 +305,11 @@ export class Service {
     const job = await this.d.store.get(jobId);
     if (!job || !TERMINAL.has(job.status) || job.settled) return;
     const charge = this.chargeFor(job);
+    if (this.d.cfg.billing.mode === "free") {
+      await this.d.store.patch(jobId, { settled: true, chargeMicro: 0, releasedMicro: 0 });
+      this.d.log("job_settled", { job: jobId, status: job.status, hands: job.handsDone ?? 0, charge_micro: 0, billing: "free", cogs_micro: job.cogsMicro, sandbox_deleted: job.sandboxDeleted });
+      return;
+    }
     const r = await this.d.ledger.settle(`job:${job.input.idempotencyKey}`, charge, { job: job.id, status: job.status, hands: job.handsDone ?? 0, error_class: job.errorClass });
     await this.d.store.patch(jobId, { settled: true, chargeMicro: r.chargedMicro, releasedMicro: r.releasedMicro });
     this.d.log("job_settled", { job: jobId, status: job.status, hands: job.handsDone ?? 0, charge_micro: r.chargedMicro, released_micro: r.releasedMicro, cogs_micro: job.cogsMicro, sandbox_deleted: job.sandboxDeleted });

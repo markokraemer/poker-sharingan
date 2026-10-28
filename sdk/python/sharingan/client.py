@@ -22,6 +22,8 @@ PROTOCOL_VERSION = 1
 CLIENT_NAME = "sharingan-py/0.1.0"
 
 
+USER_AGENT = "poker-sharingan-sdk/0.1 (+https://sharingan.poker)"
+
 class ApiException(Exception):
     """HTTP-level error from the REST API (`{"error": {code, message, details}}`)."""
 
@@ -54,6 +56,7 @@ class ArenaClient:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Accept", "application/json")
+        req.add_header("User-Agent", USER_AGENT)   # the default Python-urllib UA is blocked by Cloudflare (error 1010) on the public arena
         if data is not None:
             req.add_header("Content-Type", "application/json")
         tok = token or self.token
@@ -196,7 +199,7 @@ class Runner:
         backoff = 0.2
         while not self._stop:
             try:
-                async with websockets.connect(self.url, ping_interval=None, max_size=16 * 2**20) as ws:
+                async with websockets.connect(self.url, user_agent_header=USER_AGENT, ping_interval=None, max_size=16 * 2**20) as ws:
                     self._ws = ws
                     self.connects += 1
                     backoff = 0.2

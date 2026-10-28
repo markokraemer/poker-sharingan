@@ -1,0 +1,5 @@
+[Unit]
+Description=Sharingan health check (logs to the journal; failures show as a failed unit)
+[Service]
+Type=oneshot
+ExecStart=/srv/sharingan/bin/healthcheck.sh

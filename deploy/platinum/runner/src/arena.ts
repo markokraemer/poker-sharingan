@@ -56,6 +56,16 @@ export class ArenaClient {
     this.doFetch = doFetch;
   }
 
+  /** Whose bot token is this? Calls GET /v1/me with the player's own token. Returns undefined for an unknown token. */
+  async whoami(token: string): Promise<{ playerId: string; name: string; admin: boolean } | undefined> {
+    const r = await this.doFetch(new URL("/v1/me", this.cfg.url), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
+    if (r.status === 401 || r.status === 403) return undefined;
+    if (!r.ok) throw new ArenaError(r.status, "whoami_failed", `GET /v1/me -> ${r.status}`);
+    const j = (await r.json()) as { player_id?: string; name?: string; admin?: boolean };
+    if (!j.player_id) return undefined;
+    return { playerId: j.player_id, name: j.name ?? "", admin: j.admin === true };
+  }
+
   private async call<T>(method: string, path: string, token: string | undefined, body?: string | Uint8Array | object): Promise<T> {
     const raw = body === undefined ? undefined : typeof body === "string" || body instanceof Uint8Array ? body : JSON.stringify(body);
     const res = await this.doFetch(new URL(path, this.cfg.url), {

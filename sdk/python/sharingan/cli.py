@@ -5,6 +5,7 @@
     sharingan connect mybot.py --server URL --token T [--player-id ID]        # answer your_turn until the server closes
     sharingan play mybot.py --vs sharingan-1 [--server URL]
     sharingan serve mybot.py --port 9000 [--secret S]
+    sharingan submit mybot.py --server URL [--token T] [--hands N]            # hosted job on the server's runner: verified score
     sharingan pipe mybot.py                                                   # stdin/stdout, for `sharingan-arena run --bot "sharingan pipe mybot.py"`
     sharingan eval mybot.py --local [--track T] [--hands N] [--lanes L]       # run the local worker binary, no server
 
@@ -443,6 +444,76 @@ def _eval_local(args: argparse.Namespace) -> int:
     return 0
 
 
+def _submit(args: argparse.Namespace) -> int:
+    """Hosted job: upload the bot, the server's runner plays it in an isolated sandbox, a verified score lands on the leaderboard."""
+    import base64
+    import io
+    import tarfile
+    path = os.path.abspath(args.bot)
+    if not os.path.exists(path):
+        print(f"sharingan: no such file: {args.bot}", file=sys.stderr)
+        return 2
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        if os.path.isdir(path):
+            entry = args.entry or "bot.py"
+            tar.add(path, arcname=".", filter=lambda ti: None if "__pycache__" in ti.name or ".git" in ti.name else ti)
+        else:
+            entry = os.path.basename(path)
+            tar.add(path, arcname=entry)
+    api = ArenaClient(args.server)
+    token = args.token
+    if not token:
+        name = os.path.splitext(os.path.basename(path.rstrip("/")))[0][:40] or "bot"
+        me = api.register_bot(name)
+        token = me.token
+        print(f"sharingan: registered {name} as {me.player_id}; your token (shown once, keep it): {token}", file=sys.stderr)
+    body = {"botName": os.path.splitext(os.path.basename(path.rstrip("/")))[0][:48] or "bot", "language": "python", "entry": entry,
+            "track": args.track, "hands": args.hands, "idempotencyKey": args.key or f"cli-{int(time.time() * 1000)}",
+            "artifactTgzBase64": base64.b64encode(buf.getvalue()).decode()}
+    if args.lanes:
+        body["lanes"] = args.lanes
+    if args.requirements:
+        body["requirementsFile"] = args.requirements
+    api.timeout = 120.0
+    try:
+        job = api.request("POST", "/v1/jobs", body, token=token)
+    except ApiException as e:
+        print(f"sharingan: submit refused: {e.status} {e.code}: {e.message}", file=sys.stderr)
+        return 1
+    except OSError as e:
+        return _unreachable(args.server, e)
+    jid = job["id"]
+    print(f"sharingan: job {jid} accepted ({args.hands} hands on {args.track})", file=sys.stderr, flush=True)
+    t0, last = time.time(), None
+    api.timeout = 30.0
+    while True:
+        try:
+            j = api.request("GET", f"/v1/jobs/{jid}", token=token)
+        except (ApiException, OSError):
+            time.sleep(3)
+            continue
+        line = f"{j['status']} {j.get('hands_done', 0)}/{j.get('hands_total', 0)} hands"
+        if line != last and not args.quiet:
+            print(f"sharingan: [{int(time.time() - t0)}s] {line}", file=sys.stderr, flush=True)
+            last = line
+        if j["status"] in ("finished", "failed", "aborted") and j.get("settled", True):
+            break
+        if args.timeout and time.time() - t0 > args.timeout:
+            print(f"sharingan: timed out waiting; job {jid} keeps running (GET /v1/jobs/{jid})", file=sys.stderr)
+            return 1
+        time.sleep(2)
+    if j["status"] != "finished":
+        print(f"sharingan: job {j['status']}: {j.get('error')}", file=sys.stderr)
+        if j.get("bot_log_tail"):
+            print(j["bot_log_tail"][-1500:], file=sys.stderr)
+        return 1
+    print(f"{j['bot_name']}: {j['mbb_per_game']:+.1f} +- {j['ci95_mbb']:.1f} mbb/game over {j['hands_done']} hands on {j['track']} "
+          f"[{'VERIFIED' if j['verified'] else 'unverified'}, hosted job {jid}]")
+    print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
+    return 0
+
+
 def _serve(args: argparse.Namespace) -> int:
     from .webhook import serve_webhook
     bot = load_bot(args.bot)
@@ -476,6 +547,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     e.add_argument("--track", choices=TRACKS, default=None, help="with --local: ladder-v1 (default) | sharingan-1")
     e.add_argument("--lanes", type=int, default=0, help="with --local: parallel bot processes (default: worker decides)")
     e.add_argument("--out", default=None, help="with --local: where to write result.json")
+    sm = sub.add_parser("submit", help="hosted job: upload the bot, the server plays it in an isolated sandbox, prints a VERIFIED score")
+    sm.add_argument("bot", help="mybot.py (or a directory with --entry)")
+    sm.add_argument("--server", default=os.environ.get("SHARINGAN_SERVER", DEFAULT_SERVER))
+    sm.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="your arena bot token (registers a new bot if omitted)")
+    sm.add_argument("--track", choices=TRACKS, default=DEFAULT_TRACK)
+    sm.add_argument("--hands", type=int, default=20000)
+    sm.add_argument("--lanes", type=int, default=0)
+    sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
+    sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")
+    sm.add_argument("--key", default=None, help="idempotency key (resubmitting the same key returns the same job)")
+    sm.add_argument("--timeout", type=float, default=0)
+    sm.add_argument("--quiet", action="store_true")
     pp = sub.add_parser("pipe", help="serve the bot over stdin/stdout (pipe protocol) for `sharingan-arena run --bot \"sharingan pipe mybot.py\"`")
     pp.add_argument("bot")
     b = sub.add_parser("benchmark", help="run a benchmark track (ladder-v1 | sharingan-1) and print mbb/game ± CI")
@@ -510,6 +593,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if a.cmd == "pipe":
             return _pipe(a)
+        if a.cmd == "submit":
+            return _submit(a)
         if a.cmd == "eval":
             return asyncio.run(_eval(a))
         if a.cmd == "benchmark":

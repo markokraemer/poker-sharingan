@@ -1,0 +1,35 @@
+[Unit]
+Description=Sharingan hosted runner (job API, free-mode quotas, local-container sandboxes)
+Requires=sharingan-postgres.service sharingan-core.service sharingan-botnet-network.service sharingan-egress-network.service
+After=sharingan-postgres.service sharingan-core.service sharingan-botnet-network.service sharingan-egress-network.service
+
+[Container]
+ContainerName=sharingan-runner
+Image=localhost/sharingan-runner:prod
+Pull=never
+User=0:0
+EnvironmentFile=/srv/sharingan/secrets/runner.env
+Environment=PORT=8090 SANDBOX_BACKEND=local BILLING_MODE=free
+Environment=ARENA_URL=http://sharingan-core:8080 DEFAULT_JOB_MODE=worker
+Environment=FREE_MAX_HANDS_PER_DAY=1000000 FREE_MAX_CONCURRENT_JOBS=2
+Environment=MAX_CONCURRENT_RUNS=12 BOT_CPU=4 BOT_RAM_MB=12288 BOT_DISK_GB=5 LOCAL_PIDS_LIMIT=512
+Environment=MAX_LANES=8 DEFAULT_LANES=4 MAX_HANDS=200000 RUN_DEADLINE_S=7200 POLL_INTERVAL_MS=1000
+Environment=CONTAINER_HOST=unix:///var/run/engine.sock LOCAL_BOT_IMAGE=localhost/sharingan-bot:prod
+Environment=LOCAL_BOT_NETWORK=sharingan-botnet LOCAL_EGRESS_NETWORK=sharingan-egress
+Environment=LOCAL_SANDBOX_BINDS=/srv/sharingan/models:/models:ro
+Environment=WORKER_KEY_ID=runner1
+EnvironmentFile=/srv/sharingan/config/runner-public.env
+Environment=PUBLIC_BASE_URL=https://arena.sharingan.poker
+Volume=/run/podman/podman.sock:/var/run/engine.sock
+SecurityLabelDisable=true
+Network=sharingan.network
+PublishPort=127.0.0.1:8090:8090
+HealthCmd=node -e "fetch('http://127.0.0.1:8090/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HealthInterval=10s
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

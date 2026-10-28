@@ -1,0 +1,22 @@
+[Unit]
+Description=Sharingan Postgres (arena + runner databases)
+After=network-online.target
+
+[Container]
+ContainerName=sharingan-postgres
+Image=docker.io/library/postgres:16-alpine
+EnvironmentFile=/srv/sharingan/secrets/postgres.env
+Volume=/srv/sharingan/pgdata:/var/lib/postgresql/data
+Volume=/srv/sharingan/initdb:/docker-entrypoint-initdb.d:ro
+Network=sharingan.network
+HealthCmd=pg_isready -U sharingan -d runner
+HealthInterval=5s
+HealthRetries=20
+PodmanArgs=--shm-size=512m
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
