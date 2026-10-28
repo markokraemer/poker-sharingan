@@ -43,11 +43,12 @@ Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](do
 ## Run it
 
 ```bash
-cargo build --release
-./target/release/pluribus h2h --a bot1.plcp --b bot2.plcp --players 6 --deals 1000000 ...
+pip install poker-sharingan
+sharingan eval mybot.py                         # score vs the ladder, with an error bar
+sharingan benchmark mybot.py --track sharingan-1  # the hard test
 ```
 
-More: [docs/OVERVIEW.md](docs/OVERVIEW.md)
+`mybot.py` is just an `act(state)` function. SDKs: [sdk/](sdk/) · Self-host the arena: [arena/server](arena/server) · Train SHARINGAN-1: [docs/TRAINING.md](docs/TRAINING.md)
 
 ## Layout
 
