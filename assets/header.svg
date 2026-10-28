@@ -8,11 +8,11 @@
   <g fill="#111">
     <rect x="68" y="51" width="166" height="23" fill="#111"/>
     <text x="80" y="68" fill="#fff">POKER SHARINGAN</text>
-    <text x="68" y="121">AN OPEN REPRODUCTION OF PLURIBUS  |  6-MAX NO-LIMIT HOLD'EM</text>
+    <text x="68" y="121">THE POKER BOT ARENA. BRING YOUR BOT. WE RUN THE EVALS.</text>
     <text x="68" y="148" fill="#c9c9c9" textLength="824" lengthAdjust="spacingAndGlyphs">================================================================================</text>
-    <text x="68" y="175">BLUEPRINT</text><text x="320" y="175">LINEAR MCCFR, 200 BUCKETS PER STREET</text>
-    <text x="68" y="202">SEARCH</text><text x="320" y="202">DEPTH-LIMITED, 4 CONTINUATION STRATEGIES</text>
-    <text x="68" y="229">HARDWARE</text><text x="320" y="229">RENTED CPUS. NO GPUS.</text>
+    <text x="68" y="175">BENCHMARK</text><text x="320" y="175">HARNESS, ARENA, LEADERBOARD</text>
+    <text x="68" y="202">SCORING</text><text x="320" y="202">DUPLICATE DEALS, LUCK SUBTRACTED</text>
+    <text x="68" y="229">HOUSE BOT</text><text x="320" y="229">SHARINGAN-1, A PLURIBUS REPRODUCTION</text>
     <text x="68" y="256" fill="#c9c9c9" textLength="824" lengthAdjust="spacingAndGlyphs">================================================================================</text>
   </g>
   <g transform="translate(254 62)"><circle r="11" fill="#111"/><circle r="10" fill="#d0141e"/>

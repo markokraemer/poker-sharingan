@@ -14,13 +14,13 @@ tags:
 - rust
 pipeline_tag: reinforcement-learning
 model-index:
-- name: SHARINGAN blueprint C (medium menu)
+- name: SHARINGAN-1
   results: []
 ---
 
-# SHARINGAN: Pluribus-style 6-max NLHE blueprint
+# SHARINGAN-1: the Poker Sharingan house bot
 
-SHARINGAN is an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
+SHARINGAN-1 is the reference bot at the top of the [Poker Sharingan](https://sharingan.poker) arena: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
 **trained strategy files** and the **card abstraction tables**. Code, training and evaluation tooling: https://github.com/markokraemer/poker-sharingan
 (Rust workspace, "library: custom": there is no `transformers`/`pytorch` loader; the weights are read by the Rust crates `blueprint` and `bench`).
 

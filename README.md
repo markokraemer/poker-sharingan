@@ -1,89 +1,87 @@
-<p align="center"><img src="assets/header.svg" width="100%" alt="POKER SHARINGAN"></p>
+<p align="center"><img src="assets/header.svg" width="100%" alt="POKER SHARINGAN: the poker bot arena"></p>
 
 ```text
-11  AN AGENT-BUILT, FROM-SCRATCH REPRODUCTION OF PLURIBUS (BROWN & SANDHOLM, SCIENCE 2019),
-12  THE FIRST AI TO BEAT PROFESSIONALS AT SIX-PLAYER NO-LIMIT HOLD'EM. ONE RUST WORKSPACE:
-13  TRAINER, ABSTRACTION, REAL-TIME SEARCH, EVALUATION, LIVE CLIENT. CODE AND WEIGHTS OPEN.
+11  POKER IS ONE OF THE HARDEST THINGS IN AI TO EVALUATE. LUCK SWAMPS SKILL: A BAD BOT CAN
+12  WIN FOR THOUSANDS OF HANDS. A REAL ANSWER TAKES MILLIONS OF HANDS, EVERY DEAL REPLAYED
+13  FROM EVERY SEAT, AND LUCK SUBTRACTED OUT. POKER SHARINGAN IS THAT SETUP, READY TO USE:
+14  AN OPEN BENCHMARK, HARNESS, ARENA AND LEADERBOARD FOR POKER BOTS OF ANY KIND.
 ```
 
-### EXHIBIT A: RESULTS
+### EXHIBIT A: WHAT YOU GET
 
 ```text
-14  ALL NUMBERS: DUPLICATE DEALS + AIVAT, MBB/GAME (10 MBB/GAME = 1 BB/100), 95% CI.
-15  BLUEPRINT@N = AFTER N MCCFR ITERATIONS. THREE BET-SIZE MENUS WERE TRAINED; C IS THE BEST.
-16
-17  MATCH                                          DEALS     RESULT
-18  ---------------------------------------------  --------  -----------------
-19  C@4.77e10 vs C@2e10       (3 + 3 seats)        4M        +3.8   +- 1.0
-20  C@4.77e10 vs B@2e10       (3 + 3 seats)        4M        +3.4   +- 1.3
-21  C@2e10    vs A@2e10       (3 + 3 seats)        4M        +4.0   +- 1.3
-22  C@1.83e11 vs C@4.77e10    (3 + 3 seats)        4M        PENDING
-23
-24  SEARCH + C@2e10 vs 5 x C@2e10                  30k       +87    +- 27
-25  C@4.77e10 vs 5 x SvanBot  (live budget)        20k       +56.7  +- 34.7
-26  SvanBot   vs 5 x C@4.77e10 (live budget)       50k       -46.9  +- 21.2
-27
-28  EXPLOITER (TRAINED BEST RESPONSE, 12M ITERS)   DEALS     EXPLOITER WINS
-29  ---------------------------------------------  --------  -----------------
-30  vs C@4.77e10                                   20k       -290   +- 59
-31  vs C@2e10                                      20k       -323   +- 62
-32
-33  LIVE, OPEN POKER ARENA (SEARCH + C@2e10)       HANDS     BB/100, LUCK-ADJ.
-34  ---------------------------------------------  --------  -----------------
-35  final config                                   2,329     +77.6  [26, 129]
+15  ARENA           SIX-PLAYER NO-LIMIT HOLD'EM TABLES, RUNNING AROUND THE CLOCK.
+16  LEADERBOARD     ONE PUBLIC RANKING. EVERY SCORE COMES WITH AN ERROR BAR.
+17  HARNESS         THE SAME ENGINE ON YOUR MACHINE. A MILLION HANDS BEFORE YOU SUBMIT.
+18  FAIR SCORING    DUPLICATE DEALS + AIVAT LUCK CORRECTION. SKILL, NOT CARDS.
+19  OPPONENTS       A LADDER OF REFERENCE BOTS, FROM RULE BOTS UP TO SHARINGAN-1.
+20  HISTORIES       EVERY HAND YOUR BOT PLAYED, TO STUDY AND IMPROVE ON.
+21  CLOUD           WE PROVISION THE ARENA AND RUN YOUR EVALS AT SCALE. SOON.
 ```
-
-Negative exploiter numbers mean the exploiter loses: it found no hole worth money. SvanBot ran with a fresh install's
-defaults and no learned opponent model. It still beats weak rule bots harder than we do, which is a different game.
-Every caveat is in [docs/RESULTS.md](docs/RESULTS.md).
 
 ### EXHIBIT B: HOW IT WORKS
 
 ```text
-36  1  PLAY BILLIONS OF HANDS AGAINST ITSELF. AFTER EACH DECISION, RECORD HOW MUCH BETTER
-37     EVERY OTHER ACTION WOULD HAVE DONE (REGRET). PLAY ACTIONS IN PROPORTION TO REGRET.
-38  2  SAMPLE: THE LEARNER TRIES EVERY ACTION, EVERYONE ELSE AND THE DECK PLAY ONE LINE.
-39  3  FORGET EARLY GARBAGE (LINEAR DISCOUNTING). STOP EXPLORING HOPELESS ACTIONS (PRUNING).
-40  4  SHRINK THE GAME: 200 BUCKETS OF SIMILAR HANDS PER STREET, A FIXED MENU OF BET SIZES.
-41  5  THE AVERAGE OF ALL THAT PLAY IS THE BLUEPRINT.
-42  6  AT THE TABLE, ON TURN AND RIVER: GUESS EACH RANGE FROM THE BETTING, RE-SOLVE THE SPOT
-43     A FEW ACTIONS DEEP, LET OPPONENTS SWITCH BETWEEN 4 STYLES AT THE HORIZON, PLAY IT.
+22  1  YOUR BOT IS SENT THE STATE OF THE HAND: ITS CARDS, THE BOARD, THE POT, ITS OPTIONS.
+23  2  IT ANSWERS WITH AN ACTION. THAT IS THE WHOLE API.
+24  3  IT PLAYS THE FIELD. EVERY DEAL IS REPLAYED FROM EVERY SEAT.
+25  4  ITS SCORE, WITH AN ERROR BAR, GOES ON THE LEADERBOARD.
+26
+27  →  {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200,
+28      "options": ["fold","call","raise"], "min_raise_to": 400, "stack": 9400}
+29  ←  {"action": "raise", "to": 800}
 ```
 
-The maths, in full: [docs/METHOD.md](docs/METHOD.md).
+The full table contract (REST + WebSocket, seeded decks, duplicate rotations, hand histories): [docs/TABLE_API.md](docs/TABLE_API.md).
 
-### EXHIBIT C: RUN IT
+### EXHIBIT C: THE HOUSE BOT, SHARINGAN-1
+
+A from-scratch reproduction of Pluribus (Brown & Sandholm, *Science* 2019), the first AI to beat professionals at
+six-player no-limit hold'em. Built by coding agents, trained on rented CPUs. Its final training run, to the paper's
+full 8-day budget, is finishing now. The numbers below are from earlier checkpoints of the same run.
+
+```text
+30  DUPLICATE DEALS + AIVAT. MBB/GAME, 95% CI. 10 MBB/GAME = 1 BB/100.
+31
+32  CHECKPOINT AT 4.77e10 ITERATIONS VS AT 2e10        4M DEALS     +3.8   +- 1.0
+33  VS SvanBot, #1 ON A PUBLIC ARENA (ITS LIVE BUDGET)  20k DEALS    +56.7  +- 34.7
+34  SvanBot VS FIVE COPIES OF IT                        50k DEALS    -46.9  +- 21.2
+35  A BOT TRAINED ONLY TO EXPLOIT IT                    20k DEALS    -290   +- 59
+36  WITH REAL-TIME SEARCH, LIVE ON A PUBLIC ARENA       2,329 HANDS  +77.6 BB/100 [26, 129]
+37  FINAL RUN (1.83e11 ITERATIONS)                                   TRAINING
+```
+
+How it works, in plain words and in full: [docs/METHOD.md](docs/METHOD.md).
+Every result with its caveats: [docs/RESULTS.md](docs/RESULTS.md).
+
+### EXHIBIT D: RUN IT
 
 ```bash
 git clone https://github.com/markokraemer/poker-sharingan && cd poker-sharingan
 RUSTFLAGS="-C target-cpu=native" cargo build --release
 
-# weights + card abstraction (not in git)
-huggingface-cli download TODO/sharingan --local-dir weights
+# SHARINGAN-1 weights + card abstraction (not in git)
+huggingface-cli download TODO/sharingan-1 --local-dir weights
 
-# head-to-head, 6-max, duplicate + AIVAT
-./target/release/pluribus h2h --a weights/C-4.77e10.plcp --sizing-a medium --b weights/C-2e10.plcp --sizing-b medium \
+# a duplicate, luck-corrected six-max match between two bots
+./target/release/pluribus h2h --a weights/a.plcp --sizing-a medium --b weights/b.plcp --sizing-b medium \
   --buckets data/buckets-200 --players 6 --deals 1000000 --threads 32 --warm --out h2h.json
 ```
 
-The CLI is named `pluribus`, after the paper. Training, evaluation, search and the live client:
-[docs/OVERVIEW.md](docs/OVERVIEW.md) · [docs/TRAINING.md](docs/TRAINING.md) · [docs/EVALUATION.md](docs/EVALUATION.md).
+The engine CLI is named `pluribus`, after the paper. Bring-your-own-bot adapters, the gauntlet, the exploiter and
+training: [docs/OVERVIEW.md](docs/OVERVIEW.md) · [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/TRAINING.md](docs/TRAINING.md).
 
-### EXHIBIT D: NEXT
-
-```text
-44  PLAY AGAINST IT     A PUBLIC 6-MAX TABLE API. BRING AN AGENT, TAKE A SEAT.      SOON
-45  OPEN BENCHMARK      DUPLICATE + AIVAT LEADERBOARD. ANYONE CAN SUBMIT A BOT.      SOON
-46  CONTRACT            docs/TABLE_API.md                                          DRAFT
-```
-
-### EXHIBIT E: THE FINE PRINT
+### EXHIBIT E: STATUS
 
 ```text
-47  COMPUTE      ~EUR 480 SO FAR ON RENTED 64-CORE BOXES. FINAL RUN IN PROGRESS.
-48  NOT PROVEN   NO MATCH AGAINST HUMAN PROFESSIONALS. NO MATCH AGAINST PLURIBUS ITSELF.
-49  USE          RESEARCH AND BOT ARENAS. REAL-MONEY SITES BAN BOTS. DON'T.
-50  LICENSE      APACHE-2.0. THIRD-PARTY NOTICES IN NOTICE.
+38  ENGINE, DUPLICATE + AIVAT SCORING, REFERENCE BOTS                BUILT
+39  SHARINGAN-1, FINAL TRAINING RUN                                  TRAINING
+40  PUBLIC TABLE API AND LOCAL HARNESS                               SOON
+41  LEADERBOARD AND OPEN SUBMISSIONS                                 SOON
+42  CLOUD ARENA                                                      SOON
 ```
 
-<sub>Brown, N. & Sandholm, T. Superhuman AI for multiplayer poker. <i>Science</i> 365, 885–890 (2019). doi:10.1126/science.aay2400</sub>
+```text
+43  FOR RESEARCH AND BOT ARENAS. REAL-MONEY SITES BAN BOTS.
+44  APACHE-2.0. THIRD-PARTY NOTICES IN NOTICE.  https://sharingan.poker
+```
