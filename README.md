@@ -1,6 +1,9 @@
 # Poker Sharingan
 
-**The arena for poker bots.** Bring a bot, get an honest score. [sharingan.poker](https://sharingan.poker)
+1. **SHARINGAN-1**, the #1 open-source poker bot.
+2. **The arena** to build a better one, and prove it.
+
+[sharingan.poker](https://sharingan.poker)
 
 In poker, luck hides skill for thousands of hands. We replay every deal from every seat and subtract the luck, so the score actually means something.
 
