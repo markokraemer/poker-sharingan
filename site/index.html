@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Poker Sharingan</title>
-<meta name="description" content="An open reproduction of Pluribus. Six-player no-limit hold'em, trained on rented CPUs.">
+<meta name="description" content="The open arena for poker AI. Bring your bot, we run the evals: one harness, millions of luck-corrected hands, one public leaderboard.">
 <meta property="og:title" content="Poker Sharingan">
-<meta property="og:description" content="An open reproduction of Pluribus. Six-player no-limit hold'em, trained on rented CPUs.">
+<meta property="og:description" content="The open arena for poker AI. Bring your bot, we run the evals: one harness, millions of luck-corrected hands, one public leaderboard.">
 <meta property="og:image" content="https://sharingan.poker/og.png">
 <meta property="og:url" content="https://sharingan.poker/">
 <meta name="twitter:card" content="summary_large_image">
@@ -28,19 +28,23 @@
   .sheet { max-width:96ch; margin:0 auto; padding:0 16px 0 56px; }
   .l { counter-increment:ln; position:relative; min-height:calc(var(--lh) * 1em); display:flex; flex-wrap:wrap; justify-content:space-between; column-gap:2ch; }
   .l::before { content:counter(ln); position:absolute; left:-5ch; width:3.2ch; text-align:right; font-size:10px; color:var(--gutter); top:.55em; }
+  .l > * { min-width:0; }
   .up { text-transform:uppercase; }
   .muted { color:var(--muted); }
-  .l > * { min-width:0; }
+  .red { color:var(--red); }
   .rule { color:var(--faint); overflow:hidden; white-space:nowrap; display:block; flex:1 1 0; min-width:0; }
   .chip { display:inline-block; background:var(--ink); color:var(--paper); padding:0 1.5ch; margin:-1px 0; }
   .eye { display:inline-block; width:1.05em; height:1.05em; vertical-align:-.17em; margin-left:1.5ch; }
-  .kv { display:grid; grid-template-columns:24ch 1fr; width:100%; }
-  .row { display:grid; grid-template-columns:minmax(0,1fr) 9ch 18ch; column-gap:2ch; width:100%; }
-  .row > :nth-child(n+2) { text-align:right; }
-  .red { color:var(--red); }
+  .p { display:block; max-width:80ch; }
+  .kv { display:grid; grid-template-columns:18ch minmax(0,1fr); width:100%; }
+  .step { display:grid; grid-template-columns:4ch minmax(0,1fr); width:100%; }
+  .row { display:grid; grid-template-columns:minmax(0,1fr) 12ch; column-gap:2ch; width:100%; }
+  .row > :last-child { text-align:right; }
+  .code { display:block; white-space:pre; overflow-x:auto; color:var(--muted); width:100%; }
   @media (max-width:640px) {
     .sheet { padding:0 16px 0 40px; } .l::before { left:-4.2ch; }
-    .kv { grid-template-columns:minmax(0,1fr); } .row { grid-template-columns:minmax(0,1fr) auto; } .row > :nth-child(2) { display:none; }
+    .kv { grid-template-columns:minmax(0,1fr); }
+    .code { white-space:pre-wrap; }
   }
 </style>
 </head>
@@ -49,40 +53,41 @@
   <div class="l"></div>
   <div class="l"><h1 style="font:inherit;margin:0"><span class="chip">POKER SHARINGAN</span><svg class="eye" viewBox="-12 -12 24 24" aria-hidden="true"><circle r="11" fill="#111"/><circle r="10" fill="#d0141e"/><g fill="#111"><circle cy="-5.6" r="1.9"/><circle cx="4.9" cy="2.8" r="1.9"/><circle cx="-4.9" cy="2.8" r="1.9"/></g><circle r="2.2" fill="#111"/></svg></h1></div>
   <div class="l"></div>
-  <div class="l up">An open reproduction of Pluribus. Six-player no-limit hold'em.</div>
+  <div class="l up">The open arena for poker AI.</div>
+  <div class="l">Bring your bot. We run the evals.</div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up"><div class="kv"><span>Blueprint</span><span>Linear MCCFR, 200 buckets per street</span></div></div>
-  <div class="l up"><div class="kv"><span>Search</span><span>Depth-limited, 4 continuation strategies</span></div></div>
-  <div class="l up"><div class="kv"><span>Hardware</span><span>Rented CPUs. No GPUs.</span></div></div>
-  <div class="l up"><div class="kv"><span>Built by</span><span>Coding agents, under one human</span></div></div>
+  <div class="l"><span class="p">Poker is one of the hardest things in AI to evaluate. Luck swamps skill: a bad bot can win for thousands of hands. A real answer takes millions of hands, the same cards replayed from every seat, and maths that strips the luck out. Almost nobody has that set up, so most poker bots are graded on noise.</span></div>
+  <div class="l"></div>
+  <div class="l"><span class="p">Poker Sharingan is that setup, ready to use. One harness, one arena and one public leaderboard, for any kind of poker agent: a solver, a neural net, a rule bot or an LLM.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">What you get</div>
   <div class="l"></div>
-  <div class="l up">Exhibit A: Results</div>
-  <div class="l up muted">Duplicate deals + AIVAT. mbb/game, 95% CI. 10 mbb/game = 1 bb/100.</div>
+  <div class="l"><div class="kv"><span>ARENA</span><span>Six-player no-limit hold'em tables, running around the clock.</span></div></div>
+  <div class="l"><div class="kv"><span>LEADERBOARD</span><span>One public ranking. Every score comes with an error bar.</span></div></div>
+  <div class="l"><div class="kv"><span>HARNESS</span><span>The same engine on your machine. Play a million hands before you submit.</span></div></div>
+  <div class="l"><div class="kv"><span>FAIR SCORING</span><span>Every deal is replayed from every seat, then luck is subtracted out.</span></div></div>
+  <div class="l"><div class="kv"><span>OPPONENTS</span><span>A ladder of reference bots, from simple rule bots to a Pluribus reproduction.</span></div></div>
+  <div class="l"><div class="kv"><span>HAND HISTORIES</span><span>Every hand your bot played, to study and improve on.</span></div></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">How it works</div>
   <div class="l"></div>
-  <div class="l"><div class="row"><span>C@4.77e10 vs C@2e10</span><span>4M</span><span>+3.8 ± 1.0</span></div></div>
-  <div class="l"><div class="row"><span>C@4.77e10 vs B@2e10</span><span>4M</span><span>+3.4 ± 1.3</span></div></div>
-  <div class="l"><div class="row"><span>C@1.83e11 vs C@4.77e10</span><span>4M</span><span class="muted">training</span></div></div>
-  <div class="l"><div class="row"><span>search vs 5 × blueprint</span><span>30k</span><span>+87 ± 27</span></div></div>
-  <div class="l"><div class="row"><span>us vs 5 × SvanBot</span><span>20k</span><span>+56.7 ± 34.7</span></div></div>
-  <div class="l"><div class="row"><span>SvanBot vs 5 × us</span><span>50k</span><span>−46.9 ± 21.2</span></div></div>
-  <div class="l"><div class="row"><span>trained exploiter vs us</span><span>20k</span><span>−290 ± 59</span></div></div>
-  <div class="l"><div class="row"><span>live arena, 2,329 hands</span><span>bb/100</span><span>+77.6 [26, 129]</span></div></div>
+  <div class="l"><div class="step"><span>1</span><span>Your bot is sent the state of the hand: its cards, the board, the pot, its options.</span></div></div>
+  <div class="l"><div class="step"><span>2</span><span>It answers with an action. That is the whole API.</span></div></div>
+  <div class="l"><div class="step"><span>3</span><span>It plays thousands of hands against the field, every deal replayed from every seat.</span></div></div>
+  <div class="l"><div class="step"><span>4</span><span>Its score, with an error bar, goes on the leaderboard.</span></div></div>
   <div class="l"></div>
-  <div class="l up">Exhibit B: How it works</div>
-  <div class="l">It plays itself billions of times. After every decision it asks how much better</div>
-  <div class="l">each other action would have done, and leans toward the ones it regrets not taking.</div>
-  <div class="l">The average of all that play is the blueprint. At the table, on the turn and river,</div>
-  <div class="l">it reads each range from the betting and re-solves the spot a few actions deep,</div>
-  <div class="l">letting every opponent switch style at the horizon. Then it plays.</div>
-  <div class="l"></div>
-  <div class="l up">Exhibit C: Next</div>
-  <div class="l"><div class="row"><span class="up">Take a seat: public 6-max table API</span><span></span><span class="up red">Soon</span></div></div>
-  <div class="l"><div class="row"><span class="up">Open benchmark, anyone can submit a bot</span><span></span><span class="up red">Soon</span></div></div>
+  <div class="l"><span class="code">→  {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200,
+    "options": ["fold","call","raise"], "min_raise_to": 400, "stack": 9400}
+←  {"action": "raise", "to": 800}</span></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up muted">Research and bot arenas only. Real-money sites ban bots.</div>
-  <div class="l muted">Brown &amp; Sandholm, Superhuman AI for multiplayer poker, Science 365 (2019).</div>
+  <div class="l up">Status</div>
+  <div class="l"></div>
+  <div class="l"><div class="row"><span>Engine, fair scoring, reference bots</span><span class="up">Built</span></div></div>
+  <div class="l"><div class="row"><span>Public table API and local harness</span><span class="up red">Soon</span></div></div>
+  <div class="l"><div class="row"><span>Leaderboard and open submissions</span><span class="up red">Soon</span></div></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up muted">For research and bot arenas. Real-money sites ban bots.</div>
 </div></main>
 </body>
 </html>
