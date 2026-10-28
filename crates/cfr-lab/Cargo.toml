@@ -1,0 +1,7 @@
+[package]
+name = "cfr-lab"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+cards.workspace = true

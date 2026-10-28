@@ -1,0 +1,10 @@
+[package]
+name = "blueprint"
+edition.workspace = true
+version.workspace = true
+description = "Pluribus blueprint: parallel external-sampling Linear MCCFR with negative-regret pruning."
+
+[dependencies]
+cards.workspace = true
+nlhe = { path = "../nlhe" }
+rayon.workspace = true

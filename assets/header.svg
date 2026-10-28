@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 290" width="960" height="290" font-family="'Source Code Pro', ui-monospace, Menlo, Consolas, monospace" font-size="15">
+  <rect width="960" height="290" fill="#fff"/>
+  <g fill="#8a8a8a" font-size="10" text-anchor="end">
+    <text x="52" y="40">1</text><text x="52" y="67">2</text><text x="52" y="94">3</text><text x="52" y="121">4</text>
+    <text x="52" y="148">5</text><text x="52" y="175">6</text><text x="52" y="202">7</text><text x="52" y="229">8</text>
+    <text x="52" y="256">9</text><text x="52" y="283">10</text>
+  </g>
+  <g fill="#111">
+    <rect x="68" y="51" width="166" height="23" fill="#111"/>
+    <text x="80" y="68" fill="#fff">POKER SHARINGAN</text>
+    <text x="68" y="121">AN OPEN REPRODUCTION OF PLURIBUS  |  6-MAX NO-LIMIT HOLD'EM</text>
+    <text x="68" y="148" fill="#c9c9c9" textLength="824" lengthAdjust="spacingAndGlyphs">================================================================================</text>
+    <text x="68" y="175">BLUEPRINT</text><text x="320" y="175">LINEAR MCCFR, 200 BUCKETS PER STREET</text>
+    <text x="68" y="202">SEARCH</text><text x="320" y="202">DEPTH-LIMITED, 4 CONTINUATION STRATEGIES</text>
+    <text x="68" y="229">HARDWARE</text><text x="320" y="229">RENTED CPUS. NO GPUS.</text>
+    <text x="68" y="256" fill="#c9c9c9" textLength="824" lengthAdjust="spacingAndGlyphs">================================================================================</text>
+  </g>
+  <g transform="translate(254 62)"><circle r="11" fill="#111"/><circle r="10" fill="#d0141e"/>
+    <g fill="#111"><circle cx="0" cy="-5.6" r="1.9"/><circle cx="4.9" cy="2.8" r="1.9"/><circle cx="-4.9" cy="2.8" r="1.9"/></g><circle r="2.2" fill="#111"/></g>
+</svg>

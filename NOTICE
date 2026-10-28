@@ -1,0 +1,37 @@
+SHARINGAN
+Copyright 2026 Marko Kraemer
+Licensed under the Apache License, Version 2.0.
+
+This product includes or derives from the following third-party work:
+
+* crates/iso is a Rust port of the hand-isomorphism indexer by Kevin Waugh
+  (https://github.com/kdub0/hand-isomorphism, `hand_index.c`; K. Waugh, "A Fast and
+  Optimal Hand Isomorphism Algorithm", 2013), distributed under this notice:
+
+    Copyright (c) 2013 Kevin Waugh (waugh@cs.cmu.edu).
+    All rights reserved.
+
+    Redistribution and use in source and binary forms are permitted
+    provided that the above copyright notice and this paragraph are
+    duplicated in all such forms and that any documentation,
+    advertising materials, and other materials related to such
+    distribution and use acknowledge that the software was developed
+    by the <organization>.  The name of the
+    <organization> may not be used to endorse or promote products derived
+    from this software without specific prior written permission.
+    THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+  The hand-isomorphism indexer was developed by Kevin Waugh.
+
+External tools that are used as opponents or data but are NOT redistributed here:
+* RLCard (https://github.com/datamllab/rlcard, MIT): scripts/extbots/rlcard_*.py are our own
+  bridge/training scripts that import it at runtime.
+* PokerBench (HF `RZ412/PokerBench`, Apache-2.0 per its dataset card): download it separately.
+* SvanBot (https://github.com/SvanLabs/SvanBot, Apache-2.0): scripts/extbots/svan/extbridge.rs is our own
+  glue code that links against SvanBot's crates at build time; SvanBot's source is not included.
+* Open Poker (openpoker.ai) and Slumbot (slumbot.com): public services used through their APIs.
+
+The Pluribus paper and supplement (Brown & Sandholm, Science 2019) are copyrighted by
+their publisher and are not included.

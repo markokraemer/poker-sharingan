@@ -1,0 +1,10 @@
+[package]
+name = "cards"
+edition.workspace = true
+version.workspace = true
+description = "Card primitives, 7-card hand evaluator and fast RNG."
+
+[dependencies]
+
+[dev-dependencies]
+rayon.workspace = true

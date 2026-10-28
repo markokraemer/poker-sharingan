@@ -1,0 +1,17 @@
+[package]
+name = "search"
+edition.workspace = true
+version.workspace = true
+description = "Pluribus real-time search: nested unsafe depth-limited MCCFR with 4 continuation strategies, as a bench PolicyFactory."
+
+[dependencies]
+cards.workspace = true
+rayon.workspace = true
+nlhe = { path = "../nlhe" }
+blueprint = { path = "../blueprint" }
+abstraction = { path = "../abstraction" }
+bench = { path = "../bench" }
+pluribus = { path = "../pluribus" }
+
+[dev-dependencies]
+referee = { path = "../referee" }

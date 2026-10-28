@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wrapper: run archive.py. Export the object-storage credentials first (SCW_ACCESS_KEY / SCW_SECRET_KEY),
+# e.g. from your own secret manager; this script never reads a credentials file.
+exec python3 "$(dirname "$0")/archive.py" "$@"

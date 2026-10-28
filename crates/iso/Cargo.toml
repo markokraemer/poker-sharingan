@@ -1,0 +1,8 @@
+[package]
+name = "iso"
+edition.workspace = true
+version.workspace = true
+description = "Poker hand isomorphism indexer (Waugh): suit-isomorphic card sequences <-> dense indices."
+
+[dependencies]
+cards.workspace = true

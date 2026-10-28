@@ -1,0 +1,19 @@
+[package]
+name = "bench"
+edition.workspace = true
+version.workspace = true
+description = "Evaluation harness: policies, gauntlet, duplicate matches, AIVAT, LBR, Slumbot adapter."
+
+[dependencies]
+cards.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+nlhe = { path = "../nlhe" }
+abstraction = { path = "../abstraction" }
+blueprint = { path = "../blueprint" }
+ureq = { version = "2.10", features = ["json"] }
+
+[[bin]]
+name = "bench"
+path = "src/main.rs"

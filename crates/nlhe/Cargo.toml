@@ -1,0 +1,8 @@
+[package]
+name = "nlhe"
+edition.workspace = true
+version.workspace = true
+description = "Fast 2-6 player no-limit hold'em state machine, action abstraction and action translation."
+
+[dependencies]
+cards.workspace = true

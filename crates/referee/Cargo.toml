@@ -1,0 +1,19 @@
+[package]
+name = "referee"
+edition.workspace = true
+version.workspace = true
+description = "Spot-by-spot referee: PokerBench accuracy and exact heads-up river EV loss for bench policies."
+
+[dependencies]
+cards.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+nlhe = { path = "../nlhe" }
+abstraction = { path = "../abstraction" }
+blueprint = { path = "../blueprint" }
+bench = { path = "../bench" }
+
+[[bin]]
+name = "referee"
+path = "src/main.rs"
