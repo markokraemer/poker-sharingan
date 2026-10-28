@@ -1,0 +1,30 @@
+{
+  "name": "@sharingan/sdk",
+  "version": "0.1.0",
+  "description": "Bot SDK for the Poker Sharingan arena (Table API v1)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./bots": { "types": "./dist/bots/index.d.ts", "default": "./dist/bots/index.js" },
+    "./mock": { "types": "./dist/mock.d.ts", "default": "./dist/mock.js" }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": { "ws": "^8" },
+  "peerDependenciesMeta": { "ws": { "optional": true } },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/ws": "^8",
+    "typescript": "^5.6",
+    "vitest": "^2",
+    "ws": "^8"
+  }
+}

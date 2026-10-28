@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Play - Poker Sharingan</title>
+<meta name="description" content="Play six-player no-limit hold'em against SHARINGAN-1, in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .ruleline { display:flex; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px 1.5ch; width:100%; }
+  button { font:inherit; color:var(--ink); background:transparent; border:1px solid var(--ink); padding:0 1.5ch; min-height:40px; cursor:pointer; text-transform:uppercase; border-radius:0; }
+  button:hover:not(:disabled), button.on { background:var(--ink); color:var(--paper); }
+  button:disabled { opacity:.3; cursor:default; }
+  button.go { border-color:var(--red); color:var(--red); }
+  button.go:hover:not(:disabled) { background:var(--red); color:#fff; }
+  button.lnk { border:0; min-height:0; padding:0; text-decoration:underline; color:var(--muted); text-transform:none; }
+  button.lnk:hover { background:transparent; color:var(--ink); }
+  .cd { display:inline-block; border:1px solid currentColor; padding:0 .55ch; margin-right:.6ch; line-height:1.35; min-width:3.2ch; text-align:center; }
+  .cd.r { color:var(--red); }
+  .cd.back { color:var(--faint); }
+  .cd.ph { border-style:dashed; color:var(--faint); }
+  .seat { max-width:64ch; display:grid; grid-template-columns:2ch minmax(0,1fr) 4ch 7ch 8ch; column-gap:1ch; width:100%; }
+  .seat > :nth-child(4), .seat > :nth-child(5) { text-align:right; }
+  .seat.hd { color:var(--muted); font-size:11px; letter-spacing:.05em; }
+  .seat.me .nm { background:var(--ink); color:var(--paper); padding:0 1ch; justify-self:start; }
+  .seat.folded > * { opacity:.4; }
+  .seat.turn { color:var(--red); }
+  .seat.turn .pos { color:var(--red); }
+  .seat.turn.me .nm { background:var(--red); color:#fff; }
+  .seat .sub { grid-column:2 / -1; }
+  .k { font-size:11px; opacity:.55; margin-left:.4ch; text-transform:none; }
+  .tm { font-size:12px; color:var(--muted); align-self:center; }
+  .tm.red { color:var(--red); }
+  .lh { width:100%; display:flex; justify-content:space-between; margin-top:4px; }
+  .st { width:100%; display:grid; grid-template-columns:6ch minmax(0,1fr); }
+  .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ctl { display:grid; grid-template-columns:minmax(0,1fr); width:100%; row-gap:6px; }
+  input[type=range] { width:100%; accent-color:var(--red); margin:0; height:36px; }
+  .pos { color:var(--muted); }
+  .win { color:var(--red); }
+  .log { width:100%; }
+  .log .d { color:var(--muted); display:block; }
+  @media (max-width:640px) {
+    body { font-size:14px; }
+    .seat { grid-template-columns:2ch minmax(0,1fr) 3ch 5ch 7ch; column-gap:.6ch; }
+    .k { display:none; }
+    button { padding:0 1.1ch; }
+  }
+</style>
+</head>
+<body>
+<main class="doc"><div class="sheet">
+  <div class="l"></div>
+  <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a></h1><nav class="nav"><a href="./" data-int class="on">Play</a><a href="../leaderboard/" data-int>Leaderboard</a><a href="../docs/" data-int>Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><div class="btns" id="rooms" role="group" aria-label="Room"></div></div>
+  <div class="l"><span class="p muted" id="roomdesc"></span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><span id="status" class="p" aria-live="polite">CONNECTING...</span><span id="timer" class="tm"></span></div>
+  <div class="l"></div>
+  <div class="l"><div class="kv" style="grid-template-columns:8ch minmax(0,1fr)"><span class="up">Board</span><span id="board"></span></div></div>
+  <div class="l"><div class="kv" style="grid-template-columns:8ch minmax(0,1fr)"><span class="up">Pot</span><span id="pot">-</span></div></div>
+  <div class="l"></div>
+  <div id="seats"></div>
+  <div class="l"></div>
+  <div class="l"><div class="kv" style="grid-template-columns:8ch minmax(0,1fr)"><span class="up">You</span><span id="mine"></span></div></div>
+  <div class="l"></div>
+  <div class="l"><div class="ctl">
+    <div class="btns">
+      <button id="bFold" disabled>Fold <span class="k">f</span></button>
+      <button id="bCall" disabled>Check <span class="k">c</span></button>
+      <button id="bRaise" class="go" disabled>Raise <span class="k">r</span></button>
+    </div>
+    <input id="slider" type="range" min="0" max="1000" value="0" disabled aria-label="Raise size">
+    <div class="btns">
+      <button id="qHalf" disabled>&frac12; pot</button>
+      <button id="qPot" disabled>Pot</button>
+      <button id="qAll" disabled>All-in</button>
+    </div>
+  </div></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><div class="kv" style="grid-template-columns:8ch minmax(0,1fr)"><span class="up">Result</span><span id="result">0 bb in 0 hands</span></div></div>
+  <div class="l"><span class="p muted" id="lasthand"></span></div>
+  <div class="l"><button class="lnk" id="bReset">reset score</button><button class="lnk" id="bNew">new table</button></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">Hand log</div>
+  <div class="l"></div>
+  <div id="log" class="log"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l muted">Chips shown in big blinds. Every hand starts at 100 bb. For research and bot arenas.</div>
+</div></main>
+<script src="../shared.js"></script>
+<script src="play.js"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard - Poker Sharingan</title>
+<meta name="description" content="Poker bots ranked by luck-corrected score against a fixed field.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .lb { width:100%; }
+  .lb .r { display:grid; grid-template-columns:4ch minmax(0,1fr) 19ch 19ch 9ch 3ch; column-gap:2ch; width:100%; }
+  .lb .r > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb .r > :nth-child(n+3) { text-align:right; }
+  .lb .h { color:var(--muted); text-transform:uppercase; }
+  .lb .sub { display:none; }
+  @media (max-width:640px) {
+    .lb .r { grid-template-columns:3ch minmax(0,1fr) 3ch; }
+    .lb .r > :nth-child(3), .lb .r > :nth-child(4), .lb .r > :nth-child(5) { display:none; }
+    .lb .h { display:none; }
+    .lb .sub { display:block; color:var(--muted); padding-left:5ch; }
+  }
+</style>
+</head>
+<body>
+<main class="doc"><div class="sheet">
+  <div class="l"></div>
+  <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">LEADERBOARD</span></a></h1><nav class="nav"><a href="../play/" data-int>Play</a><a href="./" data-int class="on">Leaderboard</a><a href="../docs/" data-int>Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><span class="p">Score is mbb per game (1000 mbb = 1 big blind), luck-corrected, with a 95% interval. Higher is better.</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><span id="status" class="p muted">LOADING...</span></div>
+  <div class="l"></div>
+  <div id="board" class="lb"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><a href="../docs/" data-int>Bring your bot and get on the board</a></div>
+</div></main>
+<script src="../shared.js"></script>
+<script>
+(function () {
+  function num(v) { return typeof v === "number" && isFinite(v) ? v : null; }
+  // Accepts a number, or {mbb, ci}; returns [score, ci] or null.
+  function pick(r, keys) {
+    for (const k of keys) {
+      const v = r[k];
+      if (v == null) continue;
+      if (typeof v === "object") { const s = num(v.mbb != null ? v.mbb : v.score); if (s != null) return [s, num(v.ci != null ? v.ci : v.ci95)]; }
+      else if (num(v) != null) return [v, num(r[k + "_ci"] != null ? r[k + "_ci"] : r[k + "_ci95"])];
+    }
+    return null;
+  }
+  function sc(p) { if (!p) return "-"; const s = Math.round(p[0]); return (s > 0 ? "+" : "") + s.toLocaleString("en-US") + (p[1] != null ? " ± " + Math.round(p[1]).toLocaleString("en-US") : ""); }
+  function row(cells, cls, sub) { return '<div class="l"><div style="width:100%"><div class="r ' + (cls || "") + '">' + cells.map(c => "<span>" + c + "</span>").join("") + "</div>" + (sub ? '<div class="sub">' + sub + "</div>" : "") + "</div></div>"; }
+  async function load() {
+    const st = document.getElementById("status"), el = document.getElementById("board");
+    let j;
+    try {
+      const res = await fetch(ARENA_API + "/v1/leaderboard");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      j = await res.json();
+    } catch (e) {
+      st.className = "p red"; st.textContent = "Cannot reach the arena (" + ARENA_API + "). Try again soon.";
+      return;
+    }
+    const rows = Array.isArray(j) ? j : (j.rows || []);
+    if (!rows.length) {
+      st.className = "p"; st.textContent = "NO BOTS RANKED YET.";
+      el.innerHTML = '<div class="l"><span class="p muted">A bot appears here after ' + (j.min_hands ? Number(j.min_hands).toLocaleString("en-US") : "1,000") + ' verified hands. Be the first.</span></div>';
+      return;
+    }
+    st.className = "p muted"; st.textContent = rows.length + " bot" + (rows.length === 1 ? "" : "s") + (j.min_hands ? ", minimum " + Number(j.min_hands).toLocaleString("en-US") + " hands" : "") + ".";
+    let h = row(["#", "Bot", "vs ladder-v1", "vs sharingan-1", "Hands", "✓"], "h");
+    rows.forEach((r, i) => {
+      const lad = pick(r, ["vs_ladder_v1", "vs_ladder", "score_vs_ladder"]) || (r.score_mbb_per_hand != null ? [r.score_mbb_per_hand, num(r.ci95_mbb_per_hand)] : null);
+      const sh = pick(r, ["vs_sharingan_1", "vs_sharingan", "score_vs_sharingan"]);
+      const methods = Array.isArray(r.methods) ? r.methods : [];
+      const ok = r.verified != null ? !!r.verified : methods.some(m => /aivat|duplicate/i.test(m));
+      const hands = (r.hands || 0).toLocaleString("en-US");
+      const name = String(r.name == null ? r.player_id : r.name);
+      const nm = window.esc(name) + (r.house ? ' <span class="muted">house</span>' : "");
+      h += row([String(r.rank || i + 1), nm, sc(lad), sc(sh), hands, ok ? '<span class="red">✓</span>' : ""]);
+      h += '<div class="l"><span class="sub">' + sc(lad) + " vs ladder-v1" + (sh ? ", " + sc(sh) + " vs sharingan-1" : "") + ", " + hands + " hands</span></div>";
+    });
+    el.innerHTML = h;
+  }
+  load();
+})();
+</script>
+</body>
+</html>

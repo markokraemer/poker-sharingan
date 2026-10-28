@@ -1,0 +1,38 @@
+[package]
+name = "sharingan-arena"
+edition.workspace = true
+version.workspace = true
+description = "Poker Sharingan arena table server: REST + WebSocket table API, duplicate matches, hand histories, leaderboard."
+license.workspace = true
+
+[lib]
+name = "arena_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sharingan-arena"
+path = "src/main.rs"
+
+[dependencies]
+cards.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+nlhe = { path = "../../engine/nlhe" }
+bench = { path = "../bench" }
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal"] }
+futures-util = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+rand_chacha = "0.9"
+uuid = { version = "1", features = ["v4"] }
+ureq = { version = "2.10", features = ["json"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+tokio-tungstenite = "0.26"

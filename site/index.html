@@ -40,6 +40,9 @@
   .step { display:grid; grid-template-columns:4ch minmax(0,1fr); width:100%; }
   .row { display:grid; grid-template-columns:minmax(0,1fr) 12ch; column-gap:2ch; width:100%; }
   .row > :last-child { text-align:right; }
+  .nav { display:flex; flex-wrap:wrap; gap:0 2ch; }
+  .nav a { text-decoration:none; text-transform:uppercase; color:var(--muted); }
+  .nav a:hover { color:var(--ink); text-decoration:underline; }
   .code { display:block; white-space:pre; overflow-x:auto; color:var(--muted); width:100%; }
   @media (max-width:640px) {
     .sheet { padding:0 16px 0 40px; } .l::before { left:-4.2ch; }
@@ -57,6 +60,7 @@
   <div class="l"><div class="step"><span>2</span><span>THE ARENA TO BUILD A BETTER ONE, AND PROVE IT.</span></div></div>
   <div class="l"></div>
   <div class="l"><a href="https://github.com/markokraemer/poker-sharingan">github.com/markokraemer/poker-sharingan</a></div>
+  <div class="l"><nav class="nav"><a href="play/">Play</a><a href="leaderboard/">Leaderboard</a><a href="docs/">Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span class="p">In poker, luck hides skill for thousands of hands. We replay every deal from every seat and subtract the luck, so the score means something.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>

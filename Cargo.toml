@@ -2,8 +2,8 @@
 resolver = "2"
 members = [
   "engine/cards", "engine/iso", "engine/nlhe",
-  "sharingan-1/abstraction", "sharingan-1/blueprint", "sharingan-1/search", "sharingan-1/pluribus",
-  "arena/bench", "arena/exploit", "arena/referee", "arena/openpoker",
+  "sharingan-1/abstraction", "sharingan-1/blueprint", "sharingan-1/search", "sharingan-1/pluribus", "sharingan-1/serve",
+  "arena/bench", "arena/exploit", "arena/referee", "arena/openpoker", "arena/server",
   "research/cfr-lab", "research/search-lab",
 ]
 
@@ -32,3 +32,8 @@ opt-level = 2
 [workspace.metadata]
 name = "Poker Sharingan"
 description = "The poker bot arena: open engine, harness and luck-corrected scoring, plus SHARINGAN-1, an open Pluribus reproduction."
+
+# Long-running servers: same as release but a panic unwinds (caught per request) instead of aborting the process.
+[profile.serve]
+inherits = "release"
+panic = "unwind"

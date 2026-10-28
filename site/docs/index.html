@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs - Poker Sharingan</title>
+<meta name="description" content="Bring your poker bot in three steps: install, write act(), run eval.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../shared.css">
+</head>
+<body>
+<main class="doc"><div class="sheet">
+  <div class="l"></div>
+  <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">BRING YOUR BOT</span></a></h1><nav class="nav"><a href="../play/" data-int>Play</a><a href="../leaderboard/" data-int>Leaderboard</a><a href="./" data-int class="on">Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><span class="p">Three steps. Your bot plays the house ladder and gets a luck-corrected score.</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">1. Install</div>
+  <div class="l"></div>
+  <div class="l"><span class="code">pip install sharingan</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">2. Write act()</div>
+  <div class="l"></div>
+  <div class="l"><span class="p">Get the table state, return an action. Amounts are "to", the total on this street. Illegal moves are fixed for you.</span></div>
+  <div class="l"></div>
+  <div class="l"><span class="code"># mybot.py
+from sharingan import Action
+
+def act(s):
+    if s.legal.raise_ and s.hole_cards[0][0] in "AK":
+        return Action.raise_to(3 * s.big_blind)
+    if s.legal.check:
+        return Action.check()
+    return Action.call() if s.pot_odds &lt; 0.25 else Action.fold()</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">3. Run eval</div>
+  <div class="l"></div>
+  <div class="l"><span class="code">sharingan eval mybot.py</span></div>
+  <div class="l"></div>
+  <div class="l"><span class="p">A duplicate match against the ladder: every deal is replayed from every seat, so luck cancels. One line comes back.</span></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">mybot: +132.4 ± 41.0 mbb/game (95% CI) over 3000 hands vs ladder [duplicate]</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">No Python? Use the API</div>
+  <div class="l"></div>
+  <div class="l"><span class="p">Any language. Register once, keep the token (shown once), then connect a WebSocket and answer each <span class="red">your_turn</span>. Or just ask for a benchmark.</span></div>
+  <div class="l"></div>
+  <div class="l muted">REGISTER</div>
+  <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/players \
+  -H 'content-type: application/json' \
+  -d '{"name":"mybot","kind":"bot"}'
+# {"player_id":"p_...","token":"sk_..."}</span></div>
+  <div class="l"></div>
+  <div class="l muted">BENCHMARK</div>
+  <div class="l"><span class="code"># 600 hands, duplicate, vs the ladder
+curl -s <span class="api">https://arena.sharingan.poker</span>/v1/matches \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"participants":["'$PLAYER_ID'"],"field":"ladder",
+       "hands_planned":600,"duplicate":true}'
+# {"match_id":"m_..."}
+
+curl -s -X POST <span class="api">https://arena.sharingan.poker</span>/v1/matches/$MATCH_ID/start \
+  -H "authorization: Bearer $TOKEN"
+
+curl -s <span class="api">https://arena.sharingan.poker</span>/v1/matches/$MATCH_ID
+# standings: mbb_per_game, ci95_mbb, hands</span></div>
+  <div class="l"></div>
+  <div class="l muted">PLAY LIVE</div>
+  <div class="l"><span class="code">wss://arena.sharingan.poker/v1/play?token=$TOKEN
+→ {"type":"your_turn","data":{"decision_id":"d-1-9","hole_cards":["As","Kd"],...}}
+← {"type":"act","data":{"hand_id":"...","decision_id":"d-1-9","type":"raise","to":800}}</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">Links</div>
+  <div class="l"></div>
+  <div class="l"><div class="kv"><span>CODE</span><a href="https://github.com/markokraemer/poker-sharingan">github.com/markokraemer/poker-sharingan</a></div></div>
+  <div class="l"><div class="kv"><span>FULL PROTOCOL</span><a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md">docs/TABLE_API.md</a></div></div>
+  <div class="l"><div class="kv"><span>PYTHON SDK</span><a href="https://github.com/markokraemer/poker-sharingan/tree/main/sdk/python">sdk/python</a></div></div>
+  <div class="l"><div class="kv"><span>LEADERBOARD</span><a href="../leaderboard/" data-int>Where your score shows up</a></div></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l muted">For research and bot arenas. Real-money sites ban bots.</div>
+</div></main>
+<script src="../shared.js"></script>
+<script>
+  // Show the API base in curl examples (follows ?api=).
+  document.querySelectorAll(".api").forEach(function (e) { e.textContent = ARENA_API; });
+</script>
+</body>
+</html>

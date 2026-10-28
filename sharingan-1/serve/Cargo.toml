@@ -1,0 +1,30 @@
+[package]
+name = "sharingan-serve"
+edition.workspace = true
+version.workspace = true
+description = "SHARINGAN-1 inference API: stateless POST /v1/act over a compact blueprint + turn/river real-time search."
+
+[lib]
+name = "sharingan_serve"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sharingan-serve"
+path = "src/main.rs"
+
+[dependencies]
+cards.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+nlhe = { path = "../../engine/nlhe" }
+bench = { path = "../../arena/bench" }
+search = { path = "../search" }
+blueprint = { path = "../blueprint" }
+abstraction = { path = "../abstraction" }
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
