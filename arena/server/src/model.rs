@@ -244,6 +244,9 @@ pub struct RunRecord {
     pub status: String,
     /// True only when the server itself ran the bot (house/hosted bots); remote bots are unverified.
     pub verified: bool,
+    /// Set by the trusted runner (`ARENA_RUNNER_TOKEN`): the bot ran on infrastructure the arena operator controls.
+    #[serde(default)]
+    pub hosted: bool,
     pub mbb_per_game: Option<f64>,
     pub ci95_mbb: Option<f64>,
     pub method: Option<String>,

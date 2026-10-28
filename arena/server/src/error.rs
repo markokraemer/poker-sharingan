@@ -42,6 +42,16 @@ impl ApiError {
     pub fn conflict(code: &'static str, m: impl Into<String>) -> Self {
         Self::new(409, code, m)
     }
+    /// 429 `rate_limited`; `details.limit` names the knob (an `ARENA_*` setting) that was hit.
+    pub fn rate_limited(m: impl Into<String>, details: Value) -> Self {
+        Self::new(429, "rate_limited", m).with(details)
+    }
+    pub fn payload_too_large(max: usize) -> Self {
+        Self::new(413, "payload_too_large", format!("request body exceeds {max} bytes")).with(json!({"max_bytes": max}))
+    }
+    pub fn shutting_down() -> Self {
+        Self::new(503, "shutting_down", "the server is draining for shutdown; retry against another instance")
+    }
     pub fn internal(m: impl std::fmt::Display) -> Self {
         Self::new(500, "internal", m.to_string())
     }
@@ -58,7 +68,14 @@ impl std::fmt::Display for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (self.status, axum::Json(self.body())).into_response()
+        let retry_ms = self.details.get("retry_after_ms").and_then(|v| v.as_u64());
+        let mut res = (self.status, axum::Json(self.body())).into_response();
+        if let Some(ms) = retry_ms {
+            if let Ok(v) = ((ms + 999) / 1000).max(1).to_string().parse() {
+                res.headers_mut().insert("retry-after", v);
+            }
+        }
+        res
     }
 }
 

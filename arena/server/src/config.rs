@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub struct ServerConfig {
     /// `ARENA_BIND`, default `127.0.0.1:8080`.
     pub bind: String,
-    /// `ARENA_DB`, SQLite path or `:memory:`, default `arena.db`.
+    /// `ARENA_DB`, SQLite path (ignored when `ARENA_DATABASE_URL` is set) or `:memory:`, default `arena.db`.
     pub db_path: String,
     /// `ARENA_ADMIN_TOKEN`; if unset a random one is generated and logged at startup.
     pub admin_token: Option<String>,
@@ -28,6 +28,36 @@ pub struct ServerConfig {
     pub min_leaderboard_hands: u64,
     /// `ARENA_SAVE_FREE_HANDS` (default true): store hand histories of free tables too.
     pub save_free_hands: bool,
+    /// `ARENA_DATABASE_URL` (`postgres://...`): use Postgres instead of SQLite.
+    pub database_url: Option<String>,
+    /// `ARENA_DATABASE_SCHEMA`: Postgres schema for all tables (default: the connection's `public`).
+    pub database_schema: Option<String>,
+    /// `ARENA_DB_POOL` (default 8): Postgres connections.
+    pub db_pool: usize,
+    /// `ARENA_RUNNER_TOKEN`: bearer token of the trusted eval runner (hosted attestation). Unset = no runner.
+    pub runner_token: Option<String>,
+    /// `ARENA_RATE_LIMIT_RPS` (default 50, 0 = off): sustained requests/s per bearer token (per IP when anonymous).
+    pub rate_limit_rps: f64,
+    /// `ARENA_RATE_LIMIT_BURST` (default 100).
+    pub rate_limit_burst: f64,
+    /// `ARENA_TRUST_PROXY` (default false): key anonymous requests by the first `X-Forwarded-For` hop.
+    pub trust_proxy: bool,
+    /// `ARENA_MAX_TABLES_PER_PLAYER` (default 10): open free tables a player owns or sits at.
+    pub max_tables_per_player: usize,
+    /// `ARENA_MAX_MATCHES_PER_PLAYER` (default 4): unfinished matches/benchmark runs a player owns.
+    pub max_matches_per_player: usize,
+    /// `ARENA_MAX_WS_PER_PLAYER` (default 4): simultaneous `/v1/play` sockets.
+    pub max_ws_per_player: usize,
+    /// `ARENA_MAX_RUN_HANDS` (default 100000): hands of one benchmark run.
+    pub max_run_hands: u32,
+    /// `ARENA_MAX_MATCH_HANDS` (default 1000000): `hands_planned` of one match.
+    pub max_match_hands: u32,
+    /// `ARENA_MAX_BODY_BYTES` (default 262144): HTTP request body.
+    pub max_body_bytes: usize,
+    /// `ARENA_MAX_WS_MESSAGE_BYTES` (default 65536): one client WebSocket message.
+    pub max_ws_message_bytes: usize,
+    /// `ARENA_SHUTDOWN_GRACE_MS` (default 20000): how long SIGTERM lets running matches finish.
+    pub shutdown_grace_ms: u64,
 }
 
 impl Default for ServerConfig {
@@ -45,6 +75,21 @@ impl Default for ServerConfig {
             reconnect_grace_ms: 2000,
             min_leaderboard_hands: 1000,
             save_free_hands: true,
+            database_url: None,
+            database_schema: None,
+            db_pool: 8,
+            runner_token: None,
+            rate_limit_rps: 50.0,
+            rate_limit_burst: 100.0,
+            trust_proxy: false,
+            max_tables_per_player: 10,
+            max_matches_per_player: 4,
+            max_ws_per_player: 4,
+            max_run_hands: 100_000,
+            max_match_hands: 1_000_000,
+            max_body_bytes: 256 * 1024,
+            max_ws_message_bytes: 64 * 1024,
+            shutdown_grace_ms: 20_000,
         }
     }
 }
@@ -77,6 +122,21 @@ impl ServerConfig {
             reconnect_grace_ms: num("ARENA_RECONNECT_GRACE_MS", d.reconnect_grace_ms),
             min_leaderboard_hands: num("ARENA_LEADERBOARD_MIN_HANDS", d.min_leaderboard_hands),
             save_free_hands: flag("ARENA_SAVE_FREE_HANDS", d.save_free_hands),
+            database_url: env("ARENA_DATABASE_URL"),
+            database_schema: env("ARENA_DATABASE_SCHEMA"),
+            db_pool: num("ARENA_DB_POOL", d.db_pool),
+            runner_token: env("ARENA_RUNNER_TOKEN"),
+            rate_limit_rps: num("ARENA_RATE_LIMIT_RPS", d.rate_limit_rps),
+            rate_limit_burst: num("ARENA_RATE_LIMIT_BURST", d.rate_limit_burst),
+            trust_proxy: flag("ARENA_TRUST_PROXY", d.trust_proxy),
+            max_tables_per_player: num("ARENA_MAX_TABLES_PER_PLAYER", d.max_tables_per_player),
+            max_matches_per_player: num("ARENA_MAX_MATCHES_PER_PLAYER", d.max_matches_per_player),
+            max_ws_per_player: num("ARENA_MAX_WS_PER_PLAYER", d.max_ws_per_player),
+            max_run_hands: num("ARENA_MAX_RUN_HANDS", d.max_run_hands),
+            max_match_hands: num("ARENA_MAX_MATCH_HANDS", d.max_match_hands),
+            max_body_bytes: num("ARENA_MAX_BODY_BYTES", d.max_body_bytes),
+            max_ws_message_bytes: num("ARENA_MAX_WS_MESSAGE_BYTES", d.max_ws_message_bytes),
+            shutdown_grace_ms: num("ARENA_SHUTDOWN_GRACE_MS", d.shutdown_grace_ms),
         }
     }
 }

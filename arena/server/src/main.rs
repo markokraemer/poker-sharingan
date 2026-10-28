@@ -1,7 +1,7 @@
 use arena_server::config::ServerConfig;
 
 fn usage() -> ! {
-    eprintln!("usage: sharingan-arena [--port N] [--bind HOST:PORT] [--db PATH]   (env: see arena/server/README.md)");
+    eprintln!("usage: sharingan-arena [--port N] [--bind HOST:PORT] [--db PATH] [--database-url postgres://...]   (env: see arena/server/README.md)");
     std::process::exit(2)
 }
 
@@ -22,6 +22,7 @@ async fn main() {
             }
             "--bind" => cfg.bind = val(),
             "--db" => cfg.db_path = val(),
+            "--database-url" => cfg.database_url = Some(val()),
             _ => usage(),
         }
     }
@@ -37,8 +38,19 @@ async fn main() {
     if generated {
         tracing::info!("admin token (generated, set ARENA_ADMIN_TOKEN to fix it): {}", srv.app.admin_token);
     }
+    wait_for_signal().await;
+    tracing::info!("shutdown requested: draining (a second signal exits immediately)");
     tokio::select! {
-        _ = srv.task => {}
+        _ = srv.shutdown() => {}
+        _ = wait_for_signal() => { tracing::warn!("second signal: exiting now"); }
+    }
+}
+
+async fn wait_for_signal() {
+    use tokio::signal::unix::{signal, SignalKind};
+    let mut term = signal(SignalKind::terminate()).expect("SIGTERM handler");
+    tokio::select! {
+        _ = term.recv() => {}
         _ = tokio::signal::ctrl_c() => {}
     }
 }

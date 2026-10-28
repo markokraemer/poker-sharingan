@@ -2,6 +2,9 @@
 //! duplicate matches, hand history export and the leaderboard. Each test spawns the server
 //! in-process on an ephemeral port with an in-memory SQLite database and drives it over
 //! real HTTP and WebSocket connections.
+//!
+//! Storage backend: in-memory SQLite by default; with `ARENA_TEST_DATABASE_URL=postgres://...` every
+//! test server gets its own fresh schema in that Postgres database, so the same suite runs on both.
 
 use arena_server::config::ServerConfig;
 use arena_server::{start, RunningServer};
@@ -31,7 +34,23 @@ async fn srv() -> Srv {
 }
 
 async fn srv_with(blueprint: Option<std::path::PathBuf>) -> Srv {
-    let cfg = ServerConfig {
+    srv_cfg(blueprint, |_| {}).await
+}
+
+static SCHEMA_N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+async fn srv_cfg(blueprint: Option<std::path::PathBuf>, tweak: impl FnOnce(&mut ServerConfig)) -> Srv {
+    let pg = std::env::var("ARENA_TEST_DATABASE_URL").ok().filter(|v| !v.is_empty());
+    let schema = pg.as_ref().map(|_| {
+        let n = SCHEMA_N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        format!("t_{}_{}_{}", std::process::id(), n, t % 1_000_000_007)
+    });
+    let mut cfg = ServerConfig {
+        database_url: pg,
+        database_schema: schema,
+        db_pool: 2, // the whole suite runs ~30 servers in parallel; every pooled client holds ~10 fds
+        rate_limit_rps: 0.0,
         blueprint,
         sizing: "tiny".into(),
         bind: "127.0.0.1:0".into(),
@@ -42,6 +61,7 @@ async fn srv_with(blueprint: Option<std::path::PathBuf>) -> Srv {
         min_leaderboard_hands: 6,
         ..Default::default()
     };
+    tweak(&mut cfg);
     let rs = start(cfg).await.unwrap();
     Srv { base: format!("http://{}", rs.addr), ws: format!("ws://{}", rs.addr), rs, http: reqwest::Client::new() }
 }
@@ -888,4 +908,324 @@ async fn benchmark_runs_house_verified_remote_unverified_with_progress() {
     assert_eq!(only["rows"].as_array().unwrap().len(), 1);
     let (_, t) = s.get("/v1/benchmarks/ladder-v1", None).await;
     assert_eq!(t["top_runs"].as_array().unwrap().len(), 1);
+}
+
+// ---- hosted attestation (runner token) ----
+
+/// Answer every `your_turn` with check/call until the run's final `benchmark_progress`; returns its data.
+async fn play_run_out(room: &mut Room) -> Value {
+    loop {
+        let (i, m) = room.recv().await;
+        match m["type"].as_str().unwrap() {
+            "your_turn" => {
+                let d = m["data"].clone();
+                let ty = if d["legal"]["check"] == true { "check" } else { "call" };
+                room.act(i, m["table_id"].as_str().unwrap(), &d, ty, None);
+            }
+            "benchmark_progress" if m["data"]["status"] != "running" => return m["data"].clone(),
+            _ => {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn hosted_attestation_only_via_the_runner_token() {
+    let Some(bp) = test_blueprint() else {
+        eprintln!("skipped: no tiny blueprint (set SHARINGAN_TEST_BLUEPRINT)");
+        return;
+    };
+    let s = srv_cfg(Some(bp), |c| c.runner_token = Some("runner-secret".into())).await;
+    let mut room = Room::new(&s, 1).await;
+    let (pid, ptok) = room.ids[0].clone();
+    // nobody but the runner can ask for a hosted run
+    for who in [ptok.as_str(), "admin"] {
+        let (st, e) = s.post("/v1/benchmarks/ladder-v1/runs", Some(who), json!({"player_id": pid, "hands": 12, "hosted": true})).await;
+        assert_eq!(st, 403, "{e}");
+        assert_eq!(e["error"]["code"], "forbidden");
+    }
+    assert_eq!(s.post("/v1/runner/hosted", Some(&ptok), json!({"player_id": pid, "run_id": "x"})).await.0, 403);
+    assert_eq!(s.post("/v1/runner/hosted", Some("admin"), json!({"player_id": pid, "run_id": "x"})).await.0, 403);
+    assert_eq!(s.post("/v1/runner/hosted", None, json!({"player_id": pid, "run_id": "x"})).await.0, 401);
+    // the runner token is not an admin token
+    assert_eq!(s.post("/v1/tables", Some("runner-secret"), json!({})).await.0, 403);
+    assert_eq!(s.post("/v1/benchmarks/ladder-v1/runs", Some("runner-secret"), json!({"hands": 12})).await.0, 400); // player_id required
+    // runner starts a hosted run: verified, and stays verified on the leaderboard
+    let (st, run) = s.post("/v1/benchmarks/ladder-v1/runs", Some("runner-secret"), json!({"player_id": pid, "hands": 12, "hosted": true})).await;
+    assert_eq!(st, 201, "{run}");
+    assert_eq!((run["hosted"].clone(), run["verified"].clone()), (json!(true), json!(true)));
+    let fin = play_run_out(&mut room).await;
+    assert_eq!(fin["status"], "finished");
+    assert_eq!(fin["verified"], true);
+    let (_, lb) = s.get("/v1/leaderboard?track=ladder-v1&min_hands=1", None).await;
+    let row = lb["rows"].as_array().unwrap().iter().find(|r| r["player_id"] == pid.as_str()).expect("row").clone();
+    assert_eq!(row["verified"], true);
+    // a run the runner starts without `hosted` is remote: unverified until attested, and only while running
+    let (st, run2) = s.post("/v1/benchmarks/ladder-v1/runs", Some("runner-secret"), json!({"player_id": pid, "hands": 12})).await;
+    assert_eq!(st, 201, "{run2}");
+    assert_eq!((run2["hosted"].clone(), run2["verified"].clone()), (json!(false), json!(false)));
+    let rid = run2["run_id"].as_str().unwrap().to_string();
+    let (st, e) = s.post("/v1/runner/hosted", Some("runner-secret"), json!({"player_id": "someone-else", "run_id": rid})).await;
+    assert_eq!(st, 400, "{e}");
+    let (st, a) = s.post("/v1/runner/hosted", Some("runner-secret"), json!({"player_id": pid, "run_id": rid})).await;
+    assert_eq!(st, 200, "{a}");
+    assert_eq!((a["hosted"].clone(), a["verified"].clone()), (json!(true), json!(true)));
+    let (_, g) = s.get(&format!("/v1/benchmarks/ladder-v1/runs/{rid}"), None).await;
+    assert_eq!(g["verified"], true);
+    // revoking works too
+    let (_, a) = s.post("/v1/runner/hosted", Some("runner-secret"), json!({"player_id": pid, "run_id": rid, "hosted": false})).await;
+    assert_eq!(a["verified"], false);
+    s.post("/v1/runner/hosted", Some("runner-secret"), json!({"player_id": pid, "run_id": rid})).await;
+    assert_eq!(play_run_out(&mut room).await["verified"], true);
+    let (st, e) = s.post("/v1/runner/hosted", Some("runner-secret"), json!({"player_id": pid, "run_id": rid})).await;
+    assert_eq!(st, 409, "{e}");
+    // a plain remote run by the bot itself stays unverified, and is rejected without a runner token set up
+    let (st, run3) = s.post("/v1/benchmarks/ladder-v1/runs", Some(&ptok), json!({"hands": 12})).await;
+    assert_eq!(st, 201, "{run3}");
+    assert_eq!(run3["verified"], false);
+    assert_eq!(play_run_out(&mut room).await["verified"], false);
+}
+
+#[tokio::test]
+async fn runner_endpoints_are_off_without_a_runner_token() {
+    let s = srv().await;
+    let (st, e) = s.post("/v1/runner/hosted", Some("anything"), json!({"player_id": "x", "run_id": "y"})).await;
+    assert_eq!(st, 401, "{e}");
+}
+
+// ---- rate limits and abuse limits ----
+
+fn err_code(v: &Value) -> &str {
+    v["error"]["code"].as_str().unwrap_or("")
+}
+
+#[tokio::test]
+async fn request_rate_limit_is_per_token_with_retry_after() {
+    let s = srv_cfg(None, |c| {
+        c.rate_limit_rps = 0.5;
+        c.rate_limit_burst = 5.0;
+    })
+    .await;
+    let (_, a) = s.register("a").await; // 1 anonymous request
+    let (_, b) = s.register("b").await; // 2
+    for _ in 0..3 {
+        assert_eq!(s.get("/v1/leaderboard", None).await.0, 200); // 3,4,5
+    }
+    let resp = s.http.get(format!("{}/v1/leaderboard", s.base)).send().await.unwrap();
+    assert_eq!(resp.status().as_u16(), 429);
+    let ra: u64 = resp.headers()["retry-after"].to_str().unwrap().parse().unwrap();
+    assert!((1..=3).contains(&ra), "{ra}");
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(err_code(&body), "rate_limited", "{body}");
+    assert_eq!(body["error"]["details"]["limit"], "ARENA_RATE_LIMIT_RPS");
+    assert!(body["error"]["details"]["retry_after_ms"].as_u64().unwrap() > 0);
+    // buckets are per token: a and b are unaffected by the anonymous flood and by each other
+    for tok in [&a, &b] {
+        assert_eq!(s.get("/v1/leaderboard", Some(tok)).await.0, 200);
+    }
+    for _ in 0..4 {
+        assert_eq!(s.get("/v1/leaderboard", Some(&a)).await.0, 200);
+    }
+    let (st, e) = s.get("/v1/leaderboard", Some(&a)).await;
+    assert_eq!((st, err_code(&e)), (429, "rate_limited"));
+    assert_eq!(s.get("/v1/leaderboard", Some(&b)).await.0, 200);
+    // admin and health probes are exempt
+    for _ in 0..30 {
+        assert_eq!(s.get("/v1/leaderboard", Some("admin")).await.0, 200);
+        assert_eq!(s.get("/healthz", None).await.0, 200);
+        assert_eq!(s.get("/readyz", None).await.0, 200);
+    }
+    // the 429 carries CORS headers so browsers can read it
+    let resp = s.http.get(format!("{}/v1/leaderboard", s.base)).send().await.unwrap();
+    assert_eq!(resp.status().as_u16(), 429);
+    assert_eq!(resp.headers()["access-control-allow-origin"], "*");
+}
+
+#[tokio::test]
+async fn open_tables_per_player_are_capped_and_freed_by_delete() {
+    let s = srv_cfg(None, |c| c.max_tables_per_player = 2).await;
+    let (pid, tok) = s.register("capped").await;
+    let mut ids = vec![];
+    for _ in 0..2 {
+        let (st, t) = s.post("/v1/tables", Some(&tok), json!({"decision_time_ms": 1000})).await;
+        assert_eq!(st, 201, "{t}");
+        ids.push(t["table_id"].as_str().unwrap().to_string());
+    }
+    let (st, e) = s.post("/v1/tables", Some(&tok), json!({})).await;
+    assert_eq!((st, err_code(&e)), (429, "rate_limited"), "{e}");
+    assert_eq!(e["error"]["details"]["limit"], "ARENA_MAX_TABLES_PER_PLAYER");
+    // sitting at someone else's table counts too
+    let other = s.table(json!({"decision_time_ms": 1000})).await; // admin-owned
+    let (st, e) = s.post(&format!("/v1/tables/{other}/seats/0"), Some(&tok), json!({"player_id": pid})).await;
+    assert_eq!((st, err_code(&e)), (429, "rate_limited"), "{e}");
+    // only the owner or admin can close; closing frees a slot
+    let (_, tok2) = s.register("stranger").await;
+    assert_eq!(s.req("DELETE", &format!("/v1/tables/{}", ids[0]), Some(&tok2), None).await.0, 403);
+    let (st, c) = s.req("DELETE", &format!("/v1/tables/{}", ids[0]), Some(&tok), None).await;
+    assert_eq!(st, 200, "{c}");
+    assert_eq!(c["status"], "closed");
+    assert_eq!(s.post("/v1/tables", Some(&tok), json!({"decision_time_ms": 1000})).await.0, 201);
+    // house bots and the admin are not capped
+    for _ in 0..4 {
+        s.table(json!({"decision_time_ms": 1000})).await;
+    }
+}
+
+#[tokio::test]
+async fn unfinished_matches_per_player_and_hand_caps() {
+    let s = srv_cfg(None, |c| {
+        c.max_matches_per_player = 1;
+        c.max_match_hands = 60;
+        c.max_run_hands = 600;
+    })
+    .await;
+    let (_, tok) = s.register("m").await;
+    let m = json!({"participants": participants(), "hands_planned": 12, "table_config": {"decision_time_ms": 1000}});
+    let (st, v) = s.post("/v1/matches", Some(&tok), m.clone()).await;
+    assert_eq!(st, 201, "{v}");
+    let (st, e) = s.post("/v1/matches", Some(&tok), m.clone()).await;
+    assert_eq!((st, err_code(&e)), (429, "rate_limited"), "{e}");
+    assert_eq!(e["error"]["details"]["limit"], "ARENA_MAX_MATCHES_PER_PLAYER");
+    assert_eq!(s.post("/v1/matches", Some("admin"), m.clone()).await.0, 201); // admin exempt
+    // hands cap on matches (admin included) and on benchmark runs (players)
+    let big = json!({"participants": participants(), "hands_planned": 66});
+    let (st, e) = s.post("/v1/matches", Some("admin"), big).await;
+    assert_eq!(st, 400, "{e}");
+    assert_eq!(e["error"]["details"]["limit"], "ARENA_MAX_MATCH_HANDS");
+    let (_, tok2) = s.register("r").await;
+    let (st, e) = s.post("/v1/benchmarks/ladder-v1/runs", Some(&tok2), json!({"hands": 6000})).await;
+    assert_eq!(st, 400, "{e}");
+    assert_eq!(e["error"]["details"]["limit"], "ARENA_MAX_RUN_HANDS");
+}
+
+#[tokio::test]
+async fn websockets_per_player_are_capped() {
+    let s = srv_cfg(None, |c| c.max_ws_per_player = 2).await;
+    let (_, tok) = s.register("w").await;
+    let url = format!("{}/v1/play?token={tok}", s.ws);
+    let (a, _) = connect_async(&url).await.unwrap();
+    let (b, _) = connect_async(&url).await.unwrap();
+    for _ in 0..50 {
+        if s.rs.app.hub.total() == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    match connect_async(&url).await {
+        Err(tokio_tungstenite::tungstenite::Error::Http(r)) => {
+            assert_eq!(r.status().as_u16(), 429);
+            let body: Value = serde_json::from_slice(r.body().as_deref().unwrap_or(b"{}")).unwrap_or_default();
+            assert_eq!(err_code(&body), "rate_limited", "{body}");
+        }
+        other => panic!("expected a 429 handshake, got {:?}", other.map(|_| "connected")),
+    }
+    // another player is unaffected; closing one frees a slot
+    let (_, tok2) = s.register("w2").await;
+    connect_async(format!("{}/v1/play?token={tok2}", s.ws)).await.unwrap();
+    drop(a);
+    let mut ok = false;
+    for _ in 0..100 {
+        if connect_async(&url).await.is_ok() {
+            ok = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(ok, "slot never freed");
+    drop(b);
+}
+
+#[tokio::test]
+async fn payload_size_limits() {
+    let s = srv_cfg(None, |c| {
+        c.max_body_bytes = 1024;
+        c.max_ws_message_bytes = 256;
+    })
+    .await;
+    let (st, e) = s.post("/v1/bots", None, json!({"name": "x".repeat(5000)})).await;
+    assert_eq!(st, 413, "{e}");
+    assert_eq!(err_code(&e), "payload_too_large");
+    assert_eq!(e["error"]["details"]["max_bytes"], 1024);
+    assert_eq!(s.post("/v1/bots", None, json!({"name": "fine"})).await.0, 201);
+    // an oversized WebSocket message ends the connection; small ones are fine
+    let (_, tok) = s.register("big").await;
+    let (mut ws, _) = connect_async(format!("{}/v1/play?token={tok}", s.ws)).await.unwrap();
+    ws.send(Message::Text(json!({"v": 1, "type": "ping", "data": {}}).to_string().into())).await.unwrap();
+    let pong = tokio::time::timeout(Duration::from_secs(5), ws.next()).await.unwrap().unwrap().unwrap();
+    assert!(pong.to_text().unwrap().contains("pong"));
+    ws.send(Message::Text(format!("{{\"type\":\"ping\",\"pad\":\"{}\"}}", "x".repeat(2000)).into())).await.unwrap();
+    let end = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match ws.next().await {
+                None | Some(Err(_)) | Some(Ok(Message::Close(_))) => return,
+                Some(Ok(_)) => {}
+            }
+        }
+    })
+    .await;
+    assert!(end.is_ok(), "socket stayed open after an oversized message");
+}
+
+// ---- health, readiness, graceful shutdown ----
+
+#[tokio::test]
+async fn health_and_readiness() {
+    let s = srv().await;
+    let (st, v) = s.get("/healthz", None).await;
+    assert_eq!((st, v.as_str()), (200, Some("ok")));
+    let (st, v) = s.get("/readyz", None).await;
+    assert_eq!(st, 200, "{v}");
+    assert_eq!((v["status"].as_str(), v["db"].as_str(), v["draining"].as_bool()), (Some("ready"), Some("ok"), Some(false)));
+    assert_eq!(s.get("/livez", None).await.0, 200);
+}
+
+#[tokio::test]
+async fn graceful_shutdown_drains_aborts_and_closes_sockets() {
+    let s = srv_cfg(None, |c| c.shutdown_grace_ms = 300).await;
+    let (_, tok) = s.register("sd").await;
+    let (mut ws, _) = connect_async(format!("{}/v1/play?token={}", s.ws, tok)).await.unwrap();
+    // a long all-house match that cannot finish within the grace period
+    let (st, m) = s
+        .post("/v1/matches", Some("admin"), json!({"participants": participants(), "hands_planned": 600000, "duplicate": true,
+                                                   "aivat": "off", "table_config": {"decision_time_ms": 1000}}))
+        .await;
+    assert_eq!(st, 201, "{m}");
+    let mid = m["match_id"].as_str().unwrap().to_string();
+    assert_eq!(s.post(&format!("/v1/matches/{mid}/start"), Some("admin"), json!({})).await.0, 200);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let (base, app, http) = (s.base.clone(), s.rs.app.clone(), s.http.clone());
+    let Srv { rs, .. } = s;
+    let down = tokio::spawn(rs.shutdown());
+    // draining: not ready, new work refused, reads still served
+    let mut saw = false;
+    for _ in 0..50 {
+        let r = http.get(format!("{base}/readyz")).send().await.unwrap();
+        if r.status().as_u16() == 503 {
+            let v: Value = r.json().await.unwrap();
+            assert_eq!(v["status"], "draining");
+            saw = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(saw, "readyz never turned 503");
+    let r = http.post(format!("{base}/v1/tables")).bearer_auth("admin").json(&json!({})).send().await.unwrap();
+    assert_eq!(r.status().as_u16(), 503);
+    let v: Value = r.json().await.unwrap();
+    assert_eq!(err_code(&v), "shutting_down");
+    assert_eq!(http.get(format!("{base}/healthz")).send().await.unwrap().status().as_u16(), 200);
+    tokio::time::timeout(Duration::from_secs(30), down).await.expect("shutdown hung").unwrap();
+    // the unfinished match was aborted and persisted; the socket got closed
+    let rec = app.store.get_match(&mid).unwrap().unwrap();
+    assert_eq!(rec.status, "aborted");
+    let closed = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match ws.next().await {
+                None | Some(Err(_)) | Some(Ok(Message::Close(_))) => return,
+                Some(Ok(_)) => {}
+            }
+        }
+    })
+    .await;
+    assert!(closed.is_ok(), "websocket not closed by shutdown");
+    assert!(http.get(format!("{base}/healthz")).send().await.is_err(), "still accepting connections");
 }

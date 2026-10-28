@@ -25,13 +25,16 @@ type App = State<Arc<AppState>>;
 pub fn router(app: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
+        .route("/livez", get(|| async { "ok" }))
+        .route("/readyz", get(readyz))
+        .route("/v1/runner/hosted", post(runner_hosted))
         .route("/v1/bots", post(register).get(list_players))
         .route("/v1/players", post(register).get(list_players))
         .route("/v1/bots/{id}", get(get_player))
         .route("/v1/players/{id}", get(get_player))
         .route("/v1/house", get(list_house))
         .route("/v1/tables", post(create_table).get(list_tables))
-        .route("/v1/tables/{id}", get(get_table))
+        .route("/v1/tables/{id}", get(get_table).delete(close_table))
         .route("/v1/tables/{id}/seats/{seat}", post(sit).delete(stand))
         .route("/v1/tables/{id}/fill", post(fill))
         .route("/v1/matches", post(create_match).get(list_matches))
@@ -51,8 +54,121 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/v1/benchmarks/{track}/runs/{run}", get(crate::benchmarks::get_run))
         .route("/v1/benchmarks/{track}/runs/{run}/abort", post(crate::benchmarks::abort_run))
         .route("/v1/play", get(crate::ws::play))
+        .layer(axum::extract::DefaultBodyLimit::max(app.cfg.max_body_bytes))
+        .layer(axum::middleware::from_fn_with_state(app.clone(), json_413))
+        .layer(axum::middleware::from_fn_with_state(app.clone(), rate_limit))
         .layer(axum::middleware::from_fn(cors))
         .with_state(app)
+}
+
+/// Per-token (anonymous: per-IP) token-bucket limiter; 429 `rate_limited` with `Retry-After`.
+/// Health probes, CORS preflights and the admin/runner tokens are exempt.
+async fn rate_limit(State(app): App, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let path = req.uri().path();
+    if !app.limiter.enabled() || matches!(path, "/healthz" | "/livez" | "/readyz") || req.method() == axum::http::Method::OPTIONS {
+        return next.run(req).await;
+    }
+    let tok = crate::state::bearer(req.headers());
+    if let Some(t) = &tok {
+        if ct_eq(t, &app.admin_token) || app.cfg.runner_token.as_deref().map(|r| ct_eq(t, r)).unwrap_or(false) {
+            return next.run(req).await;
+        }
+    }
+    let key = match &tok {
+        Some(t) => format!("t:{}", &sha256_hex(t.as_bytes())[..16]),
+        None => {
+            let fwd = if app.cfg.trust_proxy {
+                req.headers().get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|s| s.trim().to_string())
+            } else {
+                None
+            };
+            let ip = fwd.or_else(|| {
+                req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip().to_string())
+            });
+            format!("ip:{}", ip.unwrap_or_default())
+        }
+    };
+    match app.limiter.check(&key) {
+        Ok(()) => next.run(req).await,
+        Err(ms) => ApiError::rate_limited(
+            "too many requests; slow down",
+            json!({"limit": "ARENA_RATE_LIMIT_RPS", "rps": app.cfg.rate_limit_rps, "burst": app.cfg.rate_limit_burst, "retry_after_ms": ms}),
+        )
+        .into_response(),
+    }
+}
+
+/// Body-limit rejections come back as plain text; give them the contract's error format.
+async fn json_413(State(app): App, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let res = next.run(req).await;
+    if res.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return ApiError::payload_too_large(app.cfg.max_body_bytes).into_response();
+    }
+    res
+}
+
+/// Load-balancer readiness: 200 only when the database answers and the server is not draining.
+async fn readyz(State(app): App) -> Response {
+    let a = app.clone();
+    let db_ok = tokio::task::spawn_blocking(move || a.store.ping().is_ok()).await.unwrap_or(false);
+    let draining = app.is_draining();
+    let running = app.matches.read().unwrap().values().filter(|m| m.state.lock().unwrap().rec.status == "running").count();
+    let status = if draining { "draining" } else if !db_ok { "unavailable" } else { "ready" };
+    let body = json!({"status": status, "db": if db_ok { "ok" } else { "error" }, "draining": draining,
+        "tables": app.tables.read().unwrap().len(), "matches_running": running, "ws_connections": app.hub.total()});
+    ((if status == "ready" { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE }), Json(body)).into_response()
+}
+
+#[derive(Deserialize)]
+struct HostedReq {
+    player_id: String,
+    run_id: String,
+    #[serde(default = "yes")]
+    hosted: bool,
+}
+fn yes() -> bool {
+    true
+}
+
+/// Runner-only: register (or revoke) a bot as `hosted` for one running benchmark run. Only a hosted
+/// run is `verified`; the flag is stored with the run and shows on the leaderboard.
+async fn runner_hosted(State(app): App, headers: HeaderMap, Json(req): Json<HostedReq>) -> Res<Json<Value>> {
+    match app.authenticate_any(&headers)? {
+        Principal::Runner => {}
+        _ => return Err(ApiError::forbidden("only the runner token (ARENA_RUNNER_TOKEN) can attest hosted bots")),
+    }
+    let mut run = app.store.get_run(&req.run_id)?.ok_or_else(|| ApiError::not_found("run"))?;
+    let pid = if HouseRegistry::looks_like_house(&req.player_id) { house_id(&app.house.resolve(&req.player_id)?) } else { req.player_id.clone() };
+    if run.player_id != pid {
+        return Err(ApiError::bad_request("run_id does not belong to that player_id"));
+    }
+    if run.status != "running" {
+        return Err(ApiError::conflict("match_not_running", format!("run is {}; attest while it is running", run.status)));
+    }
+    let house = app.store.get_player(&pid)?.map(|p| p.house).unwrap_or(false);
+    run.hosted = req.hosted;
+    run.verified = req.hosted || house;
+    app.store.put_run(&run)?;
+    Ok(Json(json!({"run_id": run.run_id, "player_id": run.player_id, "hosted": run.hosted, "verified": run.verified})))
+}
+
+async fn close_table(State(app): App, headers: HeaderMap, Path(id): Path<String>) -> Res<Json<Value>> {
+    let who = app.authenticate(&headers)?;
+    let t = app.table(&id)?;
+    let (owner, is_match) = {
+        let i = t.inner.lock().unwrap();
+        (i.owner.clone(), i.match_id.is_some())
+    };
+    if !who.is_admin() && who.owner_id() != owner {
+        return Err(ApiError::forbidden("only the table owner or an admin can close a table"));
+    }
+    if is_match {
+        return Err(ApiError::conflict("table_locked", "match tables close with their match (abort the match)"));
+    }
+    let _ = t.tx.send(crate::table::TableCmd::Close);
+    t.wake.notify_one();
+    t.inner.lock().unwrap().status = "closed".into();
+    Ok(Json(t.table_json(&app.hub)))
 }
 
 /// Minimal CORS so the static site (a different origin) can call the REST API from a browser.
@@ -157,8 +273,18 @@ async fn list_house(State(app): App) -> Json<Value> {
 // ---- tables ----
 
 async fn create_table(State(app): App, headers: HeaderMap, Json(cfg): Json<TableConfig>) -> Res<(StatusCode, Json<Value>)> {
+    app.ensure_accepting()?;
     let who = app.authenticate(&headers)?;
     cfg.validate()?;
+    if !who.is_admin() {
+        let n = app.open_tables_of(&who.owner_id());
+        if n >= app.cfg.max_tables_per_player {
+            return Err(ApiError::rate_limited(
+                format!("you already have {n} open tables (limit {}); close one with DELETE /v1/tables/{{id}}", app.cfg.max_tables_per_player),
+                json!({"limit": "ARENA_MAX_TABLES_PER_PLAYER", "max": app.cfg.max_tables_per_player}),
+            ));
+        }
+    }
     let id = new_id("t");
     let t = spawn_table(&app, id, who.owner_id(), cfg, None, 0);
     Ok((StatusCode::CREATED, Json(t.table_json(&app.hub))))
@@ -199,7 +325,7 @@ fn seat_player(app: &AppState, who: &Principal, owner: &str, req: &SitReq) -> Re
         (None, Some(p)) => p.clone(),
         (None, None) => match who {
             Principal::Player(p) => p.player_id.clone(),
-            Principal::Admin => return Err(ApiError::bad_request("player_id required")),
+            Principal::Admin | Principal::Runner => return Err(ApiError::bad_request("player_id required")),
         },
     };
     let rec = app.store.get_player(&id)?.ok_or_else(|| ApiError::not_found("player"))?;
@@ -247,7 +373,17 @@ async fn sit(State(app): App, headers: HeaderMap, Path((id, seat)): Path<(String
     let who = app.authenticate(&headers)?;
     let t = app.table(&id)?;
     let owner = t.inner.lock().unwrap().owner.clone();
+    app.ensure_accepting()?;
     let rec = seat_player(&app, &who, &owner, &req)?;
+    if !rec.house && !who.is_admin() {
+        let n = app.open_tables_of(&rec.player_id);
+        if n >= app.cfg.max_tables_per_player {
+            return Err(ApiError::rate_limited(
+                format!("{} is already at or owns {n} open tables (limit {})", rec.player_id, app.cfg.max_tables_per_player),
+                json!({"limit": "ARENA_MAX_TABLES_PER_PLAYER", "max": app.cfg.max_tables_per_player}),
+            ));
+        }
+    }
     Ok(Json(do_sit(&app, &t, seat, &rec)?))
 }
 
@@ -334,6 +470,20 @@ struct MatchReq {
     lanes: Option<usize>,
 }
 
+/// Players may have a limited number of unfinished matches / benchmark runs at once (admin and runner: unlimited).
+pub fn check_match_quota(app: &AppState, who: &Principal) -> Res<()> {
+    if matches!(who, Principal::Player(_)) {
+        let n = app.live_matches_of(&who.owner_id());
+        if n >= app.cfg.max_matches_per_player {
+            return Err(ApiError::rate_limited(
+                format!("you already have {n} unfinished matches or runs (limit {})", app.cfg.max_matches_per_player),
+                json!({"limit": "ARENA_MAX_MATCHES_PER_PLAYER", "max": app.cfg.max_matches_per_player}),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn match_json(rt: &MatchRuntime, app: &AppState) -> Value {
     let mut v = serde_json::to_value(rt.record()).unwrap();
     v["standings"] = serde_json::to_value(rt.standings()).unwrap();
@@ -343,7 +493,9 @@ fn match_json(rt: &MatchRuntime, app: &AppState) -> Value {
 }
 
 async fn create_match(State(app): App, headers: HeaderMap, Json(req): Json<MatchReq>) -> Res<(StatusCode, Json<Value>)> {
+    app.ensure_accepting()?;
     let who = app.authenticate(&headers)?;
+    check_match_quota(&app, &who)?;
     let mut parts = req.participants.clone();
     match req.field.as_deref() {
         None => {}
@@ -380,8 +532,9 @@ async fn create_match(State(app): App, headers: HeaderMap, Json(req): Json<Match
             if d.enabled { Some(d) } else { None }
         }
     };
-    if req.hands_planned == 0 || req.hands_planned > 1_000_000 {
-        return Err(ApiError::bad_request("hands_planned must be 1..1000000"));
+    if req.hands_planned == 0 || req.hands_planned > app.cfg.max_match_hands {
+        return Err(ApiError::bad_request(format!("hands_planned must be 1..{}", app.cfg.max_match_hands))
+            .with(json!({"limit": "ARENA_MAX_MATCH_HANDS", "max": app.cfg.max_match_hands})));
     }
     if duplicate.is_some() && req.hands_planned % 6 != 0 {
         return Err(ApiError::bad_request("duplicate matches need hands_planned to be a multiple of 6 (one deal = 6 hands)"));

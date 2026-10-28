@@ -86,6 +86,10 @@ pub struct RunReq {
     lanes: Option<usize>,
     #[serde(default)]
     decision_time_ms: Option<u64>,
+    /// Runner token only: the trusted runner is playing this bot on operator-controlled infrastructure,
+    /// so the run is `verified`. Anyone else sending `hosted: true` gets 403.
+    #[serde(default)]
+    hosted: Option<bool>,
 }
 
 pub async fn create_run(
@@ -94,9 +98,19 @@ pub async fn create_run(
     Path(tid): Path<String>,
     body: Option<Json<RunReq>>,
 ) -> Res<(StatusCode, Json<Value>)> {
-    let who = app.authenticate(&headers)?;
+    app.ensure_accepting()?;
+    let who = app.authenticate_any(&headers)?;
     let t = track(&tid)?;
-    let req = body.map(|b| b.0).unwrap_or(RunReq { player_id: None, hands: None, lanes: None, decision_time_ms: None });
+    let req = body.map(|b| b.0).unwrap_or(RunReq { player_id: None, hands: None, lanes: None, decision_time_ms: None, hosted: None });
+    let runner = matches!(who, crate::state::Principal::Runner);
+    if req.hosted == Some(true) && !runner {
+        return Err(ApiError::forbidden("only the runner token (ARENA_RUNNER_TOKEN) can start a hosted (verified) run"));
+    }
+    crate::api::check_match_quota(&app, &who)?;
+    if matches!(who, crate::state::Principal::Player(_)) && req.hands.map(|h| h > app.cfg.max_run_hands).unwrap_or(false) {
+        return Err(ApiError::bad_request(format!("hands exceeds the per-run limit of {}", app.cfg.max_run_hands))
+            .with(json!({"limit": "ARENA_MAX_RUN_HANDS", "max": app.cfg.max_run_hands})));
+    }
     let pid = match (&req.player_id, &who) {
         (Some(p), _) if crate::house::HouseRegistry::looks_like_house(p) => house_id(&app.house.resolve(p)?),
         (Some(p), _) => p.clone(),
@@ -104,7 +118,7 @@ pub async fn create_run(
         (None, _) => return Err(ApiError::bad_request("player_id required")),
     };
     let rec = app.store.get_player(&pid)?.ok_or_else(|| ApiError::not_found("player"))?;
-    if !who.is_admin() && who.owner_id() != rec.player_id {
+    if !who.is_admin() && !runner && who.owner_id() != rec.player_id {
         return Err(ApiError::forbidden("you can only run your own bot (admins can run any, including house bots)"));
     }
     let mut panel = Vec::new();
@@ -114,6 +128,7 @@ pub async fn create_run(
     if !rec.house && !app.hub.connected(&rec.player_id) {
         return Err(ApiError::conflict("not_connected", "connect to /v1/play with your bot token before starting a run"));
     }
+    let hosted = runner && req.hosted == Some(true);
     let hands = req.hands.unwrap_or(DEFAULT_HANDS).clamp(6, 1_000_000);
     let hands = (hands + 5) / 6 * 6;
     let lanes = req.lanes.unwrap_or(if rec.house { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8) } else { 1 });
@@ -156,7 +171,8 @@ pub async fn create_run(
         hands_planned: hands,
         hands_done: 0,
         status: "running".into(),
-        verified: rec.house,
+        verified: rec.house || hosted,
+        hosted,
         mbb_per_game: None,
         ci95_mbb: None,
         method: None,
@@ -215,9 +231,9 @@ pub async fn list_runs(State(app): App, Path(tid): Path<String>, Query(q): Query
 }
 
 pub async fn abort_run(State(app): App, headers: HeaderMap, Path((tid, rid)): Path<(String, String)>) -> Res<Json<Value>> {
-    let who = app.authenticate(&headers)?;
+    let who = app.authenticate_any(&headers)?;
     let r = find_run(&app, &tid, &rid)?;
-    if !who.is_admin() && who.owner_id() != r.player_id {
+    if !who.is_admin() && !matches!(who, crate::state::Principal::Runner) && who.owner_id() != r.player_id {
         return Err(ApiError::forbidden("not your run"));
     }
     let rt = app.match_rt(&r.match_id)?;

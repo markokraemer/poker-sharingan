@@ -1,8 +1,8 @@
 # sharingan-arena: the table server
 
 REST + WebSocket server implementing [docs/TABLE_API.md](../../docs/TABLE_API.md). One crate, binary `sharingan-arena`.
-Rules come from `engine/nlhe`, house bots and AIVAT from `arena/bench`. SQLite storage behind the `Store` trait
-(`src/store.rs`), so Postgres can be added later.
+Rules come from `engine/nlhe`, house bots and AIVAT from `arena/bench`. Storage behind the `Store` trait (`src/store.rs`): SQLite by default,
+Postgres (`src/pgstore.rs`, migrations in `migrations/`) with `ARENA_DATABASE_URL`.
 
 ## Run
 
@@ -25,6 +25,27 @@ The first start logs a generated admin token (set `ARENA_ADMIN_TOKEN` to pin it)
 | `ARENA_RECONNECT_GRACE_MS` | `2000` | how long a turn waits for a seat whose socket is gone |
 | `ARENA_LEADERBOARD_MIN_HANDS` | `1000` | leaderboard threshold |
 | `ARENA_SAVE_FREE_HANDS` | `true` | store histories of non-match tables |
+| `ARENA_DATABASE_URL` | unset | `postgres://...` selects Postgres (TLS via rustls unless `sslmode=disable`); `ARENA_DB` is then ignored |
+| `ARENA_DATABASE_SCHEMA` / `ARENA_DB_POOL` | unset / `8` | Postgres schema for all tables; connections |
+| `ARENA_RUNNER_TOKEN` | unset | bearer token of the trusted eval runner: may start/attest hosted (verified) benchmark runs (TABLE_API.md 12b item 16) |
+| `ARENA_RATE_LIMIT_RPS` / `ARENA_RATE_LIMIT_BURST` | `50` / `100` | per-token (anonymous: per-IP) request bucket; `0` = off. `ARENA_TRUST_PROXY=true` keys anonymous requests by `X-Forwarded-For` |
+| `ARENA_MAX_TABLES_PER_PLAYER` | `10` | open free tables a player owns or sits at |
+| `ARENA_MAX_MATCHES_PER_PLAYER` | `4` | unfinished matches/benchmark runs per player |
+| `ARENA_MAX_WS_PER_PLAYER` | `4` | simultaneous `/v1/play` sockets per player |
+| `ARENA_MAX_RUN_HANDS` / `ARENA_MAX_MATCH_HANDS` | `100000` / `1000000` | hands per benchmark run (players) / per match |
+| `ARENA_MAX_BODY_BYTES` / `ARENA_MAX_WS_MESSAGE_BYTES` | `262144` / `65536` | request body / one client WebSocket message |
+| `ARENA_SHUTDOWN_GRACE_MS` | `20000` | SIGTERM drain: how long running matches may finish before they are aborted |
+
+Probes for a load balancer: `GET /healthz` (liveness), `GET /readyz` (200 only if the database answers and the server is not draining).
+`SIGTERM`/`SIGINT` drains gracefully (see TABLE_API.md 12b item 18).
+
+## Tests on both backends
+
+```bash
+cargo test -p sharingan-arena                                   # SQLite (in-memory)
+ARENA_TEST_DATABASE_URL=postgres://user@host:5432/db cargo test -p sharingan-arena   # same suite on Postgres, one fresh schema per test server
+```
+Test schemas (`t_*`, `s_*`) are left behind; use a throwaway database.
 
 ## curl tour
 

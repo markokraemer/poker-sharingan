@@ -29,6 +29,10 @@ hmac = "0.12"
 hex = "0.4"
 rand_chacha = "0.9"
 uuid = { version = "1", features = ["v4"] }
+postgres = "0.19"
+tokio-postgres-rustls = "0.13"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "0.26"
 ureq = { version = "2.10", features = ["json"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

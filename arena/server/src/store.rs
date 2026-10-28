@@ -1,5 +1,5 @@
-//! Storage behind a small trait so Postgres can be added later. The SQLite implementation keeps
-//! one connection behind a mutex (WAL mode); all values that are not queried are stored as JSON.
+//! Storage behind a small trait: SQLite here (the default; one connection behind a mutex, WAL mode)
+//! and Postgres in `pgstore.rs` (`ARENA_DATABASE_URL`). Values that are not queried are stored as JSON.
 
 use crate::error::{ApiError, Res};
 use crate::model::*;
@@ -8,6 +8,9 @@ use serde_json::Value;
 use std::sync::Mutex;
 
 pub trait Store: Send + Sync {
+    /// Cheap liveness check of the backing database (readiness probe).
+    fn ping(&self) -> Res<()>;
+
     fn put_player(&self, p: &PlayerRecord) -> Res<()>;
     fn get_player(&self, id: &str) -> Res<Option<PlayerRecord>>;
     fn player_by_token_hash(&self, hash: &str) -> Res<Option<PlayerRecord>>;
@@ -101,11 +104,15 @@ fn player_from_row(r: &rusqlite::Row) -> rusqlite::Result<PlayerRecord> {
 
 const PCOLS: &str = "player_id,name,kind,owner,house,token_hash,webhook_url,webhook_secret,created_at";
 
-fn parse<T: serde::de::DeserializeOwned>(s: String) -> Res<T> {
+pub(crate) fn parse<T: serde::de::DeserializeOwned>(s: String) -> Res<T> {
     serde_json::from_str(&s).map_err(|e| ApiError::internal(format!("corrupt row: {e}")))
 }
 
 impl Store for SqliteStore {
+    fn ping(&self) -> Res<()> {
+        self.c().query_row("SELECT 1", [], |r| r.get::<_, i64>(0))?;
+        Ok(())
+    }
     fn put_player(&self, p: &PlayerRecord) -> Res<()> {
         self.c().execute(
             "INSERT INTO players(player_id,name,kind,owner,house,token_hash,webhook_url,webhook_secret,created_at,created_seq)
