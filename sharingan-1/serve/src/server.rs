@@ -46,7 +46,8 @@ impl AppState {
 
     /// Take `cost` tokens from `who`'s bucket. `Err(retry_after_secs)` when empty.
     fn take(&self, who: &str, cost: f64) -> Result<(), f64> {
-        let (rps, burst) = (self.core.cfg.rate_rps, self.core.cfg.rate_burst);
+        let cfg = &self.core.cfg;
+        let (rps, burst) = cfg.rate_overrides.get(who).copied().unwrap_or((cfg.rate_rps, cfg.rate_burst));
         let cost = cost.min(burst);
         let mut m = self.limiter.lock().unwrap();
         let now = Instant::now();

@@ -121,6 +121,22 @@ pub fn apply_sets(prm: &mut SearchParams, sets: &str) -> Result<(), String> {
     Ok(())
 }
 
+// ------------------------------------------------------------------------------ belief checks
+
+/// Hero belief below this (uniform is ~1/1176 = 8.5e-4; `finish_round` floors the hero's own hand
+/// at 1e-6) means the hero's earlier actions were off-policy for this hand.
+const OFF_POLICY_BELIEF: f32 = 1e-5;
+
+fn hero_belief(player: &SearchPlayer, seat: usize, hole: [Card; 2]) -> f32 {
+    let i = cards::hole_index(hole[0], hole[1]);
+    player.beliefs().w.get(seat).and_then(|r| r.get(i)).copied().unwrap_or(1.0)
+}
+
+/// Bit-identical distributions (same actions, same probabilities).
+fn same_dist(a: &Dist, b: &Dist) -> bool {
+    a.len() == b.len() && (0..a.len()).all(|i| a.action(i) == b.action(i) && a.prob(i) == b.prob(i))
+}
+
 // ------------------------------------------------------------------------------------------ core
 
 #[derive(Default)]
@@ -131,6 +147,8 @@ struct Counters {
     panics: AtomicU64,
     busy: AtomicU64,
     fallbacks: AtomicU64,
+    off_policy: AtomicU64,
+    no_mass: AtomicU64,
     search_micros: AtomicU64,
     search_max_micros: AtomicU64,
 }
@@ -260,6 +278,8 @@ impl Core {
                 "search_panics": self.c.panics.load(Relaxed),
                 "search_busy": self.c.busy.load(Relaxed),
                 "fallbacks": self.c.fallbacks.load(Relaxed),
+                "off_policy_history": self.c.off_policy.load(Relaxed),
+                "no_search_mass": self.c.no_mass.load(Relaxed),
                 "search_mean_ms": self.c.search_micros.load(Relaxed) as f64 / n / 1e3,
                 "search_max_ms": self.c.search_max_micros.load(Relaxed) as f64 / 1e3,
                 "searches_in_flight": self.gate.in_use(),
@@ -305,6 +325,13 @@ impl Core {
                 dist = Some(player.blueprint_dist(&view, hole));
             } else if !player.needs_search(&view) {
                 dist = Some(Player::dist(&mut player, &view, hole));
+            } else if hero_belief(&player, view.seat, hole) < OFF_POLICY_BELIEF {
+                // The hero's own earlier actions had ~zero likelihood under the hero's strategy
+                // (e.g. a replayed foreign hand): the subgame would have no mass for this hand and
+                // the search average would be empty. Skip the search, answer from the blueprint.
+                self.c.off_policy.fetch_add(1, Relaxed);
+                dist = Some(player.blueprint_dist(&view, hole));
+                reason = Some("off_policy_history".into());
             } else {
                 let (d, src, why, ms) = self.guarded_search(&mut player, &view, hole, Duration::from_millis(budget_ms));
                 dist = Some(d);
@@ -420,7 +447,14 @@ impl Core {
         match res {
             Ok(d) => {
                 self.c.searched.fetch_add(1, Relaxed);
-                (d, "search", None, ms)
+                // Player::dist silently falls back to the blueprint when the search has no average
+                // for this hand; only call it "search" when the answer really differs from it.
+                if same_dist(&d, &player.blueprint_dist(view, hole)) {
+                    self.c.no_mass.fetch_add(1, Relaxed);
+                    (d, "blueprint", Some("no_search_mass".into()), ms)
+                } else {
+                    (d, "search", None, ms)
+                }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 self.c.timeouts.fetch_add(1, Relaxed);

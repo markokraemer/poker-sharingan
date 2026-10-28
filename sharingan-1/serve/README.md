@@ -46,7 +46,8 @@ Every setting is an env var or a `--flag` (flags win):
 | `SHARINGAN_MAX_STACK_BB` | `--max-stack-bb` | 150 | never commit more than this many bb in one hand (0 = off) |
 | `SHARINGAN_BIND` | `--bind` | `0.0.0.0:8080` | |
 | `SHARINGAN_API_KEYS` / `_FILE` | `--api-keys` / `--api-keys-file` | required | `name=key,...`; or `--no-auth` for an open server |
-| `SHARINGAN_RATE_RPS` / `_BURST` | `--rate-rps` / `--rate-burst` | 20 / 40 | token bucket per key |
+| `SHARINGAN_RATE_RPS` / `_BURST` | `--rate-rps` / `--rate-burst` | 200 / 400 | token bucket per key (default for every key) |
+| `SHARINGAN_RATE_LIMITS` | `--rate-limits` | none | per-key overrides by key name: `alice=1000:2000,bob=50` (`rps[:burst]`, burst defaults to 2 x rps) |
 | `SHARINGAN_MAX_BATCH` | `--max-batch` | 64 | |
 | `SHARINGAN_MAX_INFLIGHT` | `--max-inflight` | 256 | concurrent decisions; more -> 503 |
 | `SHARINGAN_MODEL_ID` | `--model-id` | `sharingan-1` | returned in every response |
@@ -103,24 +104,32 @@ curl -s -X POST http://localhost:8080/v1/act \
   "model_id": "sharingan-1",
   "street": "turn",
   "action": {"type": "fold", "added": 0, "all_in": false},
-  "source": "search",
-  "fallback_reason": null,
+  "source": "blueprint",
+  "fallback_reason": "off_policy_history",
   "probs": [
     {"type": "fold", "p": 0.909804}, {"type": "raise", "to": 1150, "p": 0.066667},
     {"type": "call", "to": 200, "p": 0.019608}, {"type": "raise", "to": 9750, "p": 0.003922}
   ],
   "legal": {"fold": true, "check": false, "call": {"to": 200, "added": 200, "all_in": false}, "raise": {"min_to": 400, "max_to": 9750}},
-  "timing": {"total_ms": 78.1, "search_ms": 76.2, "budget_ms": 5000},
+  "timing": {"total_ms": 11.4, "search_ms": null, "budget_ms": 5000},
   "notes": []
 }
 ```
 
-(That output is from the tiny test blueprint; the numbers will differ with the real one.)
+(Real output of the request above on the tiny test blueprint. The hero's preflop raise with AKo has ~zero likelihood
+under that blueprint, so the turn search is skipped and the answer is the blueprint's, with its quantised
+probabilities (`0.909804`, `0.066667`, ...). An answer that really comes from the search has `"source": "search"`,
+`"fallback_reason": null`, a `search_ms`, and non-quantised probabilities.)
 
 * `action`: `fold` | `check` | `call` (`to`, `added`) | `raise` (`to`, `added`; also used for a bet). Always legal in the caller's chips.
-* `source`: `search` (turn/river search finished in time), `blueprint` (no search needed: preflop/flop, or search disabled),
-  `fallback` (search timed out / slot busy / panicked, or the hand could not be mapped; `fallback_reason` says why).
+* `source`: `search` only when the answer comes from the turn/river search average; `blueprint` (no search needed:
+  preflop/flop, or search disabled, or the search was skipped/empty, see below), `fallback` (search timed out / slot
+  busy / panicked, or the hand could not be mapped; `fallback_reason` says why).
   A fallback still returns the blueprint action, or a passive legal action if the blueprint cannot be used.
+* `source: "blueprint"` with a `fallback_reason` on a turn/river spot:
+  * `off_policy_history`: the hero's earlier actions have ~zero likelihood under the hero's own strategy (typically
+    a replayed foreign hand), so the subgame has no mass for the hero's hand. The search is **skipped** (instant answer).
+  * `no_search_mass`: a search ran, but its average strategy has nothing for the hero's hand; the answer is the blueprint's.
 * `probs`: the bot's distribution over real legal actions (before the stack guard); `notes`: lenient history repairs and
   stack-guard rewrites.
 

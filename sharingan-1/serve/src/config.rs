@@ -20,8 +20,9 @@
 //! | `SHARINGAN_API_KEYS` | `--api-keys` | required unless `--no-auth`: `name=key,name2=key2` or bare keys |
 //! | `SHARINGAN_API_KEYS_FILE` | `--api-keys-file` | one `name=key` or `key` per line |
 //! | `SHARINGAN_NO_AUTH` | `--no-auth` | off |
-//! | `SHARINGAN_RATE_RPS` | `--rate-rps` | 20 (refill rate per key, requests/s) |
-//! | `SHARINGAN_RATE_BURST` | `--rate-burst` | 40 |
+//! | `SHARINGAN_RATE_RPS` | `--rate-rps` | 200 (refill rate per key, requests/s) |
+//! | `SHARINGAN_RATE_BURST` | `--rate-burst` | 400 |
+//! | `SHARINGAN_RATE_LIMITS` | `--rate-limits` | none: per-key overrides `name=rps[:burst],...` (burst defaults to 2 x rps) |
 //! | `SHARINGAN_MAX_BATCH` | `--max-batch` | 64 |
 //! | `SHARINGAN_MAX_INFLIGHT` | `--max-inflight` | 256 (concurrent decisions; more -> 503) |
 //! | `SHARINGAN_MODEL_ID` | `--model-id` | `sharingan-1` |
@@ -50,6 +51,8 @@ pub struct Config {
     pub auth: bool,
     pub rate_rps: f64,
     pub rate_burst: f64,
+    /// Per-key overrides (by key name) of `(rps, burst)`.
+    pub rate_overrides: HashMap<String, (f64, f64)>,
     pub max_batch: usize,
     pub max_inflight: usize,
     pub model_id: String,
@@ -75,8 +78,9 @@ impl Default for Config {
             bind: "0.0.0.0:8080".into(),
             api_keys: vec![],
             auth: true,
-            rate_rps: 20.0,
-            rate_burst: 40.0,
+            rate_rps: 200.0,
+            rate_burst: 400.0,
+            rate_overrides: HashMap::new(),
             max_batch: 64,
             max_inflight: 256,
             model_id: "sharingan-1".into(),
@@ -88,8 +92,29 @@ impl Default for Config {
 
 pub const USAGE: &str = "usage: sharingan-serve --blueprint FILE.plcp [--buckets DIR|coarse] [--sizing medium] [--set flop=0] \
 [--budget-ms 5000] [--search-threads 16] [--search-concurrency 2] [--max-stack-bb 150] [--bind 0.0.0.0:8080] \
-[--api-keys name=key,...] [--api-keys-file F] [--no-auth] [--no-search] [--rate-rps 20] [--rate-burst 40] [--model-id ID]\n\
+[--api-keys name=key,...] [--api-keys-file F] [--no-auth] [--no-search] [--rate-rps 200] [--rate-burst 400] [--rate-limits name=rps[:burst],...] [--model-id ID]\n\
 (every flag also reads SHARINGAN_<FLAG> from the environment; see sharingan-1/serve/README.md)";
+
+/// `name=rps[:burst],...` (burst defaults to 2 x rps).
+fn parse_rate_limits(s: &str) -> Result<HashMap<String, (f64, f64)>, String> {
+    let mut out = HashMap::new();
+    for tok in s.split([',', '\n']).map(str::trim).filter(|t| !t.is_empty()) {
+        let bad = || format!("--rate-limits: bad entry {tok:?} (want name=rps[:burst])");
+        let (name, v) = tok.split_once('=').ok_or_else(bad)?;
+        let (rps, burst) = match v.split_once(':') {
+            Some((r, b)) => (r.trim().parse::<f64>().map_err(|_| bad())?, b.trim().parse::<f64>().map_err(|_| bad())?),
+            None => {
+                let r = v.trim().parse::<f64>().map_err(|_| bad())?;
+                (r, (2.0 * r).max(1.0))
+            }
+        };
+        if !(rps > 0.0) || !(burst >= 1.0) || name.trim().is_empty() {
+            return Err(bad());
+        }
+        out.insert(name.trim().to_string(), (rps, burst));
+    }
+    Ok(out)
+}
 
 fn parse_keys(s: &str, out: &mut Vec<(String, String)>) {
     for tok in s.split([',', '\n']).map(str::trim).filter(|t| !t.is_empty() && !t.starts_with('#')) {
@@ -125,7 +150,7 @@ impl Config {
         const KNOWN: &[&str] = &[
             "blueprint", "buckets", "sizing", "set", "search-buckets", "no-search", "budget-ms", "search-threads",
             "search-concurrency", "queue-ms", "max-stack-bb", "bind", "api-keys", "api-keys-file", "no-auth", "rate-rps",
-            "rate-burst", "max-batch", "max-inflight", "model-id", "warm", "help",
+            "rate-burst", "rate-limits", "max-batch", "max-inflight", "model-id", "warm", "help",
         ];
         for k in kv.keys() {
             if !KNOWN.contains(&k.as_str()) {
@@ -177,6 +202,7 @@ impl Config {
             auth,
             rate_rps: num("rate-rps", get("rate-rps"), d.rate_rps)?,
             rate_burst: num("rate-burst", get("rate-burst"), d.rate_burst)?,
+            rate_overrides: get("rate-limits").map(|s| parse_rate_limits(&s)).transpose()?.unwrap_or_default(),
             max_batch: num("max-batch", get("max-batch"), d.max_batch)?,
             max_inflight: num("max-inflight", get("max-inflight"), d.max_inflight)?,
             model_id: get("model-id").unwrap_or(d.model_id),
@@ -212,6 +238,8 @@ mod tests {
         assert_eq!(c.sets, "flop=0");
         assert_eq!(c.max_stack_bb, 150.0);
         assert_eq!(c.budget_ms, 5000);
+        assert_eq!((c.rate_rps, c.rate_burst), (200.0, 400.0));
+        assert!(c.rate_overrides.is_empty());
         assert_eq!(c.api_keys, vec![("alice".to_string(), "k1".to_string()), ("key1".to_string(), "k2".to_string())]);
     }
 
@@ -223,5 +251,13 @@ mod tests {
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &[]).is_err(), "keys required");
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &["--no-auth", "--bogus"]).is_err());
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &["--no-auth", "--budget-ms", "abc"]).is_err());
+    }
+
+    #[test]
+    fn per_key_rate_overrides() {
+        let c = p(&[("SHARINGAN_BLUEPRINT", "/x"), ("SHARINGAN_API_KEYS", "alice=k1"), ("SHARINGAN_RATE_LIMITS", "alice=500:1000, bob=50")], &[]).unwrap();
+        assert_eq!(c.rate_overrides.get("alice"), Some(&(500.0, 1000.0)));
+        assert_eq!(c.rate_overrides.get("bob"), Some(&(50.0, 100.0)));
+        assert!(p(&[("SHARINGAN_BLUEPRINT", "/x"), ("SHARINGAN_API_KEYS", "a=k"), ("SHARINGAN_RATE_LIMITS", "alice")], &[]).is_err());
     }
 }

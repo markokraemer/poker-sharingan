@@ -344,3 +344,22 @@ pub fn check_response(spot: &Spot, resp: &Value) {
     }
     assert!(resp["timing"]["total_ms"].as_f64().unwrap() >= 0.0);
 }
+
+/// River spots (from `seed`) whose hero history is on-policy, i.e. that the main core really
+/// searches (random hero actions are mostly off-policy and now skip the search). Returns `want`.
+pub async fn searchable_river_spots(seed: u64, want: usize) -> Vec<Spot> {
+    let core = core_main().expect("tiny blueprint");
+    let a = app(&core);
+    let mut out = vec![];
+    for sp in gen_spots(seed, 400, STD, &|s| s.expect.street == 3 && s.expect.n >= 2) {
+        let (_, _, v) = call(&a, "POST", "/v1/act", Some(KEY), &sp.req.to_string()).await;
+        if v["source"] == "search" {
+            out.push(sp);
+            if out.len() == want {
+                break;
+            }
+        }
+    }
+    assert_eq!(out.len(), want, "not enough searchable river spots");
+    out
+}
