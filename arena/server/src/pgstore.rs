@@ -324,4 +324,34 @@ impl Store for PgStore {
         let p = player_id.to_string();
         self.run(move |c| Ok(c.query(&format!("SELECT {RCOLS} FROM match_results WHERE player_id=$1"), &[&p])?.iter().map(result_from_row).collect()))
     }
+
+    fn delete_match_data(&self, match_id: &str) -> Res<()> {
+        let m = match_id.to_string();
+        self.run(move |c| {
+            let mut tx = c.transaction()?;
+            tx.execute("DELETE FROM hands WHERE match_id=$1", &[&m])?;
+            tx.execute("DELETE FROM match_results WHERE match_id=$1", &[&m])?;
+            tx.execute("DELETE FROM matches WHERE match_id=$1", &[&m])?;
+            tx.commit()?;
+            Ok(())
+        })
+    }
+    fn delete_run(&self, run_id: &str) -> Res<()> {
+        let r = run_id.to_string();
+        self.run(move |c| {
+            c.execute("DELETE FROM benchmark_runs WHERE run_id=$1", &[&r])?;
+            Ok(())
+        })
+    }
+    fn delete_player(&self, player_id: &str) -> Res<()> {
+        let p = player_id.to_string();
+        self.run(move |c| {
+            let mut tx = c.transaction()?;
+            tx.execute("DELETE FROM match_results WHERE player_id=$1", &[&p])?;
+            tx.execute("DELETE FROM benchmark_runs WHERE player_id=$1", &[&p])?;
+            tx.execute("DELETE FROM players WHERE player_id=$1", &[&p])?;
+            tx.commit()?;
+            Ok(())
+        })
+    }
 }

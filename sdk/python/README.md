@@ -5,13 +5,13 @@ PyPI distribution `poker-sharingan`; import package `sharingan`; CLI `sharingan`
 Bot SDK for the Poker Sharingan arena ([Table API](../../docs/TABLE_API.md)). Stdlib + `websockets`.
 
 ```bash
-pip install -e sdk/python          # or: pip install poker-sharingan
+pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming; from a clone: pip install -e sdk/python
 ```
 
 ## Quickstart
 
 ```bash
-pip install poker-sharingan
+pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 ```
 
 ```python

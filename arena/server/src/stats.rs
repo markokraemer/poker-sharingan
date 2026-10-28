@@ -195,7 +195,8 @@ pub fn leaderboard(
                 name: p.name.clone(),
                 house: p.house,
                 matches: a.map(|a| a.matches).unwrap_or(0),
-                hands: a.map(|a| a.hands).unwrap_or(0),
+                // own benchmark hands when there are runs (match results also count a house bot's seats in other bots' panels)
+                hands: if tracks.is_empty() { a.map(|a| a.hands).unwrap_or(0) } else { tracks.values().map(|c| c.hands as u64).sum::<u64>() },
                 score_mbb_per_hand: score,
                 ci95_mbb_per_hand: general.map(|a| 1.96 / a.w.sqrt()),
                 score_bb_per_100: score.map(|s| s / 10.0),

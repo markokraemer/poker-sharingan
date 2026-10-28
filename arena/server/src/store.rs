@@ -43,6 +43,11 @@ pub trait Store: Send + Sync {
     fn put_results(&self, match_id: &str, rows: &[StoredResult]) -> Res<()>;
     fn all_results(&self) -> Res<Vec<StoredResult>>;
     fn results_of_player(&self, player_id: &str) -> Res<Vec<StoredResult>>;
+
+    /// Admin cleanup: remove a match with its hands and results.
+    fn delete_match_data(&self, match_id: &str) -> Res<()>;
+    fn delete_run(&self, run_id: &str) -> Res<()>;
+    fn delete_player(&self, player_id: &str) -> Res<()>;
 }
 
 pub struct SqliteStore {
@@ -263,6 +268,29 @@ impl Store for SqliteStore {
         let mut st = c.prepare("SELECT match_id,player_id,hands,deals,net_chips,score_mbb,se_mbb,method FROM match_results WHERE player_id=?1")?;
         let rows = st.query_map([player_id], result_from_row)?.collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    fn delete_match_data(&self, match_id: &str) -> Res<()> {
+        let mut c = self.c();
+        let tx = c.transaction()?;
+        tx.execute("DELETE FROM hands WHERE match_id=?1", [match_id])?;
+        tx.execute("DELETE FROM match_results WHERE match_id=?1", [match_id])?;
+        tx.execute("DELETE FROM matches WHERE match_id=?1", [match_id])?;
+        tx.commit()?;
+        Ok(())
+    }
+    fn delete_run(&self, run_id: &str) -> Res<()> {
+        self.c().execute("DELETE FROM benchmark_runs WHERE run_id=?1", [run_id])?;
+        Ok(())
+    }
+    fn delete_player(&self, player_id: &str) -> Res<()> {
+        let mut c = self.c();
+        let tx = c.transaction()?;
+        tx.execute("DELETE FROM match_results WHERE player_id=?1", [player_id])?;
+        tx.execute("DELETE FROM benchmark_runs WHERE player_id=?1", [player_id])?;
+        tx.execute("DELETE FROM players WHERE player_id=?1", [player_id])?;
+        tx.commit()?;
+        Ok(())
     }
 }
 

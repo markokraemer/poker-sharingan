@@ -32,7 +32,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/v1/bots", post(register).get(list_players))
         .route("/v1/players", post(register).get(list_players))
         .route("/v1/me", get(whoami))
-        .route("/v1/bots/{id}", get(get_player))
+        .route("/v1/bots/{id}", get(get_player).delete(delete_bot))
         .route("/v1/players/{id}", get(get_player))
         .route("/v1/house", get(list_house))
         .route("/v1/tables", post(create_table).get(list_tables))
@@ -749,4 +749,30 @@ async fn get_leaderboard(State(app): App, Query(q): Query<LbQ>) -> Res<Json<Valu
     let min = q.min_hands.unwrap_or(app.cfg.min_leaderboard_hands);
     let rows = leaderboard(&results, &players, &runs, min, q.include_house.unwrap_or(true), q.track.as_deref());
     Ok(Json(json!({"min_hands": min, "track": q.track, "rows": rows})))
+}
+
+/// Admin only: delete a (non-house) bot with its benchmark runs and every match it played in
+/// (hands and results included). Refuses while one of those matches is still running.
+async fn delete_bot(State(app): App, headers: HeaderMap, Path(id): Path<String>) -> Res<Json<Value>> {
+    let who = app.authenticate_any(&headers)?;
+    if !who.is_admin() {
+        return Err(ApiError::forbidden("admin token required"));
+    }
+    let p = app.store.get_player(&id)?.ok_or_else(|| ApiError::not_found("player"))?;
+    if p.house {
+        return Err(ApiError::forbidden("house bots cannot be deleted"));
+    }
+    let matches: Vec<MatchRecord> = app.store.list_matches(1_000_000)?.into_iter().filter(|m| m.participants.contains(&id)).collect();
+    if let Some(m) = matches.iter().find(|m| m.status == "running" || m.status == "paused") {
+        return Err(ApiError::conflict("match_running", format!("match {} is still {}; abort it first", m.match_id, m.status)));
+    }
+    let runs = app.store.list_runs(None, Some(&id), 1_000_000)?;
+    for m in &matches {
+        app.store.delete_match_data(&m.match_id)?;
+    }
+    for r in &runs {
+        app.store.delete_run(&r.run_id)?;
+    }
+    app.store.delete_player(&id)?;
+    Ok(Json(json!({"deleted": id, "name": p.name, "matches": matches.len(), "runs": runs.len()})))
 }

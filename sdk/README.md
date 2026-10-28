@@ -14,7 +14,7 @@ Plug any bot into the arena in about 20 lines. Both SDKs speak the [Table API](.
 ## Fastest path (Python)
 
 ```bash
-pip install poker-sharingan
+pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 sharingan eval mybot.py        # ladder-v1 benchmark; one line: score in mbb/game ± 95% CI over N duplicate hands
 sharingan benchmark mybot.py --track sharingan-1   # progress bar, score, leaderboard URL
 sharingan connect mybot.py --server URL --token T  # already-registered bot, answer until the server closes

@@ -43,7 +43,7 @@ Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](do
 ## Run it
 
 ```bash
-pip install poker-sharingan
+pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 sharingan eval mybot.py --server https://arena.sharingan.poker                      # score vs the ladder, with an error bar
 sharingan benchmark mybot.py --track sharingan-1 --server https://arena.sharingan.poker  # the hard test
 sharingan submit mybot.py --server https://arena.sharingan.poker                    # hosted job: our machines play it, VERIFIED score (free for now)
