@@ -1,6 +1,6 @@
 # Poker Sharingan on Platinum
 
-Status: design plus untested skeletons. Nothing here was built, deployed, or run against Platinum. Repo paths marked `PT:` are in `~/Projects/kortix/platinum` (read only).
+Status: the images, the runner (credit ledger, Stripe webhook, job API, `PlatinumClient`) and the local stack are built and tested end to end without Platinum or Stripe credentials: see [README.md](README.md). This document is the hosting design and the Platinum gap analysis; where it still says "skeleton" or "untested" the README's tables are authoritative. **Architecture change since this was written:** an eval job's sandbox runs the *match worker* (`sharingan-arena run --bot "sharingan pipe bot.py"`, signed `result.json`, `POST /v1/results`), not a WebSocket bot; the WebSocket path survives as `mode:"connect"`. Repo paths marked `PT:` are in `~/Projects/kortix/platinum` (read only).
 
 ## 0. The three facts that shape everything
 
@@ -47,7 +47,8 @@ Two Platinum orgs on purpose: at balance <= 0 Platinum auto-stops running sandbo
 
 ### (c) Eval runner (uploaded bots)
 
-`runner/` (TypeScript, `@platinum-dev/sdk`; the SDK is TS/Python only, and the arena runner is a Node service). One job = one sandbox = one benchmark run:
+`runner/` (TypeScript, `@platinum-dev/sdk`; the SDK is TS/Python only, and the arena runner is a Node service). One job = one sandbox = one benchmark run.
+**Current flow (worker mode, see README.md):** the sandbox gets no network at all; it runs `sharingan-arena run` which plays the whole duplicate benchmark in-process (thousands of hands/s) with the user's bot as a `setpriv`-dropped stdin/stdout subprocess, signs `result.json` with an HMAC key (root-only file), and the runner POSTs it to `/v1/results`. Steps 4-6 below describe the original WebSocket design, kept as `mode:"connect"`:
 
 1. Template `sharingan-bot` (`docker/Dockerfile.bot`, `templates/sharingan-bot.json`): python 3.12 + `sdk/python` + node 22 + `poker-sharingan` + two launchers. Built once by `runner/src/provision.ts` (`Template.fromImage(...).build()`, `PT:docs/templates.md`).
 2. Per run: `sandboxes.create({template, type:"ephemeral", cpu:1, ram_mb:1024, network:{allowOut:[arenaHost], denyOut:[all]}, metadata:{sharingan_job}}, {waitForRunning:true})`. Cold boot about 98 ms, warm claim about 14 ms (`PT:README.md` Performance). Egress is locked to the arena host (hostname rules read TLS SNI; `PT:docs/networking.md`). The doc says the egress policy is not a hard boundary (source-IP spoofing), but the arena is public anyway and the bot only holds a throwaway token.
@@ -103,6 +104,7 @@ Two Platinum orgs on purpose: at balance <= 0 Platinum auto-stops running sandbo
 | G11 | One prepaid balance per org, no reseller/sub-tenant mode; zero balance stops running sandboxes after 60 min. | Isolation of arena from bot spend | None required: use two orgs, auto top-up, usage-limit breaker on the bots org. |
 | G12 | Concurrency caps by tier: `inflight`, total cpu/ram (`config.ts:891-900`) and create rate limits (`rateLimit.spawn.test.ts`). | Burst of many runs | Raise org overrides; runner `MAX_CONCURRENT_RUNS` below the cap. |
 | G13 | Template first boot on a host needs the image present; custom templates are not in the warm pool by default. | Cold start latency | Call `prepare`/`materialize` after each template build; keep a few bot sandboxes warm only if needed. |
+| G15 | Worker sandboxes need the blueprint: `ladder-v1`'s panel includes `house:sharingan-1`, so the in-sandbox worker mmaps it and `/v1/results` rejects a different `blueprint_fingerprint`. 140 GB per sandbox is impossible (G1, G2, G6; guest page caches are not shared). | `ladder-v1` / `sharingan-1` workers in production | Run the worker inside the `core` VM with a bubblewrap/gVisor bot jail, or let the worker's SHARINGAN-1 seat call `sharingan-serve` over HTTP (arena change), or a worker-sized blueprint. |
 | G14 | Hostname egress allowlist reads SNI/Host; with everything else denied it is unclear whether DNS is still allowed. Unverified. | Locked-down bot sandboxes | Test on first run. If DNS is blocked, allow the resolver IP explicitly. |
 
 Arena-side changes needed (in this repo, not done): Postgres `Store`; `hosted` attestation so Platinum-run bots can be `verified`; rate limiting (or do it in Cloudflare); optional `/v1/health` alias.
@@ -123,6 +125,8 @@ Arena-side changes needed (in this repo, not done): Postgres `Store`; `hosted` a
 - Secrets: `ARENA_ADMIN_TOKEN`, `RUNNER_AUTH_TOKEN`, `SHARINGAN_API_KEYS`, billing webhook token.
 - Decisions: price per 20k-hand run and `MARKUP`; Platinum's actual per-vCPU-second and per-GiB-second rates for `cost.ts`; Postgres provider.
 
-## 5. Untested
+## 5. What is verified now, what is not
 
-Everything. Specifically unverified: the Docker builds (no build was run), `entrypoint.sh` `wait -n` supervision, `setpriv` inside the Platinum guest, Node `--experimental-strip-types` loading user `.ts` bots, `launch_bot.*` against a live arena, every SDK call shape in `runner/src/job.ts` (typed against the SDK source by reading, not compiled), `process.start`/`logs()` field names, `usage()` cost field names, hostname egress with DNS, and whether Platinum can pull the images. No `tsc` or `npm install` was run.
+Built and run (rootless podman on box A, `deploy/local/e2e.sh`): the `arena`, `serve`, `core` and bot images (clean SIGTERM, `entrypoint.sh` incl. `wait -n` supervision, mounted-blueprint path, non-root), the runner (typecheck clean, 106 tests), the full job flow in both modes against a real arena on Postgres with the tiny blueprint, the credit ledger, signed Stripe webhooks (fake secret), and sandbox teardown.
+
+Still unverified, all of it needs a live Platinum control plane: every SDK call shape in `runner/src/platinum/real.ts` (typed against SDK 0.9.0 and exercised against a mock `fetch` only), `network:{allow_out:[], deny_out:["0.0.0.0/0"]}` leaving exec/files/process usable, `setpriv` / `env -i` inside the guest, `process.start` `timeout_ms`, `usage()` cost field names, hostname egress with DNS (G14), and whether Platinum can pull the images (G7). The `ASSETS_S3_URI` fetch path of `entrypoint.sh` never ran (no S3 credentials); nor did the Cloudflare Worker.

@@ -1,0 +1,15 @@
+.git
+target
+**/target
+site
+.wrangler
+data
+logs
+**/__pycache__
+**/node_modules
+**/.venv
+deploy/platinum/runner/dist
+deploy/platinum/runner/jobs.json
+docs
+scripts
+*.log

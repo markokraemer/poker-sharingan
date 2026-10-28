@@ -2,7 +2,8 @@
 
 env: BOT_FILE (path to bot .py), ARENA_URL (https://arena.sharingan.poker), ARENA_TOKEN (bot token), MAX_HANDS (optional),
      LOG_LEVEL (optional)
-The runner service starts the benchmark run (POST /v1/benchmarks/{track}/runs) after this process is connected;
+Connect mode only (worker mode uses `sharingan pipe` inside `sharingan-arena run`).
+The runner service starts the benchmark run (POST /v1/benchmarks/{track}/runs, runner token, hosted:true) after this process is connected;
 the arena answers 409 not_connected until the websocket is up, and the runner retries.
 
 Why `connect` and not `play` / `serve`: `play` creates its own table against house bots, `serve` is webhook mode

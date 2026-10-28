@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1.7
+# The eval runner + credit ledger service (deploy/platinum/runner). Plain Node 22, TypeScript run via type stripping.
+#
+#   podman build -f deploy/platinum/docker/Dockerfile.runner -t ghcr.io/<org>/sharingan-runner:0.1.0 .
+#
+# Config is all env (runner/src/config.ts). In local mode (SANDBOX_BACKEND=local) mount a Docker-compatible engine socket
+# at $CONTAINER_HOST (default /var/run/engine.sock) so the runner can start sandbox containers beside itself.
+
+FROM docker.io/library/node:22-bookworm-slim
+WORKDIR /app
+COPY deploy/platinum/runner/package.json deploy/platinum/runner/package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; else npm install --omit=dev --no-audit --no-fund; fi
+COPY deploy/platinum/runner/src ./src
+ENV NODE_ENV=production PORT=8090
+EXPOSE 8090
+USER node
+CMD ["node", "--experimental-strip-types", "--no-warnings", "src/server.ts"]

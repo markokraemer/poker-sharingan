@@ -1,20 +1,23 @@
 {
   "name": "sharingan-eval-runner",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Runs uploaded Sharingan bots in isolated Platinum sandboxes and drives an arena benchmark run. UNTESTED skeleton.",
-  "engines": { "node": ">=20" },
+  "description": "Runs uploaded Sharingan bots in isolated sandboxes (Platinum, or local containers) and drives an arena benchmark run, with a prepaid credit ledger.",
+  "engines": { "node": ">=22.6" },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types src/server.ts",
-    "provision": "node --experimental-strip-types src/provision.ts"
+    "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=1 \"test/*.test.ts\"",
+    "start": "node --experimental-strip-types --no-warnings src/server.ts",
+    "provision": "node --experimental-strip-types --no-warnings src/provision.ts"
   },
   "dependencies": {
-    "@platinum-dev/sdk": "0.9.0"
+    "@platinum-dev/sdk": "0.9.0",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "typescript": "^5.6"
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.8"
   }
 }

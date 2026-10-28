@@ -1,5 +1,5 @@
-// Cloudflare Worker: serve arena.sharingan.poker from the Platinum app URL. UNTESTED. INTERIM ONLY.
-// Platinum has no custom-domain support (only <slug>.apps.<domain> and <port>-<id>.sbx.<domain>; see DESIGN.md G5),
+// Cloudflare Worker: serve arena.sharingan.poker from the Platinum app URL (or the big-RAM box). Not deployed or tested. INTERIM ONLY.
+// Platinum has no custom-domain support (only <slug>.apps.<domain> and <port>-<id>.sbx.<domain>; see DESIGN.md G3),
 // so we terminate arena.sharingan.poker on Cloudflare (the repo already deploys site/ with wrangler) and forward.
 // WebSocket upgrades pass through fetch() unchanged. Set UPSTREAM to the app URL, e.g. https://sharingan-arena.apps.platinum.dev
 export interface Env { UPSTREAM: string }

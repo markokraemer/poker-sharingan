@@ -1,23 +1,39 @@
 # syntax=docker/dockerfile:1.7
-# Sandbox template image for UPLOADED USER BOTS (Python and TypeScript). UNTESTED (never built).
+# Sandbox template image for UPLOADED USER BOTS (Python and TypeScript): the "match worker" sandbox.
 #
-# Build from the repo root:
-#   docker build -f deploy/platinum/docker/Dockerfile.bot -t ghcr.io/<org>/sharingan-bot:0.1.0 .
-# Then register it as a Platinum template (see deploy/platinum/runner/src/provision.ts and templates/sharingan-bot.json).
+# Build the arena image first (it carries the compiled sharingan-arena binary), then this one, from the repo root:
+#   podman build -f deploy/platinum/docker/Dockerfile      --target arena -t ghcr.io/<org>/sharingan-arena:0.1.0 .
+#   podman build -f deploy/platinum/docker/Dockerfile.bot  --build-arg ARENA_IMAGE=ghcr.io/<org>/sharingan-arena:0.1.0 \
+#                                                          -t ghcr.io/<org>/sharingan-bot:0.1.0 .
+# Then register it as a Platinum template (deploy/platinum/runner/src/provision.ts, templates/sharingan-bot.json).
 #
-# Contents: python3 + the `sharingan` package (sdk/python), node 22 + poker-sharingan (sdk/typescript) + ws,
-# and two launchers (/opt/sharingan/launch_bot.py = thin wrapper over `sharingan connect`, launch_bot.mjs) that CONNECT the bot to the arena over
-# WebSocket (/v1/play). The image has no entrypoint process: the runner starts the bot with sandbox.process.start().
+# Contents
+#   /usr/local/bin/sharingan-arena   the match worker (`sharingan-arena run --bot "<cmd>" ...`): engine + house bots + AIVAT,
+#                                    spawns the user's bot as a stdin/stdout subprocess (`sharingan pipe mybot.py`)
+#   python3 + `sharingan` CLI        (sdk/python; `sharingan pipe`, and `sharingan connect` for the remote-bot mode)
+#   node 22 + poker-sharingan        (sdk/typescript) + ws, launch_bot.mjs
+#   /opt/sharingan/launch_bot.{py,mjs}  thin wrappers that CONNECT a bot to /v1/play (remote-bot mode only)
+# The image has no entrypoint process: the runner starts everything with sandbox.process.start().
+# The user's bot runs as uid 10002 (setpriv); the worker runs as root and keeps its signing key (written at run time,
+# mode 0400) out of the bot's reach.
 
-FROM node:22-bookworm-slim AS node
-FROM node:22-bookworm-slim AS tsbuild
+ARG ARENA_IMAGE=localhost/sharingan-arena:local
+
+FROM ${ARENA_IMAGE} AS arena-bin
+
+FROM docker.io/library/node:22-bookworm-slim AS node
+FROM docker.io/library/node:22-bookworm-slim AS tsbuild
 WORKDIR /sdk
 COPY sdk/typescript/ ./
-RUN npm install --no-audit --no-fund && npm run build \
- && npm prune --omit=dev --no-audit --no-fund && npm install --no-save --omit=dev --no-audit --no-fund ws@8
+RUN npm install --no-audit --no-fund && npm run build
+# runtime dependency of the SDK's WebSocket client, installed on its own (the SDK lists ws as a peer)
+RUN mkdir /wsdep && cd /wsdep && npm init -y >/dev/null && npm install --omit=dev --no-audit --no-fund ws@8
 
-FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tar util-linux && rm -rf /var/lib/apt/lists/*
+FROM docker.io/library/python:3.12-slim-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tar util-linux coreutils && rm -rf /var/lib/apt/lists/*
+
+# match worker (built on debian bookworm, same glibc as this base)
+COPY --from=arena-bin /usr/local/bin/sharingan-arena /usr/local/bin/sharingan-arena
 
 # node 22 runtime (copied from the official image; no apt repo needed)
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
@@ -31,13 +47,14 @@ RUN pip install --no-cache-dir /tmp/sdk-python && rm -rf /tmp/sdk-python
 RUN mkdir -p /opt/sharingan/node_modules/poker-sharingan /opt/sharingan/bot
 COPY --from=tsbuild /sdk/dist         /opt/sharingan/node_modules/poker-sharingan/dist
 COPY --from=tsbuild /sdk/package.json /opt/sharingan/node_modules/poker-sharingan/package.json
-COPY --from=tsbuild /sdk/node_modules/ws /opt/sharingan/node_modules/ws
+COPY --from=tsbuild /wsdep/node_modules/ws /opt/sharingan/node_modules/ws
 
 COPY deploy/platinum/bot/launch_bot.py  /opt/sharingan/launch_bot.py
 COPY deploy/platinum/bot/launch_bot.mjs /opt/sharingan/launch_bot.mjs
-RUN chmod -R a+rX /opt/sharingan && chmod 1777 /opt/sharingan/bot
+RUN chmod -R a+rX /opt/sharingan && chmod 1777 /opt/sharingan/bot \
+ && mkdir -p /work && chmod 0755 /work
 
-# Unprivileged user the bot process runs as (the VM is the real boundary; this just keeps run-time tokens out of root's reach).
+# Unprivileged user the bot process runs as (the VM is the real boundary; this keeps the signing key and run-time tokens out of the bot's reach).
 RUN useradd -u 10002 -m -s /usr/sbin/nologin bot
 WORKDIR /opt/sharingan/bot
 CMD ["sleep", "infinity"]

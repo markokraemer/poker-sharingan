@@ -1,0 +1,125 @@
+# The hosted Sharingan stack on one machine, with no Platinum and no Stripe account:
+#
+#   postgres   arena + runner databases
+#   arena      the table server (REST + WS), Postgres store, hosted attestation + signed worker results enabled
+#   runner     credit ledger + Stripe webhook + job API; runs each job in a LOCAL container ("sandbox") through the host's
+#              container engine socket, on the arena's network (SANDBOX_BACKEND=local)
+#
+# Use deploy/local/e2e.sh (builds the images, writes the .env, runs a full job and asserts the result). By hand:
+#   podman build ... (see e2e.sh), then:  docker-compose -f deploy/local/compose.yml --env-file <env> -p sharingan-e2e up -d
+# Works with docker-compose v2 against podman's compat socket (DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock),
+# docker compose, or podman-compose.
+#
+# Networks
+#   core    postgres, arena, runner (published ports are bound to 127.0.0.1 only)
+#   botnet  `internal: true` (no route out): the arena and, in connect mode, the sandboxes. Worker-mode sandboxes join NO network.
+#   egress  a normal network, joined by a sandbox only while `pip install` runs
+name: ${COMPOSE_PROJECT_NAME:-sharingan-local}
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: sharingan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sharingan-local-pw}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sharingan -d runner"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [core]
+
+  arena:
+    image: ${ARENA_IMAGE:-localhost/sharingan-arena:local}
+    build:
+      context: ../..
+      dockerfile: deploy/platinum/docker/Dockerfile
+      target: arena
+    pull_policy: never
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      ARENA_DATABASE_URL: postgres://sharingan:${POSTGRES_PASSWORD:-sharingan-local-pw}@postgres:5432/arena?sslmode=disable
+      ARENA_ADMIN_TOKEN: ${ARENA_ADMIN_TOKEN:-local-admin-token}
+      ARENA_RUNNER_TOKEN: ${ARENA_RUNNER_TOKEN:-local-runner-token}
+      ARENA_WORKER_KEYS: ${WORKER_KEY_ID:-runner1}=${WORKER_SIGN_KEY:-local-worker-signing-key}
+      ARENA_OPEN_REGISTRATION: "true"
+      # Optional blueprint: BLUEPRINT_DIR holds BLUEPRINT_FILE (+ buckets-200/); unset = house bots only (no ladder-v1 / sharingan-1)
+      BLUEPRINT_FILE: ${BLUEPRINT_FILE:-sharingan-1.plcp}
+      SIZING: ${SIZING:-medium}
+    volumes:
+      - ${BLUEPRINT_DIR:-./empty-models}:/models:ro
+    ports:
+      - 127.0.0.1:${ARENA_PORT:-18080}:8080
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    networks:
+      core: {}
+      botnet: {}
+
+  runner:
+    image: ${RUNNER_IMAGE:-localhost/sharingan-runner:local}
+    build:
+      context: ../..
+      dockerfile: deploy/platinum/docker/Dockerfile.runner
+    pull_policy: never
+    # Root inside the container = the invoking user on the host (rootless podman), which is what owns the engine socket.
+    user: "0:0"
+    depends_on:
+      postgres: { condition: service_healthy }
+      arena: { condition: service_healthy }
+    environment:
+      SANDBOX_BACKEND: local
+      PORT: "8090"
+      RUNNER_DATABASE_URL: postgres://sharingan:${POSTGRES_PASSWORD:-sharingan-local-pw}@postgres:5432/runner
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:-local-service-token}
+      ARENA_URL: http://arena:8080
+      ARENA_RUNNER_TOKEN: ${ARENA_RUNNER_TOKEN:-local-runner-token}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_fake_signing_secret}
+      # STRIPE_SECRET_KEY deliberately unset: checkout sessions are simulated, nothing talks to Stripe
+      PUBLIC_BASE_URL: http://127.0.0.1:${RUNNER_PORT:-18090}
+      PRICE_USD_PER_1K_HANDS: ${PRICE_USD_PER_1K_HANDS:-0.05}
+      DEFAULT_JOB_MODE: ${DEFAULT_JOB_MODE:-worker}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-500}
+      BOT_CPU: ${BOT_CPU:-2}
+      BOT_RAM_MB: ${BOT_RAM_MB:-2048}
+      # local sandboxes
+      CONTAINER_HOST: unix:///var/run/engine.sock
+      LOCAL_BOT_IMAGE: ${BOT_IMAGE:-localhost/sharingan-bot:local}
+      LOCAL_BOT_NETWORK: ${BOTNET_NAME:-sharingan-botnet}
+      LOCAL_EGRESS_NETWORK: ${EGRESS_NAME:-sharingan-egress}
+      LOCAL_SANDBOX_BINDS: ${SANDBOX_BINDS:-}
+      # match worker
+      WORKER_KEY_ID: ${WORKER_KEY_ID:-runner1}
+      WORKER_SIGN_KEY: ${WORKER_SIGN_KEY:-local-worker-signing-key}
+      WORKER_ENV_JSON: ${WORKER_ENV_JSON:-}
+    volumes:
+      - ${CONTAINER_SOCKET:-/run/user/1000/podman/podman.sock}:/var/run/engine.sock
+    security_opt:
+      - label=disable
+    ports:
+      - 127.0.0.1:${RUNNER_PORT:-18090}:8090
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    # the runner is trusted and also attaches `egress` so that the network exists for sandboxes' pip window
+    networks: [core, egress]
+
+networks:
+  core: {}
+  botnet:
+    name: ${BOTNET_NAME:-sharingan-botnet}
+    internal: true
+  egress:
+    name: ${EGRESS_NAME:-sharingan-egress}
+
+volumes:
+  pgdata: {}

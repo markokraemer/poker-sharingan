@@ -1,84 +1,74 @@
-// HTTP front for the runner. UNTESTED.
-//   POST /jobs            {userId,botName,language,artifactTgzBase64,entry,track,hands,lanes?,idempotencyKey} -> 202 {id}
-//   GET  /jobs/:id        status, progress, result, cost
-//   POST /jobs/:id/abort
-// Auth: Authorization: Bearer $RUNNER_AUTH_TOKEN (called only by our own web/billing backend, never by players directly).
-// Credits are reserved by the caller BEFORE POST /jobs and settled from GET /jobs/:id (or the webhook) after.
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { config } from "./config.ts";
-import { runJob, requestAbort, reapOrphans } from "./job.ts";
-import { store, type JobInput } from "./store.ts";
+// Runner service entry point: wires config -> storage -> sandbox backend -> Service -> HTTP.
+//   SANDBOX_BACKEND=platinum (default)  real Platinum via @platinum-dev/sdk
+//   SANDBOX_BACKEND=local               containers through a Docker-compatible engine socket (deploy/local)
+import { ArenaClient } from "./arena.ts";
+import { createApp } from "./app.ts";
+import { loadConfig } from "./config.ts";
+import { createPool, migrate } from "./db.ts";
+import { MemoryLedger, PgLedger, type Ledger } from "./ledger.ts";
+import { stdoutLog } from "./log.ts";
+import { LocalPlatinum } from "./platinum/local.ts";
+import type { PlatinumClient } from "./platinum/types.ts";
+import { Service } from "./service.ts";
+import { MemoryJobStore, PgJobStore, type JobStore } from "./store.ts";
+import { makeGateway } from "./stripe.ts";
 
-const MAX_BODY = Math.ceil(config.maxArtifactBytes * 1.4) + 64 * 1024;
-const TRACKS = new Set(["ladder-v1", "sharingan-1"]);
-let running = 0;
-const waiting: Array<() => void> = [];
-async function slot<T>(fn: () => Promise<T>): Promise<T> {
-  if (running >= config.maxConcurrentRuns) await new Promise<void>((r) => waiting.push(r));
-  running++;
-  try { return await fn(); } finally { running--; waiting.shift()?.(); }
-}
+const cfg = loadConfig();
+const log = stdoutLog;
 
-function authed(req: IncomingMessage): boolean {
-  const got = Buffer.from((req.headers.authorization ?? "").replace(/^Bearer /, ""));
-  const want = Buffer.from(config.authToken);
-  return got.length === want.length && timingSafeEqual(got, want);
-}
-const send = (res: ServerResponse, code: number, body: unknown) => {
-  res.writeHead(code, { "content-type": "application/json" });
-  res.end(JSON.stringify(body));
-};
-async function readJson(req: IncomingMessage): Promise<any> {
-  const chunks: Buffer[] = []; let n = 0;
-  for await (const c of req) { n += (c as Buffer).length; if (n > MAX_BODY) throw new Error("body too large"); chunks.push(c as Buffer); }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
-function validate(b: any): JobInput {
-  const bad = (m: string) => { throw new Error(m); };
-  if (!b || typeof b !== "object") bad("body");
-  for (const k of ["userId", "botName", "artifactTgzBase64", "entry", "track", "idempotencyKey"]) if (typeof b[k] !== "string" || !b[k]) bad(`${k} required`);
-  if (!["python", "typescript"].includes(b.language)) bad("language must be python|typescript");
-  if (!TRACKS.has(b.track)) bad("unknown track");
-  if (!/^[\w./-]{1,200}$/.test(b.entry) || b.entry.includes("..") || b.entry.startsWith("/")) bad("bad entry path");
-  if (b.requirementsFile && (!/^[\w./-]{1,200}$/.test(b.requirementsFile) || b.requirementsFile.includes(".."))) bad("bad requirementsFile");
-  const hands = Number(b.hands ?? 20000);
-  if (!Number.isInteger(hands) || hands < 600 || hands > 200_000) bad("hands must be 600..200000");
-  return { ...b, hands };
-}
-
-createServer(async (req, res) => {
-  try {
-    if (req.url === "/healthz") return send(res, 200, { ok: true, running });
-    if (!authed(req)) return send(res, 401, { error: "unauthorized" });
-    const url = new URL(req.url!, "http://x");
-    const m = url.pathname.match(/^\/jobs(?:\/([\w-]+))?(\/abort)?$/);
-    if (!m) return send(res, 404, { error: "not found" });
-
-    if (req.method === "POST" && !m[1]) {
-      const input = validate(await readJson(req));
-      const existing = store.byKey(input.idempotencyKey);
-      if (existing) return send(res, 200, { id: existing.id, deduped: true });
-      const id = `job_${randomBytes(8).toString("hex")}`;
-      const { artifactTgzBase64: _drop, ...meta } = input;
-      store.put({ id, input: meta, status: "queued", createdAt: Date.now() });
-      void slot(() => runJob(id, input)).catch((e) => store.patch(id, { status: "failed", error: String(e) }));
-      return send(res, 202, { id });
+let ledger: Ledger;
+let store: JobStore;
+let ready: () => Promise<void> = async () => {};
+if (cfg.storage === "postgres") {
+  const pool = createPool(cfg.databaseUrl!);
+  // the database may still be starting (compose): retry for a while
+  for (let i = 0; ; i++) {
+    try { await migrate(pool); break; } catch (e) {
+      if (i >= 30) throw e;
+      log("db_wait", { attempt: i + 1, error: String((e as Error).message) });
+      await new Promise((r) => setTimeout(r, 1000));
     }
-    if (req.method === "GET" && m[1]) {
-      const j = store.get(m[1]);
-      return j ? send(res, 200, j) : send(res, 404, { error: "no such job" });
-    }
-    if (req.method === "POST" && m[1] && m[2]) {
-      if (!store.get(m[1])) return send(res, 404, { error: "no such job" });
-      requestAbort(m[1]);
-      return send(res, 202, { ok: true });
-    }
-    send(res, 405, { error: "method not allowed" });
-  } catch (e) {
-    send(res, 400, { error: String((e as Error).message ?? e) });
   }
-}).listen(config.port, () => console.log(`runner listening on :${config.port}`));
+  ledger = new PgLedger(pool);
+  store = new PgJobStore(pool);
+  ready = async () => { await pool.query("SELECT 1"); };
+} else {
+  log("memory_storage", { warning: "credits and jobs are lost on restart" });
+  ledger = new MemoryLedger();
+  store = new MemoryJobStore();
+}
 
-void reapOrphans().catch(() => {});
-setInterval(() => void reapOrphans().catch((e) => console.error("reap", e)), 5 * 60_000);
+let platinum: PlatinumClient;
+if (cfg.backend === "local") {
+  platinum = new LocalPlatinum({
+    engineHost: cfg.local.engineHost, network: cfg.local.network, egressNetwork: cfg.local.egressNetwork,
+    binds: cfg.local.binds, pidsLimit: cfg.local.pidsLimit, arenaHost: new URL(cfg.arena.botUrl).hostname,
+  });
+} else {
+  const { RealPlatinum } = await import("./platinum/real.ts");   // the SDK is only loaded when it is used
+  platinum = new RealPlatinum({ apiUrl: cfg.platinum.apiUrl, token: cfg.platinum.token! });
+}
+
+const svc = new Service({ cfg, ledger, store, platinum, arena: new ArenaClient(cfg.arena), gateway: makeGateway(cfg.stripe), log });
+await svc.recover();
+svc.start();
+
+const server = createApp(svc, cfg, { ready, log });
+server.listen(cfg.port, cfg.host, () => log("listening", {
+  port: cfg.port, backend: cfg.backend, storage: cfg.storage, arena: cfg.arena.url, price_usd_per_1k_hands: cfg.pricing.usdPerKHands,
+  stripe: cfg.stripe.secretKey ? "live-api" : "simulated-checkout",
+}));
+
+let stopping = false;
+const shutdown = async (sig: string) => {
+  if (stopping) return;
+  stopping = true;
+  log("shutdown", { signal: sig, in_flight: svc.inFlight() });
+  server.close();
+  // Give running jobs a bounded time to finish and settle; anything left is failed + refunded by recover() on the next boot.
+  await Promise.race([svc.drain(), new Promise((r) => setTimeout(r, Number(process.env.SHUTDOWN_GRACE_MS ?? 20_000)))]);
+  svc.stop();
+  process.exit(0);
+};
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

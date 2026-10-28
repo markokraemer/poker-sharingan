@@ -17,3 +17,7 @@ __pycache__/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# local hosted-stack e2e data
+data/local-e2e/
+deploy/local/.env

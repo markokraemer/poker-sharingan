@@ -1,4 +1,4 @@
-// Connect a user-uploaded TypeScript/JavaScript bot to the arena. UNTESTED.
+// Connect a user-uploaded TypeScript/JavaScript bot to the arena (connect mode; ran in deploy/local with a .ts bot).
 // env: BOT_FILE (path to .ts/.js/.mjs), ARENA_URL, ARENA_TOKEN, MAX_HANDS (optional)
 // Runs under node 22 with --experimental-strip-types (set via NODE_OPTIONS in the image), so .ts bots load directly
 // (type-stripping only: no enums, no namespaces, no path aliases).
