@@ -28,7 +28,7 @@ The sizing used to train must be the sizing used to evaluate or play a checkpoin
     --checkpoint-min 360 --seed 2019 --eval-min 60 --eval-deals 2000 --eval-threads 8
 ```
 
-* `--iters` sets the total run length. The paper's minute-based schedule is mapped to iterations proportionally (`scaled_schedule(iters)` in `crates/pluribus/src/main.rs`):
+* `--iters` sets the total run length. The paper's minute-based schedule is mapped to iterations proportionally (`scaled_schedule(iters)` in `sharingan-1/pluribus/src/main.rs`):
   LCFR discount `(t/10)/(t/10+1)` for the first 3.5%, pruning after 1.7% in 95% of iterations (threshold -300M, never on the river or terminal actions), averaging after 6.9%, strategy interval 10k.
 * `--mem-gb` caps the lock-free infoset store. Size it to about 85% of RAM. When it is full, training continues gracefully without allocating new infosets.
 * Checkpoints (`blueprint.bin`, PLBP4) and `snapshots.sum` (PLSA1) are written every `--checkpoint-min` minutes; saves are tmp+rename.

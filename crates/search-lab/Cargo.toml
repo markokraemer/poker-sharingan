@@ -1,8 +1,0 @@
-[package]
-name = "search-lab"
-edition.workspace = true
-version.workspace = true
-
-[dependencies]
-cfr-lab = { path = "../cfr-lab" }
-cards.workspace = true

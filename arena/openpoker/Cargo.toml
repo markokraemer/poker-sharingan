@@ -1,0 +1,26 @@
+[package]
+name = "openpoker"
+edition.workspace = true
+version.workspace = true
+description = "Live external 6-max evaluation on Open Poker (openpoker.ai): protocol client, nlhe replay, action mapping, trace + analyzer."
+
+[lib]
+name = "openpoker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "openpoker"
+path = "src/main.rs"
+
+[dependencies]
+cards.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+nlhe = { path = "../../engine/nlhe" }
+bench = { path = "../../arena/bench" }
+search = { path = "../../sharingan-1/search" }
+blueprint = { path = "../../sharingan-1/blueprint" }
+abstraction = { path = "../../sharingan-1/abstraction" }
+rayon.workspace = true
+tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+ureq = { version = "2.10", features = ["json"] }

@@ -69,7 +69,7 @@ Hero (search) in every seat vs 5 copies of the field; blueprint alone = 0 by def
 
 Search is a clear win against the blueprint it is built on, but it *loses* EV against weak fixed rule bots compared with playing the blueprint
 alone (flop search costs about 120 mbb/game there), which is why the final config searches only the turn and river.
-Search iterations were the main lever (20k: -42, 200k: +87, 500k: no better). Details and the full hill-climb log: [`docs/RESULTS.md`](RESULTS.md) and [`crates/search/RESULTS.md`](../crates/search/RESULTS.md).
+Search iterations were the main lever (20k: -42, 200k: +87, 500k: no better). Details and the full hill-climb log: [`docs/RESULTS.md`](RESULTS.md) and [`sharingan-1/search/RESULTS.md`](../sharingan-1/search/RESULTS.md).
 
 ### External bots and live play
 
@@ -105,7 +105,7 @@ Caveats, in order of importance:
 1. SvanBot's production fleet also uses a learned neural response model and parameters tuned on its own hand database. We ran a fresh install's defaults, with empty per-opponent models.
 2. This is a "who is closer to equilibrium" test. SvanBot is a much stronger *exploiter of weak fixed bots* than our blueprint (it beats rule bots roughly twice as hard), which is exactly what a ladder full of weak bots rewards.
 3. The search arms used the small simulation budget and are not statistically significant.
-4. The SvanBot bridge (`scripts/extbots/svan/extbridge.rs`) is included; SvanBot itself (Apache-2.0) is not vendored.
+4. The SvanBot bridge (`arena/adapters/svan/extbridge.rs`) is included; SvanBot itself (Apache-2.0) is not vendored.
 
 ### Compute
 
@@ -118,7 +118,7 @@ Caveats, in order of importance:
 | **Spend so far** | **about EUR 480** of compute (~282 box-hours), plus a few euros per month for storage |
 | **Final run to the paper's 8-day budget** | TODO(final): iterations reached, wall time, infosets, EUR, and the new evaluation numbers |
 
-The paper's minute-based schedule was mapped to iterations proportionally (`scaled_schedule` in `crates/pluribus/src/main.rs`):
+The paper's minute-based schedule was mapped to iterations proportionally (`scaled_schedule` in `sharingan-1/pluribus/src/main.rs`):
 LCFR discount for the first 3.5% of the run, pruning from 1.7% (95% of iterations, threshold -300M, never on the river or terminal actions), averaging from 6.9%.
 
 ## Coming soon: public play-against API and open benchmark
@@ -147,7 +147,7 @@ huggingface-cli download TODO/sharingan --local-dir ./weights      # https://hug
 ```
 
 The 200-bucket abstraction tables (`flop.u16`, `turn.u16`, `river.u16`, `meta.txt`, ~264 MB) must end up in `data/buckets-200/`.
-They can also be rebuilt from scratch with `cargo run --release -p abstraction --bin build_buckets` (compute-heavy, see `crates/abstraction`).
+They can also be rebuilt from scratch with `cargo run --release -p abstraction --bin build_buckets` (compute-heavy, see `sharingan-1/abstraction`).
 
 ### 2. Evaluate a blueprint
 
@@ -164,7 +164,7 @@ They can also be rebuilt from scratch with `cargo run --release -p abstraction -
     --players 6 --iters 12000000 --threads 32 --mem-gb 120 --seat all --warm --eval-deals 20000 --seed 1 --out exploit.json
 ```
 
-Search experiments (blueprint + real-time search vs a field) use `crates/search/examples/vsbp.rs`:
+Search experiments (blueprint + real-time search vs a field) use `sharingan-1/search/examples/vsbp.rs`:
 
 ```bash
 cargo run --release -p search --example vsbp -- --compact weights/C.plcp --sizing medium --buckets data/buckets-200 \
@@ -175,7 +175,7 @@ cargo run --release -p search --example vsbp -- --compact weights/C.plcp --sizin
 
 ### 3. Play against it / live bot
 
-The Open Poker client (`crates/openpoker`, see its README) runs the final configuration (blueprint + turn/river search + stack reset):
+The Open Poker client (`arena/openpoker`, see its README) runs the final configuration (blueprint + turn/river search + stack reset):
 
 ```bash
 export OPENPOKER_API_KEY=...        # never commit this
@@ -218,7 +218,7 @@ continues without allocating new infosets.
 Repository layout:
 
 ```
-crates/            Rust workspace (all crates above)
+engine/ sharingan-1/ arena/ research/   Rust workspace (all crates above)
 docs/              METHOD.md, TRAINING.md, EVALUATION.md, RESULTS.md, DEVLOG.md, TABLE_API.md, BENCHMARK_LANDSCAPE.md
 data/              git-ignored; buckets-200 tables go here (see data/README.md)
 scripts/           portable helpers for running on rented boxes (hosts via PLURIBUS_HOST / PLURIBUS_DEV_HOST), extbots/, experiments/
@@ -257,7 +257,7 @@ violates their terms and may be illegal in your jurisdiction. Use it for researc
 
 ## Third-party code and data
 
-See [`NOTICE`](../NOTICE). In short: `crates/iso` is a port of Kevin Waugh's hand-isomorphism indexer; PokerBench and the RLCard/SvanBot benchmarks are used as external
+See [`NOTICE`](../NOTICE). In short: `engine/iso` is a port of Kevin Waugh's hand-isomorphism indexer; PokerBench and the RLCard/SvanBot benchmarks are used as external
 evaluation data/opponents but are not redistributed here. The Pluribus paper text is not included; get it from *Science* (doi:10.1126/science.aay2400).
 
 ## Citation

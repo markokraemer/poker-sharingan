@@ -433,17 +433,17 @@ scripted actions, plus these vectors:
 
 ## 13. What our bot does with this, and what still has to be built on our side
 
-**Already true.** The bot's NLHE engine (`crates/nlhe`) implements exactly the rules in §6: `to` semantics,
+**Already true.** The bot's NLHE engine (`engine/nlhe`) implements exactly the rules in §6: `to` semantics,
 `min_raise_to = current_bet + max(last full raise, bb)`, a short all-in does not reopen betting, the odd chip goes
 left of the button, and a fold when check is free is treated as a check. The Open Poker client
-(`crates/openpoker`) already shows the pattern it uses:
+(`arena/openpoker`) already shows the pattern it uses:
 * it rebuilds its own engine from the server's events and cross-checks stacks and pot on every event;
 * it runs the blueprint or turn/river search with a hard 5 s budget and a blueprint fallback;
 * it clamps each action to the legal set;
 * it applies a stack guard and a reset above 150 bb, and writes a full decision trace.
 
 **To build once this API exists** (about a day):
-1. **Protocol client** `crates/tableapi`, a sibling of `crates/openpoker`: WebSocket client for §4/§5, `decision_id`
+1. **Protocol client** `arena/tableapi`, a sibling of `arena/openpoker`: WebSocket client for §4/§5, `decision_id`
    handling, seq-gap detection with `hello{resume}` resync, reconnect, and mapping `your_turn` to the existing
    session/engine/policy stack.
 2. **Live AIVAT**: Open Poker hides folded cards, so the live analyzer only does an all-in luck adjustment today.

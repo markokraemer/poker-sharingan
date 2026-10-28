@@ -1,87 +1,60 @@
-<p align="center"><img src="assets/header.svg" width="100%" alt="POKER SHARINGAN: the poker bot arena"></p>
+# Poker Sharingan
 
-```text
-11  POKER IS ONE OF THE HARDEST THINGS IN AI TO EVALUATE. LUCK SWAMPS SKILL: A BAD BOT CAN
-12  WIN FOR THOUSANDS OF HANDS. A REAL ANSWER TAKES MILLIONS OF HANDS, EVERY DEAL REPLAYED
-13  FROM EVERY SEAT, AND LUCK SUBTRACTED OUT. POKER SHARINGAN IS THAT SETUP, READY TO USE:
-14  AN OPEN BENCHMARK, HARNESS, ARENA AND LEADERBOARD FOR POKER BOTS OF ANY KIND.
+**The arena for poker bots.** Bring a bot, get an honest score. [sharingan.poker](https://sharingan.poker)
+
+In poker, luck hides skill for thousands of hands. We replay every deal from every seat and subtract the luck, so the score actually means something.
+
+## Open source (this repo)
+
+| | |
+|---|---|
+| **Engine** | Six-player no-limit hold'em. `engine/` |
+| **Harness** | Run millions of hands locally. Luck-corrected scores with error bars. `arena/` |
+| **SHARINGAN-1** | Our bot, a Pluribus reproduction. Code and weights. `sharingan-1/` |
+
+## Cloud (paid, coming soon)
+
+Buy credits, run evals. We host the arena and the API: your bot plays the field at scale, you get a ranked score and every hand history.
+
+## Your bot's API
+
+Your bot gets the hand. It returns an action.
+
+```json
+→ {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200, "options": ["fold","call","raise"]}
+← {"action": "raise", "to": 800}
 ```
 
-### EXHIBIT A: WHAT YOU GET
+Full spec: [docs/TABLE_API.md](docs/TABLE_API.md)
 
-```text
-15  ARENA           SIX-PLAYER NO-LIMIT HOLD'EM TABLES, RUNNING AROUND THE CLOCK.
-16  LEADERBOARD     ONE PUBLIC RANKING. EVERY SCORE COMES WITH AN ERROR BAR.
-17  HARNESS         THE SAME ENGINE ON YOUR MACHINE. A MILLION HANDS BEFORE YOU SUBMIT.
-18  FAIR SCORING    DUPLICATE DEALS + AIVAT LUCK CORRECTION. SKILL, NOT CARDS.
-19  OPPONENTS       A LADDER OF REFERENCE BOTS, FROM RULE BOTS UP TO SHARINGAN-1.
-20  HISTORIES       EVERY HAND YOUR BOT PLAYED, TO STUDY AND IMPROVE ON.
-21  CLOUD           WE PROVISION THE ARENA AND RUN YOUR EVALS AT SCALE. SOON.
-```
+## SHARINGAN-1
 
-### EXHIBIT B: HOW IT WORKS
+A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat poker pros at six-player no-limit. Its final training run is finishing now. Earlier checkpoints:
 
-```text
-22  1  YOUR BOT IS SENT THE STATE OF THE HAND: ITS CARDS, THE BOARD, THE POT, ITS OPTIONS.
-23  2  IT ANSWERS WITH AN ACTION. THAT IS THE WHOLE API.
-24  3  IT PLAYS THE FIELD. EVERY DEAL IS REPLAYED FROM EVERY SEAT.
-25  4  ITS SCORE, WITH AN ERROR BAR, GOES ON THE LEADERBOARD.
-26
-27  →  {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200,
-28      "options": ["fold","call","raise"], "min_raise_to": 400, "stack": 9400}
-29  ←  {"action": "raise", "to": 800}
-```
+- beat SvanBot, the #1 bot on a public arena
+- a bot trained only to exploit it still loses to it
+- won +77.6 bb/100 over 2,329 live hands
 
-The full table contract (REST + WebSocket, seeded decks, duplicate rotations, hand histories): [docs/TABLE_API.md](docs/TABLE_API.md).
+Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
 
-### EXHIBIT C: THE HOUSE BOT, SHARINGAN-1
-
-A from-scratch reproduction of Pluribus (Brown & Sandholm, *Science* 2019), the first AI to beat professionals at
-six-player no-limit hold'em. Built by coding agents, trained on rented CPUs. Its final training run, to the paper's
-full 8-day budget, is finishing now. The numbers below are from earlier checkpoints of the same run.
-
-```text
-30  DUPLICATE DEALS + AIVAT. MBB/GAME, 95% CI. 10 MBB/GAME = 1 BB/100.
-31
-32  CHECKPOINT AT 4.77e10 ITERATIONS VS AT 2e10        4M DEALS     +3.8   +- 1.0
-33  VS SvanBot, #1 ON A PUBLIC ARENA (ITS LIVE BUDGET)  20k DEALS    +56.7  +- 34.7
-34  SvanBot VS FIVE COPIES OF IT                        50k DEALS    -46.9  +- 21.2
-35  A BOT TRAINED ONLY TO EXPLOIT IT                    20k DEALS    -290   +- 59
-36  WITH REAL-TIME SEARCH, LIVE ON A PUBLIC ARENA       2,329 HANDS  +77.6 BB/100 [26, 129]
-37  FINAL RUN (1.83e11 ITERATIONS)                                   TRAINING
-```
-
-How it works, in plain words and in full: [docs/METHOD.md](docs/METHOD.md).
-Every result with its caveats: [docs/RESULTS.md](docs/RESULTS.md).
-
-### EXHIBIT D: RUN IT
+## Run it
 
 ```bash
-git clone https://github.com/markokraemer/poker-sharingan && cd poker-sharingan
-RUSTFLAGS="-C target-cpu=native" cargo build --release
-
-# SHARINGAN-1 weights + card abstraction (not in git)
-huggingface-cli download TODO/sharingan-1 --local-dir weights
-
-# a duplicate, luck-corrected six-max match between two bots
-./target/release/pluribus h2h --a weights/a.plcp --sizing-a medium --b weights/b.plcp --sizing-b medium \
-  --buckets data/buckets-200 --players 6 --deals 1000000 --threads 32 --warm --out h2h.json
+cargo build --release
+./target/release/pluribus h2h --a bot1.plcp --b bot2.plcp --players 6 --deals 1000000 ...
 ```
 
-The engine CLI is named `pluribus`, after the paper. Bring-your-own-bot adapters, the gauntlet, the exploiter and
-training: [docs/OVERVIEW.md](docs/OVERVIEW.md) · [docs/EVALUATION.md](docs/EVALUATION.md) · [docs/TRAINING.md](docs/TRAINING.md).
+More: [docs/OVERVIEW.md](docs/OVERVIEW.md)
 
-### EXHIBIT E: STATUS
+## Layout
 
-```text
-38  ENGINE, DUPLICATE + AIVAT SCORING, REFERENCE BOTS                BUILT
-39  SHARINGAN-1, FINAL TRAINING RUN                                  TRAINING
-40  PUBLIC TABLE API AND LOCAL HARNESS                               SOON
-41  LEADERBOARD AND OPEN SUBMISSIONS                                 SOON
-42  CLOUD ARENA                                                      SOON
+```
+engine/        poker rules
+arena/         harness, scoring, reference bots, adapters
+sharingan-1/   our bot: training and real-time search
+research/      small-game labs and experiments
+docs/          specs, results, method
+site/          sharingan.poker
 ```
 
-```text
-43  FOR RESEARCH AND BOT ARENAS. REAL-MONEY SITES BAN BOTS.
-44  APACHE-2.0. THIRD-PARTY NOTICES IN NOTICE.  https://sharingan.poker
-```
+Apache-2.0 · For research and bot arenas. Real-money sites ban bots.

@@ -138,9 +138,9 @@ large-memory box (needs user approval for the spend).
   its own fold/call/raise×5 variants, AIVAT-scored → ~/pluribus/data/run-paper/eval.jsonl.
   First point (9.3M it, 6 min): −2051 vs tag, −1218 vs nit, +1582 vs station (untrained).
   Built-in bots are SANITY ONLY. "Worthy" evaluation = Wave 4 (launched):
-   (a) crates/exploit — trained best-response exploiter (MCCFR learner vs frozen blueprint)
+   (a) arena/exploit — trained best-response exploiter (MCCFR learner vs frozen blueprint)
        + strong LBR: opponent-independent exploitability, the GTO yardstick;
-   (b) crates/referee — PokerBench 6-max spots labelled by GTO Wizard solutions (accuracy)
+   (b) arena/referee — PokerBench 6-max spots labelled by GTO Wizard solutions (accuracy)
        + exact HU river solver EV-loss;
    (c) external: GTO Wizard AI API (HU; USER must request key), Slumbot (HU), Open Poker 6-max.
 - 2026-10-12 ~21:30: SPEED: perf showed a global per-node AtomicU64 (128 threads) + no THP
@@ -276,7 +276,7 @@ large-memory box (needs user approval for the spend).
   and play ≥2k hands vs Slumbot live.
 - ~17:55 local: Open Poker live (B-final): 55 hands, +170 bb/100 (CI ±300), 0 rejects/desyncs,
   VPIP 16.7 / PFR 14.8, mostly 6-handed; ~110 hands/h (10k hands ≈ 90 h). A(D) @3.68B, ckpt ~40 min.
-- 2026-10-13 ~18:45 local: EXTERNAL BOTS done (crates/bench/EXTERNAL_BOTS.md). No strong public 6-max bot exists;
+- 2026-10-13 ~18:45 local: EXTERNAL BOTS done (arena/bench/EXTERNAL_BOTS.md). No strong public 6-max bot exists;
   integrated chart6/-loose/-tight (native rule bots), RLCard DQN via JSON-lines Python bridge (`bench table`, `ext:`),
   B-final 6-max (AIVAT, 100k deals): vs 5x chart6 +134+-18, loose +174+-20, tight +130+-16, rlcard +587+-41;
   1 external vs 5 B: all lose (chart6 -112, rlcard -1779). Mixed tables: B positive but chart bots earn more than B
@@ -372,7 +372,7 @@ large-memory box (needs user approval for the spend).
   C RESUMED on box A toward 4e10 (same args, --iters 40000000000; schedule phases lcfr/prune/avg all already
   passed under both scalings → only effect is more iterations). 2e10 checkpoint preserved as
   run-medium/blueprint-2e10.bin (hard link; saves are tmp+rename). A(D) 66.0% @13.19B, ETA ~12 h.
-- ~12:40 local *** SEARCH HILL-CLIMB AGENT DONE (crates/search/RESULTS.md): 6-max search vs 5×B-final now
+- ~12:40 local *** SEARCH HILL-CLIMB AGENT DONE (sharingan-1/search/RESULTS.md): 6-max search vs 5×B-final now
   +100.9±22.0 mbb/g (60k deals, seed 11) / +95.3±31.1 (new default, 30k, seed 11); was −118±41. Levers:
   (1) iterations 20k→200k (−42 → +87; 500k no better); (2) opponent beliefs updated with the BLUEPRINT
   likelihood (they are the blueprint) instead of the search average (−150 → −52 @20k); own seat keeps search
@@ -468,7 +468,7 @@ large-memory box (needs user approval for the spend).
   with `--set flop=0` via scripts/op-search-loop2.sh → logs/openpoker-CsearchTR.jsonl.
   Confirmation arms on B (~/ps5/run_noflop2.sh): chart6-tight + RLCard, flop=0 vs blueprint, same seeds.
 - ~20:58 local: confirmations (same seeds, flop=0 vs blueprint): chart6-tight +65.8±62.7 vs +124.9±61.2;
-  RLCard(B-retrained) +709±214 vs +476±227. Summary in crates/search/RESULTS.md ("Final-bot config").
+  RLCard(B-retrained) +709±214 vs +476±227. Summary in sharingan-1/search/RESULTS.md ("Final-bot config").
   FINAL CONFIG = C blueprint + turn/river search (flop=0). Probe robustness arms launched on B (~/ps5/logs/probe:
   probe bet=1.5 vs 5×{bp, search flop=0, search default}). Live TR bot: 49 hands, 0 fallbacks.
   C 70.8% @28.31B; A(D) 91.6% @18.32B (93% cap, ETA ~4 h).

@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = [
+  "engine/cards", "engine/iso", "engine/nlhe",
+  "sharingan-1/abstraction", "sharingan-1/blueprint", "sharingan-1/search", "sharingan-1/pluribus",
+  "arena/bench", "arena/exploit", "arena/referee", "arena/openpoker",
+  "research/cfr-lab", "research/search-lab",
+]
 
 [workspace.package]
 edition = "2021"
@@ -9,7 +14,7 @@ license = "Apache-2.0"
 repository = "https://github.com/markokraemer/poker-sharingan"
 
 [workspace.dependencies]
-cards = { path = "crates/cards" }
+cards = { path = "engine/cards" }
 rayon = "1.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -25,5 +30,5 @@ panic = "abort"
 opt-level = 2
 
 [workspace.metadata]
-name = "SHARINGAN"
-description = "SHARINGAN: an open, agent-built reproduction of Pluribus (6-max no-limit hold'em): MCCFR blueprint plus real-time search."
+name = "Poker Sharingan"
+description = "The poker bot arena: open engine, harness and luck-corrected scoring, plus SHARINGAN-1, an open Pluribus reproduction."

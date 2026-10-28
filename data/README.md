@@ -11,7 +11,7 @@ Download `buckets-200.tar` from the Hugging Face repository `TODO/sharingan` and
 cargo run --release -p abstraction --bin build_buckets
 ```
 
-## data/pokerbench/ (optional, for `crates/referee`)
+## data/pokerbench/ (optional, for `arena/referee`)
 
 The PokerBench CSVs (~88 MB) are used by the `referee` crate to measure per-spot accuracy. PokerBench is published by its authors on Hugging Face
 (`RZ412/PokerBench`, Apache-2.0 according to its dataset card). It is not redistributed in this repository; download the four `*_game_scenario_information.csv` files from there.

@@ -1,0 +1,10 @@
+[package]
+name = "abstraction"
+edition.workspace = true
+version.workspace = true
+description = "Information abstraction: equity features, EMD k-means, bucket tables."
+
+[dependencies]
+cards.workspace = true
+rayon.workspace = true
+iso = { path = "../../engine/iso" }

@@ -1,0 +1,15 @@
+[package]
+name = "pluribus"
+edition.workspace = true
+version.workspace = true
+description = "Pluribus reproduction CLI: train the blueprint, play, benchmark."
+
+[dependencies]
+cards.workspace = true
+rayon.workspace = true
+nlhe = { path = "../../engine/nlhe" }
+blueprint = { path = "../../sharingan-1/blueprint" }
+abstraction = { path = "../../sharingan-1/abstraction" }
+bench = { path = "../../arena/bench" }
+exploit = { path = "../../arena/exploit" }
+serde_json.workspace = true

@@ -376,7 +376,7 @@ LBR (weak exploiter, 1500 deals x 300 samples, mbb/game won by LBR, lower = less
 # Superseded earlier write-up (kept; numbers below were produced by the noisy MC solver)
 # search: Pluribus real-time search (Algorithm 2) - results and deviations
 
-Reproduce on the dev box: `crates/search/run_experiments.sh` (uses `examples/eval.rs`; `examples/speed.rs` is a per-street
+Reproduce on the dev box: `sharingan-1/search/run_experiments.sh` (uses `examples/eval.rs`; `examples/speed.rs` is a per-street
 iterations/s probe). Tests: `cargo test --release -p search` (19 tests, <5 s). All numbers: 32 threads, dev box.
 
 ## Design
