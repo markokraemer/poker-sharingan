@@ -21,3 +21,19 @@ __pycache__/
 # local hosted-stack e2e data
 data/local-e2e/
 deploy/local/.env
+
+# build / package output
+node_modules/
+dist/
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# weights, archives, secrets, local databases
+*.plcp
+*.plcp.part-*
+*.tar
+*.pem
+*.key
+*.db
+tinybp/

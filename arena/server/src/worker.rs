@@ -49,7 +49,8 @@ pub struct WorkerOpts {
     pub track: String,
     pub hands: u32,
     pub lanes: usize,
-    /// `None` = the track's frozen seed (comparable with server runs).
+    /// `None` = the track's frozen seed (comparable with server runs). A secret per-run seed (`run:<hex>`, from `--seed-file`)
+    /// gives fresh deals; it never reaches the bot (see `hand_prefix`).
     pub seed: Option<String>,
     pub decision_timeout_ms: u64,
     pub startup_timeout_ms: u64,
@@ -135,6 +136,10 @@ impl BotProc {
         let mut c = Command::new("sh");
         c.arg("-c").arg(cmd);
         c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
+        // the bot must not inherit the operator's secrets (or a seed) from the worker's environment
+        for k in ["ARENA_ADMIN_TOKEN", "ARENA_RUNNER_TOKEN", "ARENA_WORKER_KEYS", "ARENA_DATABASE_URL", "ARENA_SEED", "SHARINGAN_SEED"] {
+            c.env_remove(k);
+        }
         c.env("SHARINGAN_PIPE", "1").env("SHARINGAN_LANE", lane.to_string()).env("SHARINGAN_LANES", lanes.to_string());
         c.process_group(0);
         let mut child = c.spawn()?;
@@ -182,6 +187,11 @@ impl BotProc {
                 return Ok(line);
             }
             scan = self.buf.len();
+            // A bot that keeps the pipe busy (a flood of noise, a never-ending line) never makes `read` block, so
+            // the poll below would never see the deadline: check it on every pass.
+            if Instant::now() >= deadline {
+                return Err(IoErr::Timeout);
+            }
             if self.buf.len() - self.start > MAX_LINE {
                 return Err(IoErr::Broken("line longer than 4 MiB".into()));
             }
@@ -214,14 +224,21 @@ impl BotProc {
             libc::kill(-(self.child.id() as i32), libc::SIGKILL);
         }
         let _ = self.child.kill();
-        let _ = self.child.wait();
+        // Never block on a process that does not die (a different uid we may not signal, an uninterruptible
+        // state): close our end of its stdin so it sees EOF, wait a bounded time, then leave it to init.
+        let t0 = Instant::now();
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) | Err(_) => return,
+                Ok(None) if t0.elapsed() > Duration::from_secs(3) => break,
+                Ok(None) => std::thread::sleep(Duration::from_millis(2)),
+            }
+        }
+        self.close_stdin();
     }
 
-    /// Polite end: `bye`, close stdin, wait a little, then kill.
-    pub fn finish(&mut self, bye: &str) {
-        let _ = self.send(bye, Instant::now() + Duration::from_millis(200));
-        let t0 = Instant::now();
-        // closing our stdin end: replace by dup'ing /dev/null over it
+    /// Replace our write end of the bot's stdin by /dev/null so the bot reads EOF.
+    fn close_stdin(&mut self) {
         unsafe {
             let nul = libc::open(c"/dev/null".as_ptr(), libc::O_RDONLY);
             if nul >= 0 {
@@ -229,6 +246,13 @@ impl BotProc {
                 libc::close(nul);
             }
         }
+    }
+
+    /// Polite end: `bye`, close stdin, wait a little, then kill.
+    pub fn finish(&mut self, bye: &str) {
+        let _ = self.send(bye, Instant::now() + Duration::from_millis(200));
+        let t0 = Instant::now();
+        self.close_stdin(); // the bot reads EOF
         while t0.elapsed() < Duration::from_millis(1500) {
             if let Ok(Some(_)) = self.child.try_wait() {
                 break;
@@ -382,6 +406,9 @@ struct Cx<'a> {
     cfg: TableConfig,
     seed: String,
     seed64: u64,
+    /// Prefix of every `hand_id` the bot sees. The track seed itself for the frozen deals (public anyway);
+    /// for any other seed a one-way hash of it, so a secret per-run seed never reaches the bot.
+    hand_prefix: String,
     planned: u32,
     lanes: usize,
     done: AtomicU32,
@@ -451,6 +478,9 @@ impl<'a> Lane<'a> {
         let mut b = BotProc::spawn(&o.bot_cmd, self.lane, self.cx.lanes).map_err(|e| format!("spawn failed: {e}"))?;
         let deadline = Instant::now() + Duration::from_millis(o.startup_timeout_ms);
         loop {
+            if Instant::now() >= deadline {
+                return Err(format!("no hello within {} ms", o.startup_timeout_ms));
+            }
             let line = match b.recv(deadline) {
                 Ok(l) => l,
                 Err(IoErr::Timeout) => return Err(format!("no hello within {} ms", o.startup_timeout_ms)),
@@ -508,7 +538,7 @@ impl<'a> Lane<'a> {
             return match e {
                 IoErr::Timeout => self.timed_out(t0),
                 IoErr::Eof => {
-                    self.die("bot closed its stdin".into());
+                    self.die("bot exited mid-game (closed its stdin)".into());
                     Decision::Timeout(think(t0))
                 }
                 IoErr::Broken(m) => {
@@ -518,6 +548,9 @@ impl<'a> Lane<'a> {
             };
         }
         loop {
+            if Instant::now() >= deadline {
+                return self.timed_out(t0);
+            }
             let bot = self.bot.as_mut().unwrap();
             let line = match bot.recv(deadline) {
                 Ok(l) => l,
@@ -591,7 +624,7 @@ impl<'a> Lane<'a> {
             seats.push(SeatInfo { seat: s, player_id: pid.clone(), name: pid.clone(), kind: "bot".into(), stack: cx.cfg.starting_stack });
         }
         let dk = deck::deal_deck(&cx.seed, deal as u64);
-        let hand_id = format!("{}-h{}", cx.seed, hand_no);
+        let hand_id = format!("{}-h{}", cx.hand_prefix, hand_no);
         let deck_digest = seed64(&cards::cards_str(&dk));
         let setup = HandSetup {
             table_id: self.table_id.clone(),
@@ -694,7 +727,7 @@ impl<'a> Lane<'a> {
                             self.st.timeouts += 1;
                             self.restart_after_timeout();
                         }
-                        Err(_) => self.die("bot closed its stdin".into()),
+                        Err(_) => self.die("bot exited mid-game (closed its stdin)".into()),
                     }
                 }
             }
@@ -748,6 +781,26 @@ impl<'a> Lane<'a> {
 
 // ------------------------------------------------------------------------------------ run + result
 
+/// What the bot sees of the seed inside `hand_id`s: the seed for the (public) track seed, a hash prefix otherwise.
+fn hand_prefix(seed: &str, track_seed: &str) -> String {
+    if seed == track_seed {
+        seed.to_string()
+    } else {
+        format!("run-{}", &sha256_hex(format!("hand-prefix:{seed}").as_bytes())[..16])
+    }
+}
+
+/// Read a seed from a file (`--seed-file`): trimmed, must be non-empty. The hosted runner writes a root-only file
+/// the bot's user cannot open; the worker reads it once and never passes it on to the bot process.
+pub fn read_seed_file(path: &str) -> Result<String, String> {
+    let raw = std::fs::read_to_string(path).map_err(|e| format!("cannot read seed file {path}: {e}"))?;
+    let seed = raw.trim();
+    if seed.is_empty() {
+        return Err(format!("seed file {path} is empty"));
+    }
+    Ok(seed.to_string())
+}
+
 pub fn build_house(track: &Track, cfg: Option<&ServerConfig>) -> Result<HouseRegistry, String> {
     let cfg = cfg.cloned().unwrap_or_else(ServerConfig::from_env);
     let house = HouseRegistry::build(&cfg)?;
@@ -784,7 +837,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
     let cfg = TableConfig { mode: Some("benchmark".into()), decision_time_ms: opts.decision_timeout_ms, min_players_to_deal: 6, ..Default::default() };
     cfg.validate().map_err(|e| e.message)?;
     let est = EquityEstimator::default();
-    let cx = Cx { opts, house: &house, est: &est, mode, participants: participants.clone(), cfg: cfg.clone(), seed64: seed64(&seed), seed: seed.clone(), planned: hands, lanes, done: AtomicU32::new(0) };
+    let cx = Cx { opts, house: &house, est: &est, mode, participants: participants.clone(), cfg: cfg.clone(), seed64: seed64(&seed), hand_prefix: hand_prefix(&seed, &track_seed), seed: seed.clone(), planned: hands, lanes, done: AtomicU32::new(0) };
     let started_at = now_iso();
     let t0 = Instant::now();
     let finished = AtomicBool::new(false);
@@ -889,7 +942,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
 
 // ------------------------------------------------------------------------------------ CLI
 
-pub const RUN_USAGE: &str = "usage: sharingan-arena run --bot \"<command>\" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S]
+pub const RUN_USAGE: &str = "usage: sharingan-arena run --bot \"<command>\" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S | --seed-file F]
          [--out result.json] [--sign-key-file F] [--player-id ID] [--decision-timeout-ms 5000] [--startup-timeout-ms 30000]
          [--max-restarts 3] [--aivat full|cards|off] [--hands-out FILE] [--quiet]
   env: ARENA_BLUEPRINT / ARENA_BUCKETS / ARENA_SIZING select the sharingan-1 house bot (as for the server)";
@@ -897,7 +950,7 @@ pub const RUN_USAGE: &str = "usage: sharingan-arena run --bot \"<command>\" [--t
 /// `sharingan-arena run ...`; returns the process exit code.
 pub fn cli_run(args: Vec<String>) -> i32 {
     let mut o = WorkerOpts::default();
-    let (mut out, mut key_file) = (None::<String>, None::<String>);
+    let (mut out, mut key_file, mut seed_file) = (None::<String>, None::<String>, None::<String>);
     let mut it = args.into_iter();
     let bad = |m: &str| -> i32 {
         eprintln!("sharingan-arena run: {m}\n{RUN_USAGE}");
@@ -927,6 +980,7 @@ pub fn cli_run(args: Vec<String>) -> i32 {
             "--hands" => o.hands = n!(u32),
             "--lanes" => o.lanes = n!(usize),
             "--seed" => o.seed = Some(v!()),
+            "--seed-file" => seed_file = Some(v!()),
             "--out" => out = Some(v!()),
             "--sign-key-file" => key_file = Some(v!()),
             "--player-id" => o.player_id = Some(v!()),
@@ -948,6 +1002,16 @@ pub fn cli_run(args: Vec<String>) -> i32 {
     }
     if !matches!(o.aivat.as_str(), "full" | "cards" | "off") {
         return bad("--aivat must be full, cards or off");
+    }
+    if let Some(p) = &seed_file {
+        // takes precedence over --seed
+        match read_seed_file(p) {
+            Ok(sd) => o.seed = Some(sd),
+            Err(e) => {
+                eprintln!("sharingan-arena run: {e}");
+                return 2;
+            }
+        }
     }
     let key = match &key_file {
         Some(p) => match std::fs::read_to_string(p).ok().and_then(|s| parse_key_spec(&s)) {

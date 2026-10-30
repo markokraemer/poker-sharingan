@@ -87,6 +87,7 @@ pub struct Store {
     full: std::sync::atomic::AtomicBool,
     arena: Vec<AtomicI32>,
     next: AtomicU64,
+    collisions: AtomicU64,
 }
 
 impl Store {
@@ -100,7 +101,7 @@ impl Store {
     /// which would waste up to half the RAM on a large box).
     pub fn with_index(capacity: usize, max_infosets: usize) -> Self {
         let table = (max_infosets * 10 / 7).max(16);
-        Store { keys: zeroed(table), vals: zeroed(table), count: AtomicU64::new(0), full: Default::default(), arena: zeroed(capacity), next: AtomicU64::new(0) }
+        Store { keys: zeroed(table), vals: zeroed(table), count: AtomicU64::new(0), full: Default::default(), arena: zeroed(capacity), next: AtomicU64::new(0), collisions: AtomicU64::new(0) }
     }
 
     /// Home bucket of `key` (Lemire's multiply-shift range reduction).
@@ -159,6 +160,9 @@ impl Store {
 
     /// Like `infoset`, but returns `None` instead of allocating once the index is 80% full
     /// or the regret arena is exhausted (training then treats the infoset as unvisited).
+    /// Also `None` when the key is already held by an infoset of another shape (a 64-bit key
+    /// collision between two histories): indexing its regrets with this node's actions would
+    /// read past the slot.
     #[inline]
     pub fn try_infoset(&self, history: u64, bucket: u32, n_actions: usize, _n_buckets: usize, with_avg: bool) -> Option<Slot> {
         let key = infoset_key(history, bucket);
@@ -167,7 +171,10 @@ impl Store {
             let k = self.keys[i].load(Acquire);
             if k == key {
                 let s = self.wait_ready(i);
-                debug_assert_eq!(s.n_actions as usize, n_actions, "infoset key collision or action-count mismatch");
+                if s.n_actions as usize != n_actions || s.with_avg != with_avg {
+                    self.collisions.fetch_add(1, Relaxed);
+                    return None;
+                }
                 return Some(s);
             }
             if k == 0 {
@@ -185,12 +192,17 @@ impl Store {
                         self.vals[i].store(s.pack(), Release);
                         return Some(s);
                     }
-                    Err(other) if other == key => return Some(self.wait_ready(i)),
+                    Err(other) if other == key => continue, // re-read: the slot is checked above
                     Err(_) => {}
                 }
             }
             i = self.probe_next(i);
         }
+    }
+
+    /// Lookups refused because the key belonged to an infoset of another shape.
+    pub fn collisions(&self) -> u64 {
+        self.collisions.load(Relaxed)
     }
 
     /// True once an allocation has been refused because the store is full.
@@ -372,6 +384,16 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shape_mismatch_is_refused_not_returned() {
+        let st = Store::new(1000);
+        let s = st.infoset(42, 3, 3, 10, false);
+        assert_eq!(st.try_infoset(42, 3, 2, 10, false), None);
+        assert_eq!(st.try_infoset(42, 3, 3, 10, true), None);
+        assert_eq!(st.collisions(), 2);
+        assert_eq!(st.try_infoset(42, 3, 3, 10, false), Some(s));
+    }
 
     #[test]
     fn alloc_and_regret_matching() {

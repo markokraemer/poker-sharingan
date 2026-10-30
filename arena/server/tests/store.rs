@@ -44,6 +44,7 @@ fn run(id: &str, track: &str, pid: &str) -> RunRecord {
         name: "n".into(),
         match_id: format!("m-{id}"),
         seed: "s".into(),
+        deals: None,
         hands_planned: 600,
         hands_done: 0,
         status: "running".into(),

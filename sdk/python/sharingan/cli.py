@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import importlib.util
 import inspect
+import json
 import os
 import signal
 import sys
@@ -119,7 +120,50 @@ def format_bench(name: str, run: dict, track: str) -> str:
 
 
 def leaderboard_url(server: str, track: str) -> str:
-    return f"{ArenaClient(server).base_url}/v1/leaderboard?track={track}"
+    base = ArenaClient(server).base_url
+    if base.rstrip("/") == "https://arena.sharingan.poker":
+        return "https://sharingan.poker/leaderboard/"
+    return f"{base}/v1/leaderboard?track={track}"
+
+
+TOKENS_FILE = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "sharingan", "tokens.json")
+
+
+def _load_tokens() -> dict:
+    try:
+        with open(TOKENS_FILE) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def bot_token(api: ArenaClient, name: str) -> str:
+    """The saved token for bot `name` on this server, or register the bot once and save its token (0600), so every
+    eval / benchmark / submit of the same bot lands on the same leaderboard row."""
+    key = f"{api.base_url}|{name}"
+    saved = _load_tokens().get(key)
+    if isinstance(saved, dict) and saved.get("token"):
+        try:
+            api.request("GET", "/v1/me", token=saved["token"])
+            return saved["token"]
+        except ApiException as e:
+            if e.status != 401:
+                return saved["token"]
+    me = api.register_bot(name)
+    tokens = _load_tokens()
+    tokens[key] = {"player_id": me.player_id, "token": me.token}
+    try:
+        os.makedirs(os.path.dirname(TOKENS_FILE), exist_ok=True)
+        fd = os.open(TOKENS_FILE + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(tokens, f, indent=1)
+        os.replace(TOKENS_FILE + ".tmp", TOKENS_FILE)
+        where = f"saved to {TOKENS_FILE}"
+    except OSError:
+        where = "NOT saved, keep it"
+    print(f"sharingan: registered {name} as {me.player_id}; token {me.token} ({where})", file=sys.stderr)
+    return me.token or ""
 
 
 class _Progress:
@@ -169,7 +213,7 @@ async def run_benchmark(bot: Bot, server: str, track: str, *, hands: Optional[in
     api = ArenaClient(server, token)
     if not token:
         try:
-            token = (await asyncio.to_thread(api.register_bot, bot.name)).token or ""
+            token = await asyncio.to_thread(bot_token, api, bot.name)
         except OSError as e:
             return _unreachable(server, e), None
         except ApiException as e:
@@ -465,9 +509,13 @@ def _submit(args: argparse.Namespace) -> int:
     token = args.token
     if not token:
         name = os.path.splitext(os.path.basename(path.rstrip("/")))[0][:40] or "bot"
-        me = api.register_bot(name)
-        token = me.token
-        print(f"sharingan: registered {name} as {me.player_id}; your token (shown once, keep it): {token}", file=sys.stderr)
+        try:
+            token = bot_token(api, name)
+        except ApiException as e:
+            print(f"sharingan: could not register: {e}", file=sys.stderr)
+            return 1
+        except OSError as e:
+            return _unreachable(args.server, e)
     body = {"botName": os.path.splitext(os.path.basename(path.rstrip("/")))[0][:48] or "bot", "language": "python", "entry": entry,
             "track": args.track, "hands": args.hands, "idempotencyKey": args.key or f"cli-{int(time.time() * 1000)}",
             "artifactTgzBase64": base64.b64encode(buf.getvalue()).decode()}
@@ -550,7 +598,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm = sub.add_parser("submit", help="hosted job: upload the bot, the server plays it in an isolated sandbox, prints a VERIFIED score")
     sm.add_argument("bot", help="mybot.py (or a directory with --entry)")
     sm.add_argument("--server", default=os.environ.get("SHARINGAN_SERVER", DEFAULT_SERVER))
-    sm.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="your arena bot token (registers a new bot if omitted)")
+    sm.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="your arena bot token (default: the one saved for this bot name, registering it once)")
     sm.add_argument("--track", choices=TRACKS, default=DEFAULT_TRACK)
     sm.add_argument("--hands", type=int, default=20000)
     sm.add_argument("--lanes", type=int, default=0)
@@ -567,7 +615,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     b.add_argument("--hands", type=int, default=None, help="hands (server default 20000; rounded up to a multiple of 6)")
     b.add_argument("--lanes", type=int, default=None, help="parallel lanes (bot must key state by table_id/hand_id)")
     b.add_argument("--server", default=os.environ.get("SHARINGAN_SERVER", DEFAULT_SERVER))
-    b.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="reuse a registered bot instead of registering a new one")
+    b.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="use this bot token (default: the one saved for this bot name, registering it once)")
     b.add_argument("--timeout", type=float, default=0, help="give up waiting after N seconds (0 = wait)")
     b.add_argument("--quiet", action="store_true", help="no progress bar")
     c = sub.add_parser("connect", help="connect an already-registered bot and answer your_turn until the server closes")

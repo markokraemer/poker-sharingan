@@ -15,6 +15,10 @@ player's total contribution on the current street after the action), never a "by
 | `GET /v1/info` | Bearer | model id, blueprint, sizing, search config, live stats |
 | `GET /v1/health` | none | liveness |
 
+**Public endpoint:** `https://arena.sharingan.poker/v1/act` (and `/v1/act/batch`, `/v1/info`). The bearer is any arena
+player token (`sk_...`, from `POST /v1/players` or the first `sharingan submit`), 10 decisions/s per player. A self-hosted
+server accepts such tokens with `--arena-auth-url http://ARENA` next to its own `--api-keys`.
+
 ## Run
 
 ```bash
@@ -48,6 +52,8 @@ Every setting is an env var or a `--flag` (flags win):
 | `SHARINGAN_API_KEYS` / `_FILE` | `--api-keys` / `--api-keys-file` | required | `name=key,...`; or `--no-auth` for an open server |
 | `SHARINGAN_RATE_RPS` / `_BURST` | `--rate-rps` / `--rate-burst` | 200 / 400 | token bucket per key (default for every key) |
 | `SHARINGAN_RATE_LIMITS` | `--rate-limits` | none | per-key overrides by key name: `alice=1000:2000,bob=50` (`rps[:burst]`, burst defaults to 2 x rps) |
+| `SHARINGAN_ARENA_AUTH_URL` | `--arena-auth-url` | off | also accept arena player tokens: checked once via `GET {url}/v1/me`, cached 5 min (rejections 30 s) |
+| `SHARINGAN_PUBLIC_RPS` / `SHARINGAN_PUBLIC_BURST` | `--public-rps` / `--public-burst` | 10 / 20 | rate limit per arena player |
 | `SHARINGAN_MAX_BATCH` | `--max-batch` | 64 | |
 | `SHARINGAN_MAX_INFLIGHT` | `--max-inflight` | 256 | concurrent decisions; more -> 503 |
 | `SHARINGAN_MODEL_ID` | `--model-id` | `sharingan-1` | returned in every response |

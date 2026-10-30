@@ -188,7 +188,9 @@ fn crash_at_start_forfeits_every_hand_without_restart() {
     assert_eq!(r["timeouts"], 0);
     for l in r["per_lane"].as_array().unwrap() {
         assert_eq!(l["restarts"], 0);
-        assert!(l["crashed"].as_str().unwrap().contains("exited"), "{l}");
+        // whichever the worker notices first: the write to the dead bot's stdin or the EOF on its stdout
+        let why = l["crashed"].as_str().unwrap();
+        assert!(why.contains("exited") || why.contains("closed its stdin"), "{l}");
     }
     // a bot that cannot even start
     let r = run_worker(&opts(&bp, "exit 1", 12, 1)).unwrap();
@@ -391,6 +393,7 @@ async fn post_results_accepts_signed_rejects_forged_and_the_leaderboard_picks_it
     assert_eq!(run["player_id"], pid);
     assert_eq!(run["mbb_per_game"], signed["mbb_per_game"]);
     assert_eq!(run["key_id"], "w1");
+    assert_eq!(run["deals"], "frozen"); // played on the track's public seed
     let rid = run["run_id"].as_str().unwrap();
     // replay is refused
     let (st, e) = s.call("POST", "/v1/results", Some("runner"), Some(signed.clone())).await;
@@ -425,6 +428,14 @@ async fn post_results_accepts_signed_rejects_forged_and_the_leaderboard_picks_it
     a["player_id"] = json!(pid);
     a["seed"] = json!("my-own-seed");
     assert_eq!(s.call("POST", "/v1/results", Some("runner"), Some(resign(a))).await.0, 400);
+    // a per-run seed must be run:<32..128 hex>
+    for bad_seed in ["run:abc", "run:", &format!("run:{}", "g".repeat(64)), &format!("run:{}", "a".repeat(129)), &format!("RUN:{}", "a".repeat(64)), &"a".repeat(64)] {
+        let mut a = fresh().await;
+        a["player_id"] = json!(pid);
+        a["seed"] = json!(bad_seed);
+        let (st, e) = s.call("POST", "/v1/results", Some("runner"), Some(resign(a))).await;
+        assert_eq!((st, err_code(&e)), (400, "bad_request"), "{bad_seed}: {e}");
+    }
     let mut a = fresh().await;
     a["player_id"] = json!(pid);
     a["panel"] = json!(vec!["house:random"; 5]);
@@ -519,4 +530,185 @@ async fn worker_results_are_comparable_with_server_runs_on_the_same_frozen_deals
 async fn run_worker_clone_hands(bp: &PathBuf, hands: u32) -> Value {
     let o = opts(bp, &station(), hands, 2);
     tokio::task::spawn_blocking(move || run_worker(&o).unwrap()).await.unwrap()
+}
+
+// ---------------------------------------------------------------------------------------------- secret per-run seeds
+
+fn hex64() -> String {
+    arena_server::util::random_hex()
+}
+
+#[test]
+fn seed_file_sets_fresh_deals_and_the_seed_never_reaches_the_bot() {
+    let Some(bp) = blueprint() else { return eprintln!("skipped: no test blueprint") };
+    let d = tmp("seedfile");
+    let seed = format!("run:{}", hex64());
+    let (seedf, out, inlog, envlog) = (d.join("run.seed"), d.join("result.json"), d.join("in.log"), d.join("env.log"));
+    std::fs::write(&seedf, format!("{seed}\n")).unwrap(); // trailing newline is trimmed
+    // the bot records its environment and everything the worker sends it, then plays like a calling station
+    let cmd = format!("env > {}; tee {} | {}", envlog.display(), inlog.display(), station());
+    let run = |extra: &[&str], out: &PathBuf| {
+        std::process::Command::new(BIN)
+            .args(["run", "--bot", &cmd, "--hands", "72", "--lanes", "2", "--quiet", "--seed", "decoy-seed-that-loses"])
+            .args(extra)
+            .arg("--out").arg(out)
+            .env("ARENA_BLUEPRINT", bp.display().to_string())
+            .env("ARENA_SIZING", "tiny")
+            .output()
+            .unwrap()
+    };
+    // --seed-file takes precedence over --seed
+    let o = run(&["--seed-file", &seedf.display().to_string()], &out);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let r: Value = serde_json::from_str(&std::fs::read_to_string(&out).unwrap()).unwrap();
+    assert_eq!(r["seed"], json!(seed));
+    assert_eq!(r["hands"], 72);
+    assert_eq!(r["forfeit_hands"], 0);
+    // not the frozen deals: another deck digest than the track seed's
+    let base = run_worker(&opts(&bp, &station(), 72, 2)).unwrap();
+    assert_ne!(r["deals_digest"], base["deals_digest"]);
+    // ... but reproducible from the same seed (the control plane can audit a finished run)
+    let mut again = opts(&bp, &station(), 72, 1);
+    again.seed = Some(seed.clone());
+    assert_eq!(run_worker(&again).unwrap()["deals_digest"], r["deals_digest"]);
+    // the seed is nowhere the bot can see: not in its environment, not in a single message of the pipe protocol
+    // (hand_id, decision_id, table_id, welcome ...), and no hand_id encodes the (hashed) prefix of the track seed either
+    let hexpart = seed.strip_prefix("run:").unwrap();
+    for (what, text) in [("env", std::fs::read_to_string(&envlog).unwrap()), ("pipe", std::fs::read_to_string(&inlog).unwrap())] {
+        assert!(!text.contains(hexpart), "the seed leaked into the bot's {what}");
+        assert!(!text.contains("decoy-seed"), "the --seed value leaked into the bot's {what}");
+    }
+    let first: Value = serde_json::from_str(std::fs::read_to_string(&inlog).unwrap().lines().find(|l| l.contains("your_turn")).unwrap()).unwrap();
+    assert!(first["hand_id"].as_str().unwrap().starts_with("run-"), "{first}");
+    assert!(!first["hand_id"].as_str().unwrap().contains("bench:"), "{first}");
+    // the frozen deals keep their documented hand ids
+    let frozen_log = d.join("frozen.log");
+    let cmd2 = format!("tee {} | {}", frozen_log.display(), station());
+    run_worker(&opts(&bp, &cmd2, 12, 1)).unwrap();
+    let t: Value = serde_json::from_str(std::fs::read_to_string(&frozen_log).unwrap().lines().find(|l| l.contains("your_turn")).unwrap()).unwrap();
+    assert!(t["hand_id"].as_str().unwrap().starts_with("bench:ladder-v1:v1-h"), "{t}");
+}
+
+#[test]
+fn seed_file_errors_are_reported_and_nothing_runs() {
+    let d = tmp("seederr");
+    let args = |f: &PathBuf| {
+        std::process::Command::new(BIN)
+            .args(["run", "--bot", "true", "--hands", "6", "--quiet", "--seed", "ignored"])
+            .arg("--seed-file").arg(f)
+            .output()
+            .unwrap()
+    };
+    let missing = args(&d.join("nope"));
+    assert_eq!(missing.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("cannot read seed file"), "{}", String::from_utf8_lossy(&missing.stderr));
+    std::fs::write(d.join("empty"), "  \n\t\n").unwrap();
+    let empty = args(&d.join("empty"));
+    assert_eq!(empty.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&empty.stderr).contains("empty"), "{}", String::from_utf8_lossy(&empty.stderr));
+    // the unreadable file is not silently replaced by --seed
+    assert!(!String::from_utf8_lossy(&missing.stdout).contains("ignored"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn post_results_accepts_a_fresh_per_run_seed_and_records_it() {
+    let Some(bp) = blueprint() else { return eprintln!("skipped: no test blueprint") };
+    let s = server(Some(bp.clone()), "w1=top-secret").await;
+    let (_, reg) = s.call("POST", "/v1/bots", None, Some(json!({"name": "fresh", "kind": "bot"}))).await;
+    let pid = reg["player_id"].as_str().unwrap().to_string();
+    let seed = format!("run:{}", hex64());
+    let mut o = opts(&bp, &station(), 120, 2);
+    o.seed = Some(seed.clone());
+    let mut r = tokio::task::spawn_blocking(move || run_worker(&o).unwrap()).await.unwrap();
+    r["player_id"] = json!(pid);
+    sign_result(&mut r, "w1", "top-secret");
+    let (st, run) = s.call("POST", "/v1/results", Some("runner"), Some(r.clone())).await;
+    assert_eq!(st, 201, "{run}");
+    assert_eq!((run["seed"].as_str(), run["deals"].as_str()), (Some(seed.as_str()), Some("fresh")), "{run}");
+    assert_eq!((run["verified"].clone(), run["hosted"].clone()), (json!(true), json!(true)));
+    let rid = run["run_id"].as_str().unwrap();
+    let (_, got) = s.call("GET", &format!("/v1/benchmarks/ladder-v1/runs/{rid}"), None, None).await;
+    assert_eq!(got["deals"], "fresh");
+    // the signature still binds the seed: swapping it for another valid run: seed is refused
+    let mut swapped = r.clone();
+    swapped["seed"] = json!(format!("run:{}", hex64()));
+    swapped["run_id"] = json!("w_other_run_1");
+    let (st, e) = s.call("POST", "/v1/results", Some("runner"), Some(swapped)).await;
+    assert_eq!((st, err_code(&e)), (401, "invalid_signature"), "{e}");
+}
+
+// ---------------------------------------------------------------------------------------------- slow and noisy bots never hang a run
+
+#[test]
+fn a_bot_that_answers_after_the_deadline_is_folded_restarted_then_forfeits_and_the_run_ends() {
+    let Some(bp) = blueprint() else { return eprintln!("skipped: no test blueprint") };
+    if std::process::Command::new("python3").arg("-V").output().is_err() {
+        return eprintln!("skipped: no python3");
+    }
+    // sleeps longer than the decision timeout before every answer (`def act(s): time.sleep(8); return Action.check()`)
+    let py = r#"
+import sys, json, time
+print(json.dumps({"v":1,"type":"hello","data":{"protocol":1}}), flush=True)
+for line in sys.stdin:
+    m = json.loads(line)
+    if m["type"] == "your_turn":
+        d = m["data"]
+        time.sleep(8)
+        print(json.dumps({"v":1,"type":"act","data":{"hand_id":d["hand_id"],"decision_id":d["decision_id"],"type":"check"}}), flush=True)
+    elif m["type"] == "bye":
+        break
+"#;
+    let d = tmp("slow");
+    let script = d.join("slow.py");
+    std::fs::write(&script, py).unwrap();
+    let mut o = opts(&bp, &format!("python3 {}", script.display()), 144, 2);
+    o.decision_timeout_ms = 300;
+    o.max_restarts = 3;
+    let t0 = std::time::Instant::now();
+    let r = within(Duration::from_secs(60), move || run_worker(&o).unwrap());
+    assert!(t0.elapsed() < Duration::from_secs(30), "took {:?}", t0.elapsed());
+    assert_eq!(r["hands"], 144, "every planned hand is still played and scored");
+    for l in r["per_lane"].as_array().unwrap() {
+        assert_eq!(l["restarts"], 3, "{l}");
+        assert_eq!(l["timeouts"], 4, "3 restarts, then the 4th late decision forfeits: {l}");
+        assert!(l["crashed"].as_str().unwrap().contains("restarts"), "{l}");
+    }
+    assert_eq!(r["crashed_lanes"], 2);
+    assert!(r["forfeit_hands"].as_u64().unwrap() >= 130);
+    assert!(r["mbb_per_game"].as_f64().unwrap().is_finite());
+}
+
+/// Run `f` on a thread; fail the test (instead of hanging it) when it takes longer than `limit`.
+fn within<T: Send + 'static>(limit: Duration, f: impl FnOnce() -> T + Send + 'static) -> T {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(limit).unwrap_or_else(|_| panic!("the worker did not finish within {limit:?}: a misbehaving bot hung the run"))
+}
+
+#[test]
+fn a_bot_that_floods_stdout_cannot_starve_the_decision_deadline() {
+    let Some(bp) = blueprint() else { return eprintln!("skipped: no test blueprint") };
+    // hello, then endless noise lines and never an act: the pipe is never empty, so a reader that only checks the
+    // deadline when `read` would block waits forever
+    let cmd = format!("echo '{HELLO}'; exec yes 'this is not json'");
+    let mut o = opts(&bp, &cmd, 24, 1);
+    o.decision_timeout_ms = 200;
+    o.max_restarts = 1;
+    let r = within(Duration::from_secs(60), move || run_worker(&o).unwrap());
+    let lane = &r["per_lane"][0];
+    assert_eq!(r["hands"], 24);
+    assert_eq!(lane["timeouts"], 2, "{lane}");
+    assert_eq!(lane["restarts"], 1, "{lane}");
+    assert!(lane["noise_lines"].as_u64().unwrap() > 1000, "{lane}");
+    // and a bot that floods an unterminated line (no newline at all) is cut off too (here by the 4 MiB line cap, or the deadline)
+    let cmd = format!("echo '{HELLO}'; yes x | tr -d '\\n'");
+    let mut o = opts(&bp, &cmd, 12, 1);
+    o.decision_timeout_ms = 200;
+    o.max_restarts = 0;
+    let r = within(Duration::from_secs(60), move || run_worker(&o).unwrap());
+    assert_eq!(r["hands"], 12);
+    assert_eq!(r["forfeit_hands"], 12, "{r}");
+    assert_eq!(r["crashed_lanes"], 1);
 }

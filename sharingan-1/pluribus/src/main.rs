@@ -57,7 +57,11 @@ fn train(kv: &HashMap<String, String>) {
     std::fs::create_dir_all(&out).unwrap();
 
     eprintln!("loading bucket tables");
-    let tables = TableBucketer(BucketTables::load(Path::new(&get("buckets", "data/buckets-200"))).expect("bucket tables"));
+    let bdir = get("buckets", "data/buckets-200");
+    let tables = TableBucketer(BucketTables::load(Path::new(&bdir)).unwrap_or_else(|e| {
+        eprintln!("cannot load bucket tables from {bdir}: {e}\nbuild them (~30 s on 128 cores): cargo run --release -p abstraction --bin build_buckets -- {bdir} 200 200 200 200000\nor download buckets-200.tar with the weights (MODEL_CARD.md)");
+        std::process::exit(2);
+    }));
     // Budget per infoset (measured on the paper run): ≈2.6 regret slots (10.4 B) and one
     // 16 B index entry used up to 85% load (18.8 B) → index table gets 64% of memory, the
     // regret arena 36%. (`with_index` sizes the table at max_infosets × 10/7.)
@@ -72,6 +76,13 @@ fn train(kv: &HashMap<String, String>) {
         tr.store = std::sync::Arc::new(io::load(&ckpt, capacity, max_infosets).expect("load checkpoint"));
         start_it = std::fs::read_to_string(&state_path).unwrap().trim().parse().unwrap();
         eprintln!("resumed at iteration {start_it} ({} infosets)", tr.store.infosets());
+        // Snapshots folded after this checkpoint belong to discarded training: cap the sums at
+        // the checkpoint's arena (slots past it get other offsets now).
+        let sums = out.join("snapshots.sum");
+        if sums.exists() {
+            let (k, capped) = snapshot::trim(&sums, tr.store.used_slots()).expect("trim snapshot sums");
+            eprintln!("snapshot sums: {k} snapshots, {capped} capped to the checkpoint's {} slots", tr.store.used_slots());
+        }
     } else {
         tr.store = std::sync::Arc::new(blueprint::store::Store::with_index(capacity, max_infosets));
     }
@@ -114,6 +125,9 @@ fn train(kv: &HashMap<String, String>) {
             if tr.store.is_full() {
                 eprintln!("  WARNING: store full — new infosets are no longer allocated");
             }
+            if tr.store.collisions() > 0 {
+                eprintln!("  key collisions refused: {}", tr.store.collisions());
+            }
         }
         if eval_min > 0.0 && last_eval.elapsed().as_secs_f64() > eval_min * 60.0 && !eval_busy.swap(true, Relaxed) {
             last_eval = Instant::now();
@@ -126,15 +140,23 @@ fn train(kv: &HashMap<String, String>) {
         // Postflop snapshots every 200 paper-minutes after minute 800 (scaled to the run),
         // folded into one running-sum file.
         let snap_every = 200 * (iters / 11_520).max(1);
+        // Each fold is committed together with a checkpoint, so a crash can never leave folds
+        // of training that a resume would redo.
+        let mut fold = None;
         if t >= sched.avg_after && t / snap_every != (t.saturating_sub(4096)) / snap_every {
             let c = Instant::now();
-            snapshot::accumulate(&tr.store, &out.join("snapshots.sum")).expect("snapshot");
+            let next = out.join("snapshots.sum.next");
+            snapshot::accumulate_into(&tr.store, &out.join("snapshots.sum"), &next).expect("snapshot");
             eprintln!("  snapshot folded at it {t} ({:.0}s)", c.elapsed().as_secs_f64());
+            fold = Some(next);
         }
-        if last_ckpt.elapsed().as_secs_f64() > ckpt_min * 60.0 || t == iters {
+        if fold.is_some() || last_ckpt.elapsed().as_secs_f64() > ckpt_min * 60.0 || t == iters {
             last_ckpt = Instant::now();
             let c = Instant::now();
             io::save(&tr.store, &ckpt).expect("checkpoint");
+            if let Some(next) = fold {
+                std::fs::rename(next, out.join("snapshots.sum")).expect("commit snapshot");
+            }
             std::fs::write(&state_path, t.to_string()).unwrap();
             eprintln!("  checkpoint at it {t} ({:.0}s)", c.elapsed().as_secs_f64());
         }

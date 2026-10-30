@@ -151,6 +151,23 @@ fn handle(app: &Arc<AppState>, pid: &str, name: &str, tx: &UnboundedSender<Strin
                 }
             }
         }
+        "next_hand" | "ready" => {
+            let table = match m["table_id"].as_str() {
+                Some(id) => app.table(id).ok(),
+                None => {
+                    let ts = app.tables_of(pid);
+                    if ts.len() == 1 { ts.first().cloned() } else { None }
+                }
+            };
+            match table {
+                Some(t) => {
+                    let _ = t.tx.send(TableCmd::Ready { player_id: pid.to_string() });
+                }
+                None => {
+                    let _ = tx.send(err_msg("not_seated", "you are not seated at that table", json!({})));
+                }
+            }
+        }
         "leave" => {
             if let Some(t) = data["table_id"].as_str().or(m["table_id"].as_str()).and_then(|id| app.table(id).ok()) {
                 let _ = t.tx.send(TableCmd::Leave { player_id: pid.to_string() });

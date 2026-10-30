@@ -1,0 +1,9 @@
+# Poker Sharingan
+
+> A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-1, an open-source Pluribus reproduction. Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
+
+- [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
+- [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP
+- [Leaderboard](https://sharingan.poker/leaderboard/) · JSON: https://arena.sharingan.poker/v1/leaderboard
+- [Table API](https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md): full protocol (REST, WebSocket, pipe)
+- [Code](https://github.com/markokraemer/poker-sharingan)

@@ -1229,3 +1229,64 @@ async fn graceful_shutdown_drains_aborts_and_closes_sockets() {
     assert!(closed.is_ok(), "websocket not closed by shutdown");
     assert!(http.get(format!("{base}/healthz")).send().await.is_err(), "still accepting connections");
 }
+
+// ---- human UIs: hold the table between hands, `next_hand` skips the pause ----
+
+#[tokio::test]
+async fn next_hand_ends_the_pause_between_hands_early() {
+    let s = srv().await;
+    let t = s.table(json!({"decision_time_ms": 3000, "hand_delay_ms": 60000})).await;
+    let mut room = Room::new(&s, 1).await;
+    room.sit_all(&s, &t, &[0]).await;
+    let (st, v) = s.post(&format!("/v1/tables/{t}/fill"), Some("admin"), json!({"bot": "house:tight_aggressive"})).await;
+    assert_eq!(st, 200, "{v}");
+    let evs = room.run_hand(&t, 1, |_, d| fold_or_check(d)).await;
+    assert_eq!(of_type(&evs, "hand_end").count(), 1);
+    // The table is held: no new hand starts while the pause runs.
+    let held = tokio::time::timeout(Duration::from_millis(1200), async {
+        loop {
+            let (_, m) = room.recv().await;
+            if m["type"] == "hand_start" {
+                return;
+            }
+        }
+    })
+    .await;
+    assert!(held.is_err(), "a hand started during the pause");
+    room.send(0, "next_hand", Some(&t), json!({}));
+    let next = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let (_, m) = room.recv().await;
+            if m["type"] == "hand_start" {
+                return m;
+            }
+        }
+    })
+    .await
+    .expect("next_hand did not start the next hand");
+    assert_eq!(next["data"]["hand_no"], 2);
+}
+
+// ---- abandoned free tables close themselves ----
+
+#[tokio::test]
+async fn abandoned_free_table_closes_itself_and_frees_its_slot() {
+    let s = srv().await;
+    // The env knob is read when a table is spawned: only `t` gets the short timeout.
+    std::env::set_var("ARENA_TABLE_ABANDON_MS", "1000");
+    let t = s.table(json!({})).await;
+    std::env::remove_var("ARENA_TABLE_ABANDON_MS");
+    let t2 = s.table(json!({})).await;
+    let mut closed = false;
+    for _ in 0..40 {
+        let (_, v) = s.get(&format!("/v1/tables/{t}"), None).await;
+        if v["status"] == "closed" {
+            closed = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    assert!(closed, "a table nobody is connected to must close after the abandon timeout");
+    let (_, v) = s.get(&format!("/v1/tables/{t2}"), None).await;
+    assert_ne!(v["status"], "closed", "the default timeout is far longer");
+}

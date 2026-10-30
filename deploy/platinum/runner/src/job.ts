@@ -14,16 +14,19 @@
 //                              polls progress. Slower (network round trip per decision) but needs no worker support.
 //
 // Steps (each names the sandbox / arena call):
-//   1 provisioning  arena POST /v1/bots                               fresh bot identity (+ token, connect mode) for this job
+//   1 provisioning  arena POST /v1/bots                               fresh bot identity (+ token, connect mode) for this job,
+//                   unless a public player submitted with their own token (then the run is theirs)
 //   2               sandbox create from the bot template, egress locked down
 //   3               upload artifact (writeFile + tar), optional pip install, then drop PyPI from the allowlist
 //   4 running       worker: start worker, wait for exit, read result.json, POST /v1/results
 //                   connect: start launcher, POST /v1/benchmarks/{track}/runs (retry 409 not_connected), poll
 //   5 finalizing    usage(), delete() in `finally`, meter COGS
+import { randomBytes } from "node:crypto";
 import type { ArenaClient, BenchRun, ResultAck } from "./arena.ts";
 import { ArenaError } from "./arena.ts";
 import type { Config } from "./config.ts";
 import { cogsMicro, platinumUsdFromUsage } from "./cost.ts";
+import { cleanLog } from "./logclean.ts";
 import type { Logger } from "./log.ts";
 import type { PlatinumClient, ProcessHandle, Sandbox } from "./platinum/types.ts";
 import { sleep } from "./platinum/types.ts";
@@ -49,6 +52,8 @@ const PYPI_HOSTS = ["pypi.org", "files.pythonhosted.org"];
 const BOT_DIR = "/opt/sharingan/bot";
 const BOT_UID = 10002;
 const KEY_PATH = "/opt/sharingan/worker.key";
+/** Per-job secret deal seed, same protection as the key: root-only, never in the bot's env or args. */
+export const SEED_PATH = "/opt/sharingan/run.seed";
 const BOT_ENV = "HOME=/home/bot PATH=/usr/local/bin:/usr/bin:/bin PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1";
 
 export const shq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
@@ -107,13 +112,17 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
   let runStartedAt = 0;
   let verdict: { status: "finished" | "failed" | "aborted"; error?: string; cls?: ErrorClass } = { status: "finished" };
   let handsDone = 0;
+  let dealsSeed: string | undefined;   // worker mode: revealed on the job record only once the job is over
 
   try {
     await set({ status: "provisioning" });
     const needsPip = input.language === "python" && !!input.requirementsFile;
 
-    // 1 ---- identity: the arena attributes the run to this player (worker mode: signed into result.json via --player-id)
-    const bot = await infra(() => arena.registerBot(`${input.botName}-${jobId.slice(-6)}`, input.userId));
+    // 1 ---- identity: the arena attributes the run to this player (worker mode: signed into result.json via --player-id).
+    //        A public player's own job is credited to them, so every submit with the same token lands on one leaderboard row.
+    const bot = input.playerId && input.mode === "worker"
+      ? { playerId: input.playerId, token: "" }
+      : await infra(() => arena.registerBot(`${input.botName}-${jobId.slice(-6)}`, input.userId));
     await set({ arenaPlayerId: bot.playerId });
 
     // 2 ---- sandbox. Worker mode: no egress at all. Connect mode: the arena only. PyPI only while installing.
@@ -166,7 +175,13 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     // 6 ---- meter + teardown. Always runs. usage() must be read BEFORE delete (404 afterwards).
     const patch: Partial<Job> = {};
     if (proc) {
-      try { const l = await proc.logs(); patch.botLogTail = `${l.stderr}${l.stdout ? `\n--- stdout ---\n${l.stdout}` : ""}`.slice(-4000); } catch { /* best effort */ }
+      try {
+        const l = await proc.logs();
+        // one copy of each traceback; the closing "mbb/game" line is dropped unless the run actually finished
+        const o = { maxChars: 4000, dropScore: verdict.status !== "finished" };
+        const out = cleanLog(l.stdout, o);
+        patch.botLogTail = `${cleanLog(l.stderr, o)}${out ? `\n--- stdout ---\n${out}` : ""}`.slice(-4000);
+      } catch { /* best effort */ }
       try { if ((await proc.status()).running) await proc.kill(); } catch { /* the sandbox is about to be deleted */ }
     }
     let platinumUsd: number | undefined;
@@ -184,6 +199,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
       ...patch,
       status: verdict.status,
       ...(verdict.error ? { error: verdict.error, errorClass: verdict.cls } : {}),
+      ...(dealsSeed ? { dealsSeed } : {}),
       handsDone: done,
       sandboxSeconds: seconds,
       platinumUsd,
@@ -199,20 +215,27 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     // --sign-key-file takes `id=secret` (matching an entry of the arena's ARENA_WORKER_KEYS) or a bare secret
     const keyFile = w.keyId ? `${w.keyId}=${w.signKey}` : w.signKey;
     await infra(() => sbx!.writeFile(KEY_PATH, new TextEncoder().encode(keyFile), { mode: 0o400 }));
+    // Fresh secret deals for every verified run: the worker deals from this seed, the arena checks it is well formed.
+    // The bot (uid 10002) cannot read the file, and the seed is not in anybody's env or argv.
+    const seed = `run:${randomBytes(32).toString("hex")}`;
+    dealsSeed = seed;
+    await infra(() => sbx!.writeFile(SEED_PATH, new TextEncoder().encode(seed), { mode: 0o400 }));
     const dir = w.resultPath.slice(0, w.resultPath.lastIndexOf("/")) || "/";
-    const cmd = renderCommand(w.cmdTemplate, {
+    let cmd = renderCommand(w.cmdTemplate, {
       bot: botCommand(cfg, input),
       track: input.track,
       hands: input.hands,
       lanes: input.lanes ?? cfg.limits.defaultLanes,
       out: w.resultPath,
       keyfile: KEY_PATH,
+      seedfile: SEED_PATH,
       player_id: bot.playerId,
       job_id: jobId,
       name: input.botName,
       owner: input.userId,
       key_id: w.keyId,
     });
+    if (!w.cmdTemplate.includes("{seedfile}")) cmd += ` --seed-file ${shq(SEED_PATH)}`;   // a custom template must not drop the seed
     const wp = await infra(() => sbx!.startProcess({
       cmd: ["sh", "-c", `mkdir -p ${shq(dir)} && cd ${shq(dir)} && exec ${cmd}`],
       env: { ...w.env, SHARINGAN_JOB_ID: jobId, SHARINGAN_OWNER: input.userId, SHARINGAN_BOT_NAME: input.botName, SHARINGAN_TRACK: input.track },
@@ -241,7 +264,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     }
     if (exitCode !== 0) {
       const l = await wp.logs().catch(() => ({ stdout: "", stderr: "" }));
-      throw new JobFailure("bot", `worker exited with code ${exitCode}: ${(l.stderr || l.stdout).trim().slice(-500)}`);
+      throw new JobFailure("bot", `worker exited with code ${exitCode}${logExcerpt(l)}`);
     }
 
     // result.json -> arena
@@ -256,7 +279,8 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     if (played > 0 && forfeited >= played) {
       const l = await wp.logs().catch(() => ({ stdout: "", stderr: "" }));
       await set({ handsDone: 0, forfeitHands: forfeited });
-      throw new JobFailure("bot", `the bot never answered a decision (${forfeited}/${played} hands forfeited); nothing was submitted. Last output: ${(l.stderr || l.stdout).trim().slice(-400)}`);
+      // one clear first line, then ONE de-duplicated excerpt (lanes repeat the same crash); no progress, no score line
+      throw new JobFailure("bot", `the bot never answered a decision (${forfeited}/${played} hands forfeited); nothing was submitted.${logExcerpt(l)}`);
     }
     let ack: ResultAck;
     try {
@@ -306,11 +330,11 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
         }
         if ((await cp.status().catch(() => ({ running: true }))).running === false) {
           const l = await cp.logs().catch(() => ({ stdout: "", stderr: "" }));
-          throw new JobFailure("bot", `bot exited before connecting: ${(l.stderr || l.stdout).trim().slice(-500)}`);
+          throw new JobFailure("bot", `bot exited before connecting${logExcerpt(l)}`);
         }
         if (Date.now() > connectBy) {
           const l = await cp.logs().catch(() => ({ stdout: "", stderr: "" }));
-          throw new JobFailure("bot", `bot did not connect in ${cfg.limits.connectTimeoutS}s: ${(l.stderr || l.stdout).trim().slice(-500)}`);
+          throw new JobFailure("bot", `bot did not connect in ${cfg.limits.connectTimeoutS}s${logExcerpt(l)}`);
         }
         await nap(300, ac.signal).catch(() => { throw new AbortedError(); });
       }
@@ -339,7 +363,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
         const l = await cp.logs().catch(() => ({ stdout: "", stderr: "" }));
         handsDone = run.hands_done;
         await set({ handsDone });
-        throw new JobFailure("bot", `bot process exited mid-run: ${(l.stderr || l.stdout).trim().slice(-500)}`);
+        throw new JobFailure("bot", `bot process exited mid-run${logExcerpt(l)}`);
       }
     }
     await set({
@@ -349,6 +373,12 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     if (run.status !== "finished") throw new JobFailure("bot", `run ended as ${run.status}`);
     return { handsDone: run.hands_done };
   }
+}
+
+/** "\n<de-duplicated excerpt>" of a process's output for an error message, or "" when there is none. */
+function logExcerpt(l: { stdout: string; stderr: string }): string {
+  const e = cleanLog(`${l.stderr}\n${l.stdout}`, { maxChars: 600, dropScore: true });
+  return e ? `\n${e}` : "";
 }
 
 /** Anything thrown by `fn` is our infrastructure's fault unless it already carries a verdict. */

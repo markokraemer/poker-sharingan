@@ -61,6 +61,8 @@ pub enum TableCmd {
     Act { player_id: String, data: Value, conn: ConnTx },
     Resume { player_id: String, conn: ConnTx },
     Leave { player_id: String },
+    /// A seated player skips the pause between hands (`next_hand` over the socket).
+    Ready { player_id: String },
     Close,
 }
 
@@ -211,6 +213,10 @@ pub fn spawn_table(app: &Arc<AppState>, id: String, owner: String, config: Table
         seed,
         players: HashMap::new(),
         closed: false,
+        absent_since: None,
+        abandon_after: Duration::from_millis(
+            std::env::var("ARENA_TABLE_ABANDON_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(ABANDON_MS),
+        ),
     };
     tokio::spawn(task.run());
     shared
@@ -228,7 +234,18 @@ struct TableTask {
     seed: String,
     players: HashMap<String, PlayerRecord>,
     closed: bool,
+    /// Since when no human seat of this free table has a socket (None while one is connected).
+    absent_since: Option<Instant>,
+    abandon_after: Duration,
 }
+
+/// A free table that no human has been connected to for this long closes itself
+/// (`ARENA_TABLE_ABANDON_MS` overrides). Without it a closed browser tab would leave its table, and its
+/// slot in the owner's `ARENA_MAX_TABLES_PER_PLAYER`, behind forever.
+const ABANDON_MS: u64 = 30 * 60 * 1000;
+/// A human seat that drops mid-hand (page reload) gets at least this long to come back before the
+/// timeout policy plays for it. Bots keep the short `reconnect_grace_ms`.
+const HUMAN_GRACE_MS: u64 = 20_000;
 
 enum Decision {
     Act(Action, u64),
@@ -272,6 +289,11 @@ impl TableTask {
             if self.closed {
                 return None;
             }
+            if self.plan.is_none() && self.abandoned() {
+                tracing::info!("table {}: abandoned (no connected human), closing", self.shared.id);
+                self.closed = true;
+                return None;
+            }
             if let Some(rt) = self.plan.clone() {
                 match rt.poll(self.lane) {
                     MatchPoll::Play(p) => return Some(p),
@@ -296,12 +318,25 @@ impl TableTask {
         }
     }
 
+    /// True once no human seat has been connected for `abandon_after`. A table nobody sat at counts as absent too.
+    fn abandoned(&mut self) -> bool {
+        let connected = {
+            let inner = self.shared.inner.lock().unwrap();
+            inner.seats.iter().any(|s| !s.house && s.player_id.as_deref().is_some_and(|p| self.app.hub.connected(p)))
+        };
+        if connected {
+            self.absent_since = None;
+            return false;
+        }
+        self.absent_since.get_or_insert_with(Instant::now).elapsed() >= self.abandon_after
+    }
+
     fn handle_idle(&mut self, cmd: TableCmd) {
         match cmd {
             TableCmd::Act { conn, data, .. } => {
                 self.send_error(&conn, ApiError::conflict("not_your_turn", "no decision is pending"), data["decision_id"].as_str());
             }
-            TableCmd::Resume { .. } => {}
+            TableCmd::Resume { .. } | TableCmd::Ready { .. } => {}
             TableCmd::Leave { player_id } => self.leave(&player_id),
             TableCmd::Close => self.closed = true,
         }
@@ -615,12 +650,38 @@ impl TableTask {
         if self.plan.is_none() && !lean {
             let delay = cfg.hand_delay_ms.unwrap_or(self.app.cfg.hand_delay_ms);
             if delay > 0 {
-                sleep(Duration::from_millis(delay)).await;
+                self.pause_between_hands(Duration::from_millis(delay)).await;
             }
         }
         // Never starve other tasks on this worker when every seat is a house bot.
         tokio::task::yield_now().await;
         Ok(())
+    }
+
+    /// The pause after a hand on a free table. A seated player can end it early with `next_hand`
+    /// (so a UI can hold the table as long as the player wants to read the result).
+    async fn pause_between_hands(&mut self, delay: Duration) {
+        let until = Instant::now() + delay;
+        loop {
+            match timeout_at(until, self.rx.recv()).await {
+                Err(_) | Ok(None) => return,
+                Ok(Some(TableCmd::Ready { player_id })) => {
+                    let seated = self.shared.inner.lock().unwrap().seats.iter().any(|s| s.player_id.as_deref() == Some(player_id.as_str()));
+                    if seated {
+                        return;
+                    }
+                }
+                Ok(Some(TableCmd::Leave { player_id })) => self.leave(&player_id),
+                Ok(Some(TableCmd::Close)) => {
+                    self.closed = true;
+                    return;
+                }
+                Ok(Some(TableCmd::Resume { .. })) => {}
+                Ok(Some(TableCmd::Act { conn, data, .. })) => {
+                    self.send_error(&conn, ApiError::conflict("not_your_turn", "no decision is pending"), data["decision_id"].as_str());
+                }
+            }
+        }
     }
 
     /// Ask a remote seat for its action; returns when it answers or its deadline passes.
@@ -663,7 +724,10 @@ impl TableTask {
             }
         }
 
-        let grace = Duration::from_millis(self.app.cfg.reconnect_grace_ms);
+        let mut grace = Duration::from_millis(self.app.cfg.reconnect_grace_ms);
+        if self.plan.is_none() && self.player(&pid).map(|p| p.kind == "human").unwrap_or(false) {
+            grace = grace.max(Duration::from_millis(HUMAN_GRACE_MS));
+        }
         let mut wait_until = if self.app.hub.connected(&pid) { hard } else { hard.min(Instant::now() + grace) };
         loop {
             let cmd = match timeout_at(wait_until, self.rx.recv()).await {
@@ -681,6 +745,7 @@ impl TableTask {
                     return Decision::Timeout(elapsed);
                 }
                 TableCmd::Leave { player_id } => self.leave(&player_id),
+                TableCmd::Ready { .. } => {}
                 TableCmd::Resume { player_id, conn } => {
                     if player_id == pid {
                         let _ = conn.send(env_str.clone());

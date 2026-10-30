@@ -23,6 +23,9 @@
 //! | `SHARINGAN_RATE_RPS` | `--rate-rps` | 200 (refill rate per key, requests/s) |
 //! | `SHARINGAN_RATE_BURST` | `--rate-burst` | 400 |
 //! | `SHARINGAN_RATE_LIMITS` | `--rate-limits` | none: per-key overrides `name=rps[:burst],...` (burst defaults to 2 x rps) |
+//! | `SHARINGAN_ARENA_AUTH_URL` | `--arena-auth-url` | off: also accept arena player tokens (`sk_...`), checked once via `GET {url}/v1/me` |
+//! | `SHARINGAN_PUBLIC_RPS` | `--public-rps` | 10 (refill rate per arena player) |
+//! | `SHARINGAN_PUBLIC_BURST` | `--public-burst` | 20 |
 //! | `SHARINGAN_MAX_BATCH` | `--max-batch` | 64 |
 //! | `SHARINGAN_MAX_INFLIGHT` | `--max-inflight` | 256 (concurrent decisions; more -> 503) |
 //! | `SHARINGAN_MODEL_ID` | `--model-id` | `sharingan-1` |
@@ -53,6 +56,10 @@ pub struct Config {
     pub rate_burst: f64,
     /// Per-key overrides (by key name) of `(rps, burst)`.
     pub rate_overrides: HashMap<String, (f64, f64)>,
+    /// Arena base URL whose `GET /v1/me` vouches for player tokens (public access); `None` = API keys only.
+    pub arena_auth_url: Option<String>,
+    pub public_rps: f64,
+    pub public_burst: f64,
     pub max_batch: usize,
     pub max_inflight: usize,
     pub model_id: String,
@@ -81,6 +88,9 @@ impl Default for Config {
             rate_rps: 200.0,
             rate_burst: 400.0,
             rate_overrides: HashMap::new(),
+            arena_auth_url: None,
+            public_rps: 10.0,
+            public_burst: 20.0,
             max_batch: 64,
             max_inflight: 256,
             model_id: "sharingan-1".into(),
@@ -92,7 +102,8 @@ impl Default for Config {
 
 pub const USAGE: &str = "usage: sharingan-serve --blueprint FILE.plcp [--buckets DIR|coarse] [--sizing medium] [--set flop=0] \
 [--budget-ms 5000] [--search-threads 16] [--search-concurrency 2] [--max-stack-bb 150] [--bind 0.0.0.0:8080] \
-[--api-keys name=key,...] [--api-keys-file F] [--no-auth] [--no-search] [--rate-rps 200] [--rate-burst 400] [--rate-limits name=rps[:burst],...] [--model-id ID]\n\
+[--api-keys name=key,...] [--api-keys-file F] [--no-auth] [--no-search] [--rate-rps 200] [--rate-burst 400] [--rate-limits name=rps[:burst],...] \
+[--arena-auth-url URL] [--public-rps 10] [--public-burst 20] [--model-id ID]\n\
 (every flag also reads SHARINGAN_<FLAG> from the environment; see sharingan-1/serve/README.md)";
 
 /// `name=rps[:burst],...` (burst defaults to 2 x rps).
@@ -150,7 +161,7 @@ impl Config {
         const KNOWN: &[&str] = &[
             "blueprint", "buckets", "sizing", "set", "search-buckets", "no-search", "budget-ms", "search-threads",
             "search-concurrency", "queue-ms", "max-stack-bb", "bind", "api-keys", "api-keys-file", "no-auth", "rate-rps",
-            "rate-burst", "rate-limits", "max-batch", "max-inflight", "model-id", "warm", "help",
+            "rate-burst", "rate-limits", "arena-auth-url", "public-rps", "public-burst", "max-batch", "max-inflight", "model-id", "warm", "help",
         ];
         for k in kv.keys() {
             if !KNOWN.contains(&k.as_str()) {
@@ -182,8 +193,9 @@ impl Config {
             let text = std::fs::read_to_string(&f).map_err(|e| format!("--api-keys-file {f}: {e}"))?;
             parse_keys(&text, &mut api_keys);
         }
-        if auth && api_keys.is_empty() {
-            return Err("API keys required: set SHARINGAN_API_KEYS / --api-keys / --api-keys-file, or pass --no-auth for an open server".into());
+        let arena_auth_url = get("arena-auth-url").map(|u| u.trim_end_matches('/').to_string());
+        if auth && api_keys.is_empty() && arena_auth_url.is_none() {
+            return Err("API keys required: set SHARINGAN_API_KEYS / --api-keys / --api-keys-file or --arena-auth-url, or pass --no-auth for an open server".into());
         }
         let cfg = Config {
             blueprint,
@@ -203,6 +215,9 @@ impl Config {
             rate_rps: num("rate-rps", get("rate-rps"), d.rate_rps)?,
             rate_burst: num("rate-burst", get("rate-burst"), d.rate_burst)?,
             rate_overrides: get("rate-limits").map(|s| parse_rate_limits(&s)).transpose()?.unwrap_or_default(),
+            arena_auth_url,
+            public_rps: num("public-rps", get("public-rps"), d.public_rps)?,
+            public_burst: num("public-burst", get("public-burst"), d.public_burst)?,
             max_batch: num("max-batch", get("max-batch"), d.max_batch)?,
             max_inflight: num("max-inflight", get("max-inflight"), d.max_inflight)?,
             model_id: get("model-id").unwrap_or(d.model_id),
@@ -215,8 +230,8 @@ impl Config {
         if cfg.search_concurrency == 0 || cfg.search_threads == 0 || cfg.max_batch == 0 || cfg.max_inflight == 0 {
             return Err("--search-concurrency, --search-threads, --max-batch and --max-inflight must be > 0".into());
         }
-        if !(cfg.max_stack_bb >= 0.0) || !(cfg.rate_rps > 0.0) || !(cfg.rate_burst >= 1.0) {
-            return Err("--max-stack-bb must be >= 0, --rate-rps > 0, --rate-burst >= 1".into());
+        if !(cfg.max_stack_bb >= 0.0) || !(cfg.rate_rps > 0.0) || !(cfg.rate_burst >= 1.0) || !(cfg.public_rps > 0.0) || !(cfg.public_burst >= 1.0) {
+            return Err("--max-stack-bb must be >= 0, --rate-rps / --public-rps > 0, --rate-burst / --public-burst >= 1".into());
         }
         Ok(cfg)
     }
@@ -249,6 +264,8 @@ mod tests {
         assert_eq!((c.budget_ms, c.auth, c.sets.as_str()), (250, false, "flop=0,iters=10"));
         assert!(p(&[], &["--no-auth"]).is_err(), "blueprint required");
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &[]).is_err(), "keys required");
+        let c = p(&[("SHARINGAN_BLUEPRINT", "/x"), ("SHARINGAN_ARENA_AUTH_URL", "http://127.0.0.1:8080/")], &[]).unwrap();
+        assert_eq!((c.arena_auth_url.as_deref(), c.public_rps, c.public_burst), (Some("http://127.0.0.1:8080"), 10.0, 20.0), "arena tokens alone are enough");
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &["--no-auth", "--bogus"]).is_err());
         assert!(p(&[("SHARINGAN_BLUEPRINT", "/x")], &["--no-auth", "--budget-ms", "abc"]).is_err());
     }

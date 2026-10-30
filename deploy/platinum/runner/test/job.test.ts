@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { ArenaClient } from "../src/arena.ts";
 import type { Config } from "../src/config.ts";
-import { botCommand, executeJob, parseProgress, reapOrphans, renderCommand, shq, type JobDeps } from "../src/job.ts";
+import { botCommand, executeJob, parseProgress, reapOrphans, renderCommand, SEED_PATH, shq, type JobDeps } from "../src/job.ts";
 import { noopLog } from "../src/log.ts";
 import { MemoryJobStore, type Job, type JobInput } from "../src/store.ts";
 import { FakeArena, FakePlatinum, until, workerResult, type Behavior } from "./helpers.ts";
@@ -71,6 +71,84 @@ describe("worker mode", () => {
     assert.equal(posted[0]!.body.signature.value, "deadbeef", "result.json is forwarded verbatim");
     assert.equal(arena.called("POST", "/v1/bots").length, 1, "one bot identity per job, signed into the result via --player-id");
     assert.equal(arena.called("POST", "/v1/bots")[0]!.body.owner, "user_a");
+  });
+
+  test("fresh secret deals: run:<64 hex> seed, root-only file, passed as --seed-file, never in env/args, shown only after the job", async () => {
+    let midRun: Job | undefined;
+    let st: MemoryJobStore | undefined;
+    const { platinum, store, run } = await setup({
+      onProcess: (p, sbx) => {
+        p.stderr = '{"hands_done":300,"hands_total":600}\n';
+        setTimeout(async () => { midRun = await st!.get("job_t1"); sbx.files.set("/work/result.json", new TextEncoder().encode(workerResult())); p.exit(0); }, 30);
+      },
+    });
+    st = store;
+    await run();
+    const sbx = platinum.last;
+    const seed = new TextDecoder().decode(sbx.files.get(SEED_PATH));
+    assert.equal(SEED_PATH, "/opt/sharingan/run.seed");
+    assert.match(seed, /^run:[0-9a-f]{64}$/);
+    assert.equal(sbx.fileModes.get(SEED_PATH), 0o400, "readable by root only, like the signing key");
+    assert.equal(sbx.fileModes.get("/opt/sharingan/worker.key"), 0o400);
+    const proc = sbx.procs[0]!;
+    assert.match(proc.opts.cmd.join(" "), /--seed-file '\/opt\/sharingan\/run\.seed'/);
+    assert.ok(!JSON.stringify(proc.opts).includes(seed), "the seed itself is in nobody's env or argv");
+    assert.ok(!JSON.stringify(sbx.spec).includes(seed));
+    assert.ok(!botCommand(cfg, input()).includes(seed));
+    assert.ok(!sbx.shCalls.join("\n").includes(seed), "not in any shell command either");
+    assert.equal(midRun?.dealsSeed, undefined, "not recorded while the job is running");
+    assert.equal((await store.get("job_t1"))!.dealsSeed, seed, "recorded for audit once the job is over");
+  });
+
+  test("every job gets its own seed", async () => {
+    const seeds: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const { platinum, run } = await setup({ onProcess: goodWorker() });
+      await run();
+      seeds.push(new TextDecoder().decode(platinum.last.files.get(SEED_PATH)));
+    }
+    assert.notEqual(seeds[0], seeds[1]);
+  });
+
+  test("a custom WORKER_CMD_TEMPLATE without {seedfile} still gets --seed-file appended", async () => {
+    const { platinum, run } = await setup({ onProcess: goodWorker() }, {}, {
+      WORKER_CMD_TEMPLATE: "sharingan-arena run --bot {bot} --track {track} --hands {hands} --out {out} --sign-key-file {keyfile} --player-id {player_id}",
+    });
+    await run();
+    assert.match(platinum.last.procs[0]!.opts.cmd.join(" "), /--player-id 'p_test' --seed-file '\/opt\/sharingan\/run\.seed'$/);
+  });
+
+  test("a failing bot: one clear line, ONE de-duplicated traceback, no progress, no score line (error and bot_log_tail)", async () => {
+    const tb = "Traceback (most recent call last):\n  File \"/opt/sharingan/bot/bot.py\", line 3, in <module>\n    import nope\nModuleNotFoundError: No module named 'nope'\n";
+    const stderr = ["lane 0", "lane 1", "lane 2", "lane 3"].map((l, i) => `${tb}  ladder-v1 ${(i + 1) * 100}/600 hands (50 hands/s)\n`).join("")
+      + '{"hands_done":600,"hands_total":600}\nladder-v1: +0.0 \u00b1 0.0 mbb/game (aivat) over 600 hands on ladder-v1; 50 hands/s; 600 FORFEIT hands; signed\n';
+    const { store, run } = await setup({
+      onProcess: (p, sbx) => { p.stderr = stderr; setTimeout(() => { sbx.files.set("/work/result.json", new TextEncoder().encode(workerResult({ forfeit_hands: 600 }))); p.exit(0); }, 20); },
+    });
+    await run();
+    const j = (await store.get("job_t1"))!;
+    assert.equal(j.status, "failed");
+    const [first, ...rest] = j.error!.split("\n");
+    assert.equal(first, "the bot never answered a decision (600/600 hands forfeited); nothing was submitted.");
+    const body = rest.join("\n");
+    assert.equal(body.split("Traceback").length - 1, 1, body);
+    assert.equal(body.split("ModuleNotFoundError").length - 1, 1);
+    for (const t of [body, j.botLogTail!]) {
+      assert.doesNotMatch(t, /mbb\/game|FORFEIT|signed|hands_done|\d+\/\d+ hands/);
+    }
+    assert.doesNotMatch(j.error!, /mbb\/game|FORFEIT|signed/);
+    assert.equal(j.botLogTail!.split("Traceback").length - 1, 1, j.botLogTail);
+    assert.match(j.botLogTail!, /ModuleNotFoundError/);
+  });
+
+  test("a finished run keeps its closing summary line in bot_log_tail", async () => {
+    const { store, run } = await setup({
+      onProcess: (p, sbx) => { p.stderr = "ladder-v1: +12.5 \u00b1 3.2 mbb/game (aivat) over 600 hands on ladder-v1; 50 hands/s; signed\n"; setTimeout(() => { sbx.files.set("/work/result.json", new TextEncoder().encode(workerResult())); p.exit(0); }, 20); },
+    });
+    await run();
+    const j = (await store.get("job_t1"))!;
+    assert.equal(j.status, "finished");
+    assert.match(j.botLogTail!, /mbb\/game/);
   });
 
   test("progress lines in the worker's output update the job while it runs", async () => {

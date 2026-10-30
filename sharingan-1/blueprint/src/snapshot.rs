@@ -74,8 +74,15 @@ unsafe impl Sync for Out {}
 
 /// Fold the store's current postflop strategy into the running-sum file at `path`.
 pub fn accumulate(store: &Store, path: &Path) -> io::Result<()> {
+    accumulate_into(store, path, path)
+}
+
+/// Like `accumulate`, but reads the sums so far from `old` and writes the result to `new`
+/// (`old` is left untouched), so the fold can be committed together with a checkpoint.
+pub fn accumulate_into(store: &Store, old: &Path, new: &Path) -> io::Result<()> {
     let used = store.used_slots();
-    let old = if path.exists() { Some(File::open(path)?) } else { None };
+    let path = new;
+    let old = if old.exists() { Some(File::open(old)?) } else { None };
     let hdr = match &old {
         Some(f) => read_header(f)?,
         None => Header { used: vec![], n: 0, data_start: 0 },
@@ -122,6 +129,24 @@ pub fn accumulate(store: &Store, path: &Path) -> io::Result<()> {
     w.flush()?;
     drop(w);
     std::fs::rename(tmp, path)
+}
+
+/// Make a sums file consistent with a checkpoint whose arena holds `used` slots: slots past
+/// `used` were allocated after the checkpoint and get other offsets when training resumes,
+/// so every snapshot's coverage is capped at `used` and their sums dropped (in place).
+/// Returns (snapshots, snapshots that were capped).
+pub fn trim(path: &Path, used: u64) -> io::Result<(usize, usize)> {
+    let f = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let h = read_header(&f)?;
+    let capped = h.used.iter().filter(|&&u| u > used).count();
+    for (j, &u) in h.used.iter().enumerate() {
+        f.write_all_at(&u.min(used).to_le_bytes(), 16 + 8 * j as u64)?;
+    }
+    let n = h.n.min(used);
+    f.write_all_at(&n.to_le_bytes(), 16 + 8 * h.used.len() as u64)?;
+    f.set_len(h.data_start + 2 * n)?;
+    f.sync_all()?;
+    Ok((h.used.len(), capped))
 }
 
 /// Overwrite regrets with final blueprint probabilities × `EXPORT_SCALE`: φ for first-round
@@ -207,5 +232,26 @@ mod tests {
         assert!((p[0] - 0.75).abs() < 1e-4, "{p:?}");
         st.strategy(late, &mut p);
         assert!(p[1] > 0.99, "{p:?}");
+    }
+
+    #[test]
+    fn trim_drops_coverage_past_the_checkpoint() {
+        let st = Store::new(1000);
+        let a = st.infoset(1, 0, 2, 1, false);
+        st.add_regret(a, 0, 10.0);
+        let path = std::env::temp_dir().join("plsa_trim_test.bin");
+        let _ = std::fs::remove_file(&path);
+        accumulate(&st, &path).unwrap();
+        let used = st.used_slots();
+        let b = st.infoset(2, 0, 2, 1, false); // allocated after the "checkpoint"
+        st.add_regret(b, 1, 10.0);
+        accumulate(&st, &path).unwrap();
+        assert_eq!(trim(&path, used).unwrap(), (2, 1));
+        let f = File::open(&path).unwrap();
+        let h = read_header(&f).unwrap();
+        assert_eq!((h.used.clone(), h.n), (vec![used, used], used));
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), h.data_start + 2 * used);
+        assert_eq!(read_sums(&f, &h, 0, used).unwrap(), vec![510, 0]);
+        assert_eq!(trim(&path, used).unwrap(), (2, 0)); // idempotent
     }
 }

@@ -21,7 +21,7 @@ a { color:inherit; }
 .p { display:block; max-width:80ch; }
 .kv { display:grid; grid-template-columns:18ch minmax(0,1fr); width:100%; }
 .step { display:grid; grid-template-columns:4ch minmax(0,1fr); width:100%; }
-.code { display:block; white-space:pre; overflow-x:auto; color:var(--muted); width:100%; }
+.code { display:block; white-space:pre-wrap; word-break:break-word; color:var(--muted); width:100%; }
 .nav { display:flex; flex-wrap:wrap; gap:0 2ch; }
 .nav a { text-decoration:none; text-transform:uppercase; color:var(--muted); }
 .nav a:hover, .nav a.on { color:var(--ink); text-decoration:underline; }

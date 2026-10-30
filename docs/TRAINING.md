@@ -10,7 +10,7 @@ RUSTFLAGS="-C target-cpu=native" cargo build --release -p pluribus
 ```
 
 You also need the card abstraction tables in `data/buckets-200/` (download from Hugging Face, see [`data/README.md`](../data/README.md), or rebuild with
-`cargo run --release -p abstraction --bin build_buckets`).
+`cargo run --release -p abstraction --bin build_buckets -- data/buckets-200 200 200 200 200000`, about 30 s on 128 cores).
 
 ## Action menus (`--sizing`)
 
@@ -45,11 +45,11 @@ Pass `--resume` (same `--out`, same sizing, same seed). The run directory must c
 ```
 
 Our best line (variant C) was stopped at 5.55e10 iterations at about 355k iterations/s and was still improving; reaching 1.83e11 iterations takes about
-130 more hours on one 64-core box and corresponds to roughly 8 days of total compute (the paper's budget).
-TODO(final): document the final run's exact command, wall time and iterations.
+130 more hours on one 64-core box and corresponds to roughly 8 days of total compute (the paper's budget). That run is in progress and becomes SHARINGAN-2.
 
 Changing `--iters` on resume rescales the schedule. That is harmless once every phase (LCFR, pruning, averaging) has passed.
-To keep a checkpoint, hard-link it (`ln -f blueprint.bin blueprint-<it>.bin`) since saves are tmp+rename; `snapshots.sum` is updated in place and cannot be preserved that way.
+To keep a checkpoint, hard-link it (`ln -f blueprint.bin blueprint-<it>.bin`, same for `snapshots.sum`): saves are tmp+rename. Each snapshot fold is committed together with a
+checkpoint, and a resume trims `snapshots.sum` to the checkpoint, so a crash never leaves the averages out of step with the regrets.
 
 ## Compact export
 

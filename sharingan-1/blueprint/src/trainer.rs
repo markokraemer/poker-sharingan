@@ -183,6 +183,9 @@ impl<'a, B: Bucketer> Trainer<'a, B> {
         let n = list.len();
         let actor = st.to_act().unwrap();
         let Some(slot) = self.store.lookup(hist.key(), ctx.buckets[actor][0]) else { return };
+        if slot.n_actions as usize != n || !slot.with_avg {
+            return; // key collision with an infoset of another shape (see Store::try_infoset)
+        }
         let mut sigma = [0f32; MAX_ACTIONS];
         self.store.strategy(slot, &mut sigma[..n]);
         if actor == p {

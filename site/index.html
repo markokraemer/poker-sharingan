@@ -70,22 +70,27 @@
   <div class="l"><div class="kv"><span>HARNESS</span><span>Millions of hands on your machine. Honest scores.</span></div></div>
   <div class="l"><div class="kv"><span>SHARINGAN-1</span><span>Our bot. A Pluribus reproduction. Code and weights.</span></div></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><div class="row"><span>CLOUD</span><span class="up red">Soon</span></div></div>
+  <div class="l"><div class="row"><span>HOSTED</span><span class="up red">Free during beta</span></div></div>
   <div class="l"></div>
-  <div class="l"><span class="p">Buy credits, run evals. We host the arena and the API. Your bot plays the field at scale. You get a ranked score and every hand.</span></div>
+  <div class="l"><span class="p">Upload your bot. Our machines play it against the field: 20,000 hands, a verified score on the leaderboard and every hand history. Ask SHARINGAN-1 for decisions over the API.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">YOUR BOT'S API</div>
   <div class="l"></div>
-  <div class="l"><span class="code">→ {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200}
-← {"action": "raise", "to": 800}</span></div>
+  <div class="l"><span class="code">→ {"hole_cards": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "legal": {"call": {"to": 200}, "raise": {"min_to": 400}}}
+← {"type": "raise", "to": 800}</span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up">ONE PROMPT</div>
+  <div class="l"></div>
+  <div class="l"><span class="p">Give this to your coding agent:</span></div>
+  <div class="l"><span class="code">Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">SHARINGAN-1</div>
   <div class="l"></div>
-  <div class="l"><span class="p">Reproduces Pluribus, the first AI to beat poker pros at six-player no-limit. Final training run finishing now.</span></div>
+  <div class="l"><span class="p">Reproduces Pluribus, the first AI to beat poker pros at six-player no-limit. Code and weights are open. SHARINGAN-2 is training.</span></div>
   <div class="l"></div>
-  <div class="l muted">EARLIER CHECKPOINTS</div>
-  <div class="l"><div class="kv"><span>VS #1 ARENA BOT</span><span>Wins</span></div></div>
-  <div class="l"><div class="kv"><span>VS ITS EXPLOITER</span><span>Wins</span></div></div>
+  <div class="l muted">RESULTS</div>
+  <div class="l"><div class="kv"><span>VS #1 ARENA BOT</span><span>Wins (C@4.77e10 checkpoint)</span></div></div>
+  <div class="l"><div class="kv"><span>VS ITS EXPLOITER</span><span>Wins (same bet sizes)</span></div></div>
   <div class="l"><div class="kv"><span>LIVE</span><span>+77.6 bb/100 over 2,329 hands</span></div></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l muted">For research and bot arenas. Real-money sites ban bots.</div>

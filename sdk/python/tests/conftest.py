@@ -4,6 +4,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolated_tokens(tmp_path, monkeypatch):
+    # The CLI saves bot tokens in ~/.config/sharingan; keep tests out of the real home.
+    import sharingan.cli
+    monkeypatch.setattr(sharingan.cli, "TOKENS_FILE", str(tmp_path / "tokens.json"))
+
 from sharingan.models import YourTurn
 
 # The worked example from docs/TABLE_API.md section 5.3 (seat 0 on the flop, facing a check)

@@ -13,52 +13,70 @@ In poker, luck hides skill for thousands of hands. We replay every deal from eve
 |---|---|
 | **Engine** | Six-player no-limit hold'em. `engine/` |
 | **Harness** | Run millions of hands locally. Luck-corrected scores with error bars. `arena/` |
-| **SHARINGAN-1** | Our bot, a Pluribus reproduction. Code and weights. `sharingan-1/` |
+| **SHARINGAN-1** | Our bot, a Pluribus reproduction. Code here, weights on [Hugging Face](https://huggingface.co/markokraemer/sharingan-1). `sharingan-1/` |
 
-## Cloud (paid, coming soon)
+## Hosted (free during beta)
 
-Buy credits, run evals. We host the arena and the API: your bot plays the field at scale, you get a ranked score and every hand history.
+We host the arena: your bot plays the field at scale on our machines, you get a verified, ranked score and every hand history. Paid credits for large volumes come later.
 
 ## Your bot's API
 
-Your bot gets the hand. It returns an action.
+Your bot gets the decision. It returns an action. Amounts are the total "to", never "by".
 
 ```json
-→ {"hand": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600, "to_call": 200, "options": ["fold","call","raise"]}
-← {"action": "raise", "to": 800}
+→ {"type": "your_turn", "data": {"hole_cards": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600,
+   "legal": {"fold": true, "call": {"to": 200}, "raise": {"min_to": 400, "max_to": 9800}}, ...}}
+← {"type": "act", "data": {"decision_id": "...", "type": "raise", "to": 800}}
 ```
 
-Full spec: [docs/TABLE_API.md](docs/TABLE_API.md)
+Full spec: [docs/TABLE_API.md](docs/TABLE_API.md). The SDK hides all of this behind `act(state)`.
 
 ## SHARINGAN-1
 
-A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat poker pros at six-player no-limit. Its final training run is finishing now. Earlier checkpoints:
+A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat poker pros at six-player no-limit.
+SHARINGAN-1 is blueprint C@2e10 with turn and river search, the exact bot the arena runs:
 
-- beat SvanBot, the #1 bot on a public arena
-- a bot trained only to exploit it still loses to it
-- won +77.6 bb/100 over 2,329 live hands
+- won +77.6 bb/100 over 2,329 live hands on a public bot arena
+- a best response trained to exploit it, with the same bet sizes, still loses to it
+- a longer-trained checkpoint (C@4.77e10, also released) beats SvanBot, the #1 bot on that arena, in both seatings
 
-Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
+Weights: [huggingface.co/markokraemer/sharingan-1](https://huggingface.co/markokraemer/sharingan-1) ([model card](MODEL_CARD.md)) · Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
+
+SHARINGAN-2, from the full-length training run, is next.
 
 ## Run it
 
+With an agent, one prompt:
+
+```
+Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.
+```
+
+The same file is an Agent Skill in [skills/poker-sharingan](skills/poker-sharingan/SKILL.md). By hand:
+
 ```bash
 pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
-sharingan eval mybot.py --server https://arena.sharingan.poker                      # score vs the ladder, with an error bar
-sharingan benchmark mybot.py --track sharingan-1 --server https://arena.sharingan.poker  # the hard test
-sharingan submit mybot.py --server https://arena.sharingan.poker                    # hosted job: our machines play it, VERIFIED score (free for now)
+export SHARINGAN_SERVER=https://arena.sharingan.poker
+sharingan submit mybot.py                         # our machines play 20,000 hands in ~10 s: VERIFIED score on the leaderboard
+sharingan submit mybot.py --track sharingan-1     # the hard test: five copies of SHARINGAN-1
+sharingan benchmark mybot.py                      # same, but the bot runs on your machine (LLM bots, network access)
 ```
 
 Play SHARINGAN-1 live at [sharingan.poker/play](https://sharingan.poker/play), see the [leaderboard](https://sharingan.poker/leaderboard). The public arena is `https://arena.sharingan.poker` (REST, WebSocket `/v1/play`, hosted jobs `/v1/jobs`); how it is deployed: [deploy/production](deploy/production/README.md).
 
-`mybot.py` is just an `act(state)` function. SDKs: [sdk/](sdk/) · Self-host the arena: [arena/server](arena/server) · Train SHARINGAN-1: [docs/TRAINING.md](docs/TRAINING.md)
+Ask SHARINGAN-1 for a decision from your own code: `POST https://arena.sharingan.poker/v1/act` with your bot token ([format](sharingan-1/serve/README.md)).
+
+`mybot.py` is just an `act(state)` function. SDKs: [sdk/](sdk/) · Self-host the arena: [arena/server](arena/server/README.md#self-host) · Train SHARINGAN-1: [docs/TRAINING.md](docs/TRAINING.md)
 
 ## Layout
 
 ```
 engine/        poker rules
-arena/         harness, scoring, reference bots, adapters
-sharingan-1/   our bot: training and real-time search
+arena/         harness, scoring, reference bots, adapters, the arena server
+sharingan-1/   our bot: training, real-time search, inference server
+sdk/           Python and TypeScript bot SDKs
+skills/        the agent skill (same as sharingan.poker/skill.md)
+deploy/        how sharingan.poker runs (containers, runner, edge)
 research/      small-game labs and experiments
 docs/          specs, results, method
 site/          sharingan.poker

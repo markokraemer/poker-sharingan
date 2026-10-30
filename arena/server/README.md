@@ -10,6 +10,30 @@ Postgres (`src/pgstore.rs`, migrations in `migrations/`) with `ARENA_DATABASE_UR
 cargo run --release -p sharingan-arena -- --port 8080
 ```
 
+## Self-host
+
+Both benchmark tracks (and `sharingan eval`) seat SHARINGAN-1, so the arena needs a blueprint and its card buckets.
+
+**The real one** (the same scores as the public leaderboard; ~125 GB disk): download it from [Hugging Face](https://huggingface.co/markokraemer/sharingan-1) (see the [model card](../../MODEL_CARD.md)), then
+
+```bash
+ARENA_BLUEPRINT=$PWD/sharingan-1.plcp ARENA_BUCKETS=tables:$PWD/buckets-200 ARENA_SIZING=medium \
+  cargo run --release -p sharingan-arena -- --port 8080
+```
+
+**A toy one in a minute** (for testing your setup; its scores are not comparable to the leaderboard):
+
+```bash
+cargo build --release -p abstraction --bin build_buckets -p pluribus -p sharingan-arena
+./target/release/build_buckets data/buckets-200 200 200 200 200000          # ~30 s on 128 cores, minutes on a laptop
+./target/release/pluribus train --out tinybp --iters 2000000 --sizing tiny --players 6 --mem-gb 8 --buckets data/buckets-200
+./target/release/pluribus compact --ckpt tinybp/blueprint.bin --sums tinybp/snapshots.sum --out tinybp/tiny.plcp
+ARENA_BLUEPRINT=$PWD/tinybp/tiny.plcp ARENA_BUCKETS=tables:$PWD/data/buckets-200 ARENA_SIZING=tiny ./target/release/sharingan-arena --port 8080
+```
+
+Then `sharingan eval mybot.py --server http://127.0.0.1:8080`, or `sharingan eval mybot.py --local` with `sharingan-arena` on `PATH`
+(same `ARENA_*` variables) to skip the server.
+
 The first start logs a generated admin token (set `ARENA_ADMIN_TOKEN` to pin it). Flags: `--port`, `--bind HOST:PORT`, `--db PATH`.
 
 | env | default | meaning |
@@ -97,6 +121,7 @@ sharingan-arena run --bot "sharingan-arena pipe-house tight_aggressive" --lanes 
 # control plane: accept it (ARENA_WORKER_KEYS=id=secret on the server, runner token)
 curl -s $H/v1/results -H "authorization: Bearer $RUNNER" -H 'content-type: application/json' -d @result.json
 ```
+`--seed-file F` reads a secret per-run seed (`run:<hex>`, fresh deals) instead of the public track seed; the bot never sees it (TABLE_API.md 14.4). `POST /v1/results` accepts the track seed (`deals: "frozen"`) or such a seed (`deals: "fresh"`).
 Timeouts kill and fold, crashes forfeit the lane's remaining hands (TABLE_API.md 14.3). Measured: 4.6k hands/s for a trivial Python bot on 8 lanes, 11-17k hands/s for a Rust bot on 16 lanes.
 Code: `src/worker.rs` (schedule, lanes, pipes, signing), `src/pipe_bot.rs` (reference Rust pipe bot), `src/results.rs` (intake); tests in `tests/worker.rs`.
 
@@ -114,6 +139,7 @@ Code: `src/worker.rs` (schedule, lanes, pipes, signing), `src/pipe_bot.rs` (refe
 - Fold when check is free becomes a check. Illegal actions get an `error` and the same `your_turn` (same `decision_id`) again until the deadline.
 - `deadline_ms` includes the player's remaining time bank. A seat with no live socket at the start of its turn gets only the reconnect grace.
 - Free tables deal when `min_players_to_deal` seats are filled and connected (or house) and at least one is not a house bot.
+- Match ownership: creating a match requires every non-house participant to be the caller's own bot (admins: any); `start`/`resume` return `409 not_connected` while a non-house participant is offline (admins exempt). All errors, including framework rejections and unknown routes, are the JSON envelope; player names reject control, invisible and bidi-override characters.
 - Matches: `stack_mode` is forced to `reset`, duplicate needs `hands_planned % 6 == 0`. Deals are played in blocks of `block_deals` (12) rotation-major so a deal's rotations are far apart. Hand histories of a running match are readable only by its owner/admin. `"reveal":"match_end"` also withholds other players' cards in `hand_end` until the match ends (default follows the spec and reveals).
 - Scores: AIVAT (bench `EquityEstimator` baseline; house bots that expose probabilities also get decision corrections) when `aivat` is `full`/`cards`, else plain duplicate. There is no learned blueprint value function yet. Leaderboard combines matches by inverse variance, so a score depends on the field faced.
 - Sandbox tables (`"mode":"sandbox"`) take `sandbox.decks` (card prefixes per hand), `button_seat`, `stacks`.
@@ -124,4 +150,4 @@ Code: `src/worker.rs` (schedule, lanes, pipes, signing), `src/pipe_bot.rs` (refe
 
 ## Known gaps
 
-No webhook test and no `/events` callbacks to webhook bots; `hello{resume}` always sends a fresh snapshot (no replay); tables are in memory (matches and hands persist, running matches are aborted on restart); no rate limiting; no spectator stream; in-memory per-hand records for running matches.
+No webhook test and no `/events` callbacks to webhook bots; `hello{resume}` always sends a fresh snapshot (no replay); tables are in memory (matches and hands persist, running matches are aborted on restart); no spectator stream; in-memory per-hand records for running matches.

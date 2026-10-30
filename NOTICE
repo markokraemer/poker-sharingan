@@ -4,7 +4,7 @@ Licensed under the Apache License, Version 2.0.
 
 This product includes or derives from the following third-party work:
 
-* crates/iso is a Rust port of the hand-isomorphism indexer by Kevin Waugh
+* engine/iso is a Rust port of the hand-isomorphism indexer by Kevin Waugh
   (https://github.com/kdub0/hand-isomorphism, `hand_index.c`; K. Waugh, "A Fast and
   Optimal Hand Isomorphism Algorithm", 2013), distributed under this notice:
 
@@ -26,10 +26,10 @@ This product includes or derives from the following third-party work:
   The hand-isomorphism indexer was developed by Kevin Waugh.
 
 External tools that are used as opponents or data but are NOT redistributed here:
-* RLCard (https://github.com/datamllab/rlcard, MIT): scripts/extbots/rlcard_*.py are our own
+* RLCard (https://github.com/datamllab/rlcard, MIT): arena/adapters/rlcard_*.py are our own
   bridge/training scripts that import it at runtime.
 * PokerBench (HF `RZ412/PokerBench`, Apache-2.0 per its dataset card): download it separately.
-* SvanBot (https://github.com/SvanLabs/SvanBot, Apache-2.0): scripts/extbots/svan/extbridge.rs is our own
+* SvanBot (https://github.com/SvanLabs/SvanBot, Apache-2.0): arena/adapters/svan/extbridge.rs is our own
   glue code that links against SvanBot's crates at build time; SvanBot's source is not included.
 * Open Poker (openpoker.ai) and Slumbot (slumbot.com): public services used through their APIs.
 

@@ -41,4 +41,4 @@ Each SDK ships an in-process mock (`sharingan.mock.MockArena`, `poker-sharingan/
 
 ## Contract notes and ambiguities
 
-See the "Ambiguities" section in the repo report; the SDKs defend against each (e.g. `hand_id` is read from the envelope when `your_turn.data` lacks it, `hand_end.hole_cards` keys are normalised).
+Where the contract allows more than one reading, the SDKs accept both (e.g. `hand_id` is read from the envelope when `your_turn.data` lacks it, `hand_end.hole_cards` keys are normalised). The official rulings are in [TABLE_API.md section 12b](../docs/TABLE_API.md).

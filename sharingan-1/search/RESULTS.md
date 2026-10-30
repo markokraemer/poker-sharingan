@@ -316,7 +316,7 @@ Timing (mean per search, loaded box, single-thread solve per deal): 5000 it ~55-
    (without it search loses to the blueprint).
 3. Negative-regret pruning inside the subgame (95% of iterations after the first fifth) and a coarser `later_sizing` for rounds after the root round.
 4. `focus_own`: half of our own traversals fix our actual hole cards (unbiased per infoset, faster convergence for the hand played).
-5. Later-round card abstraction = blueprint's 200 buckets (board-agnostic keys, like the blueprint), not 500 per-flop clusters. TODO.
+5. Later-round card abstraction = blueprint's 200 buckets (board-agnostic keys, like the blueprint), not 500 per-flop clusters (an open experiment).
 6. "Second raise" counts the opening bet as the first raise action (engine `raises_this_street`).
 7. Beliefs are independent per-seat marginals (joint card removal handled at sampling); own actual hand floored at 1e-6; a Bayes update with zero total likelihood is skipped.
 8. LBR/AIVAT: `dist` for non-actual holes comes from the same solution (own earlier actions frozen only for the actual hand), so it is not strictly a pure function of public history.

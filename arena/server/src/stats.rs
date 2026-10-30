@@ -208,10 +208,12 @@ pub fn leaderboard(
             })
         })
         .collect();
-    let key = |r: &LeaderboardRow| -> f64 {
+    // With a track: that track's score. Without: like the site, sharingan-1 first, then ladder-v1, then the match score.
+    let cell = |r: &LeaderboardRow, t: &str| r.tracks.get(t).map(|c| c.mbb_per_game).unwrap_or(f64::NEG_INFINITY);
+    let key = |r: &LeaderboardRow| -> [f64; 3] {
         match track {
-            Some(t) => r.tracks[t].mbb_per_game,
-            None => r.score_mbb_per_hand.unwrap_or(f64::NEG_INFINITY),
+            Some(t) => [cell(r, t), 0.0, 0.0],
+            None => [cell(r, "sharingan-1"), cell(r, "ladder-v1"), r.score_mbb_per_hand.unwrap_or(f64::NEG_INFINITY)],
         }
     };
     rows.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap_or(std::cmp::Ordering::Equal));

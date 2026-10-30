@@ -1,5 +1,6 @@
 // Shared test doubles: a scriptable fake sandbox backend and a fake arena HTTP server.
 import http from "node:http";
+import { gzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
 import { loadConfig, type Config, type Env } from "../src/config.ts";
 import type {
@@ -198,3 +199,21 @@ export const workerResult = (over: Record<string, unknown> = {}) => JSON.stringi
   schema: "sharingan-worker-result/1", run_id: "w_test0001", track: "ladder-v1", hands: 600, hands_planned: 600, mbb_per_game: 12.5, ci95_mbb: 3.2,
   forfeit_hands: 0, signature: { alg: "HMAC-SHA256", key_id: "key1", value: "deadbeef" }, ...over,
 });
+
+/** A real .tar.gz (ustar) holding `files`, as base64: what POST /v1/jobs now requires. */
+export function makeTgz(files: Record<string, string> = { "bot.py": "print('hi')\n" }): Buffer {
+  const blocks: Buffer[] = [];
+  for (const [name, content] of Object.entries(files)) {
+    const data = Buffer.from(content);
+    const h = Buffer.alloc(512);
+    h.write(name, 0, 100); h.write("0000644\0", 100); h.write("0000000\0", 108); h.write("0000000\0", 116);
+    h.write(data.length.toString(8).padStart(11, "0") + "\0", 124); h.write("00000000000\0", 136);
+    h.fill(0x20, 148, 156); h.write("0", 156); h.write("ustar\0", 257); h.write("00", 263);
+    let sum = 0; for (const b of h) sum += b;
+    h.write(sum.toString(8).padStart(6, "0") + "\0 ", 148);
+    blocks.push(h, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+  }
+  blocks.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(blocks));
+}
+export const tgzB64 = (files?: Record<string, string>): string => makeTgz(files).toString("base64");

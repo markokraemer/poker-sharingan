@@ -11,7 +11,7 @@ import { noopLog } from "../src/log.ts";
 import { Service } from "../src/service.ts";
 import { MemoryJobStore } from "../src/store.ts";
 import { CREDITS_KIND, signStripePayload, SimulatedCheckoutGateway } from "../src/stripe.ts";
-import { AUTH, FakeArena, FakePlatinum, until, WEBHOOK_SECRET, workerResult, testConfig, type Behavior } from "./helpers.ts";
+import { AUTH, FakeArena, FakePlatinum, tgzB64, until, WEBHOOK_SECRET, workerResult, testConfig, type Behavior } from "./helpers.ts";
 
 let arena: FakeArena;
 let cfg: Config;
@@ -54,7 +54,7 @@ const api = async (method: string, path: string, body?: unknown, headers: Record
 
 const submitBody = (over: Record<string, unknown> = {}) => ({
   userId: "user_a", botName: "mybot", language: "python", entry: "bot.py", track: "ladder-v1", hands: 600, idempotencyKey: "idem-1",
-  artifactTgzBase64: Buffer.from("fake-tgz").toString("base64"), ...over,
+  artifactTgzBase64: tgzB64(), ...over,
 });
 
 function stripeEvent(over: { id?: string; session?: string; cents?: number; user?: string; meta?: Record<string, string> } = {}) {
@@ -243,6 +243,35 @@ describe("job lifecycle with credits", () => {
     assert.equal(platinum.sandboxes.length, 0);
     assert.equal((await api("POST", "/v1/jobs", "{nope")).status, 400);
     assert.equal((await api("GET", "/v1/jobs/job_missing")).status, 404);
+  });
+
+  test("validation: an artifact that is not a gzip tar with the entry file is a 400 before any credits are reserved", async () => {
+    await topup(1000);
+    for (const over of [
+      { artifactTgzBase64: Buffer.from("fake-tgz").toString("base64") },
+      { artifactTgzBase64: "!!!" },
+      { artifactTgzBase64: tgzB64({ "other.py": "x" }) },
+    ]) assert.equal((await api("POST", "/v1/jobs", submitBody({ idempotencyKey: JSON.stringify(over).slice(0, 40), ...over }))).status, 400);
+    assert.equal((await api("GET", "/v1/credits/user_a")).json.reserved_micro, 0);
+  });
+
+  test("hands: 601 is echoed as 606 (submit answer, job, hands_total), reserved and billed for 606", async () => {
+    await topup(1000);
+    const sub = await api("POST", "/v1/jobs", submitBody({ hands: 601 }));
+    assert.equal(sub.json.hands, 606);
+    assert.equal(sub.json.reserved_micro, 606_000);
+    const j = (await api("GET", `/v1/jobs/${sub.json.id}`)).json;
+    assert.deepEqual([j.hands, j.hands_total], [606, 606]);
+  });
+
+  test("CORS headers are on every response and OPTIONS needs no auth (service app)", async () => {
+    const pre = await fetch(base + "/v1/jobs", { method: "OPTIONS" });
+    assert.equal(pre.status, 204);
+    assert.equal(pre.headers.get("access-control-allow-origin"), "*");
+    const unauth = await fetch(base + "/v1/jobs/x");
+    assert.equal(unauth.status, 401);
+    assert.equal(unauth.headers.get("access-control-allow-origin"), "*");
+    assert.equal((await fetch(base + "/healthz")).headers.get("access-control-allow-origin"), "*");
   });
 
   test("healthz / readyz are open; unknown routes 404", async () => {

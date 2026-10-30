@@ -1,5 +1,8 @@
 //! HTTP layer: routes, Bearer auth, per-key token-bucket rate limit, JSON logs.
 //!
+//! Bearer = a configured API key, or (with `--arena-auth-url`) any arena player token: the arena's `GET /v1/me`
+//! vouches for it once (cached), and that player gets the public rate limit.
+//!
 //! | route | auth | |
 //! |---|---|---|
 //! | `GET /v1/health` | no | liveness |
@@ -35,19 +38,25 @@ pub struct AppState {
     keys: HashMap<String, String>,
     limiter: Mutex<HashMap<String, Bucket>>,
     inflight: Arc<Semaphore>,
+    /// arena token -> (player id, or None if the arena rejected it; checked at)
+    players: Mutex<HashMap<String, (Option<String>, Instant)>>,
 }
+
+const PLAYER_TTL_S: u64 = 300;
+const REJECT_TTL_S: u64 = 30;
 
 impl AppState {
     pub fn new(core: Arc<Core>) -> Arc<AppState> {
         let keys = core.cfg.api_keys.iter().map(|(n, k)| (k.clone(), n.clone())).collect();
         let inflight = Arc::new(Semaphore::new(core.cfg.max_inflight));
-        Arc::new(AppState { core, keys, limiter: Mutex::new(HashMap::new()), inflight })
+        Arc::new(AppState { core, keys, limiter: Mutex::new(HashMap::new()), inflight, players: Mutex::new(HashMap::new()) })
     }
 
     /// Take `cost` tokens from `who`'s bucket. `Err(retry_after_secs)` when empty.
     fn take(&self, who: &str, cost: f64) -> Result<(), f64> {
         let cfg = &self.core.cfg;
-        let (rps, burst) = cfg.rate_overrides.get(who).copied().unwrap_or((cfg.rate_rps, cfg.rate_burst));
+        let default = if who.starts_with("player:") { (cfg.public_rps, cfg.public_burst) } else { (cfg.rate_rps, cfg.rate_burst) };
+        let (rps, burst) = cfg.rate_overrides.get(who).copied().unwrap_or(default);
         let cost = cost.min(burst);
         let mut m = self.limiter.lock().unwrap();
         let now = Instant::now();
@@ -62,17 +71,57 @@ impl AppState {
         }
     }
 
+    /// The arena player behind `token` (cached). `Err` only when the arena could not be asked.
+    async fn arena_player(&self, url: &str, token: &str) -> Result<Option<String>, ApiError> {
+        if let Some((p, at)) = self.players.lock().unwrap().get(token) {
+            let ttl = if p.is_some() { PLAYER_TTL_S } else { REJECT_TTL_S };
+            if at.elapsed().as_secs() < ttl {
+                return Ok(p.clone());
+            }
+        }
+        let (u, t) = (format!("{url}/v1/me"), token.to_string());
+        let res = tokio::task::spawn_blocking(move || {
+            match ureq::get(&u).set("authorization", &format!("Bearer {t}")).timeout(std::time::Duration::from_secs(3)).call() {
+                Ok(r) => Ok(r.into_json::<Value>().ok().and_then(|v| v["player_id"].as_str().map(String::from))),
+                Err(ureq::Error::Status(401 | 403, _)) => Ok(None),
+                Err(e) => Err(e.to_string()),
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|r| r);
+        let p = res.map_err(|e| {
+            log::emit("error", "arena_auth", json!({"error": e}));
+            ApiError::new(503, "auth_unavailable", "could not verify the token right now; retry shortly")
+        })?;
+        let mut m = self.players.lock().unwrap();
+        if m.len() > 100_000 {
+            m.clear();
+        }
+        m.insert(token.to_string(), (p.clone(), Instant::now()));
+        Ok(p)
+    }
+
     #[allow(clippy::result_large_err)]
-    fn authenticate(&self, headers: &HeaderMap, cost: f64) -> Result<String, ApiError> {
+    async fn authenticate(&self, headers: &HeaderMap, cost: f64) -> Result<String, ApiError> {
         let who = if self.core.cfg.auth {
             let tok = headers
                 .get(header::AUTHORIZATION)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")))
-                .map(str::trim);
-            match tok.and_then(|t| self.keys.get(t)) {
-                Some(n) => n.clone(),
-                None => return Err(ApiError::new(401, "unauthorized", "missing or invalid API key (send `Authorization: Bearer <key>`)")),
+                .map(str::trim)
+                .filter(|t| !t.is_empty());
+            let unauthorized = || ApiError::new(401, "unauthorized", "missing or invalid key (send `Authorization: Bearer <key>`; an arena bot token works)");
+            match (tok, tok.and_then(|t| self.keys.get(t))) {
+                (_, Some(n)) => n.clone(),
+                (Some(t), None) => match &self.core.cfg.arena_auth_url {
+                    Some(url) => match self.arena_player(url, t).await? {
+                        Some(pid) => format!("player:{pid}"),
+                        None => return Err(unauthorized()),
+                    },
+                    None => return Err(unauthorized()),
+                },
+                (None, None) => return Err(unauthorized()),
             }
         } else {
             "anonymous".to_string()
@@ -127,7 +176,7 @@ async fn health(State(st): State<Arc<AppState>>) -> Response {
 }
 
 async fn info(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    match st.authenticate(&headers, 1.0) {
+    match st.authenticate(&headers, 1.0).await {
         Ok(_) => respond(200, &st.core.info(), None, None),
         Err(e) => error_response(&e, None),
     }
@@ -176,7 +225,7 @@ fn log_act(rid: &str, who: &str, t0: Instant, res: &Result<ActResponse, ApiError
 async fn act(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
     let t0 = Instant::now();
     let rid = st.core.next_request_id();
-    let who = match st.authenticate(&headers, 1.0) {
+    let who = match st.authenticate(&headers, 1.0).await {
         Ok(w) => w,
         Err(e) => {
             log::emit("warn", "auth", json!({"request_id": rid, "status": e.status, "code": e.code}));
@@ -202,7 +251,7 @@ async fn act(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -
 async fn batch(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
     let t0 = Instant::now();
     let rid = st.core.next_request_id();
-    let who = match st.authenticate(&headers, 1.0) {
+    let who = match st.authenticate(&headers, 1.0).await {
         Ok(w) => w,
         Err(e) => {
             log::emit("warn", "auth", json!({"request_id": rid, "status": e.status, "code": e.code}));

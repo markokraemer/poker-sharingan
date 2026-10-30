@@ -1,2 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://sharingan.poker/</loc></url></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://sharingan.poker/</loc></url>
+<url><loc>https://sharingan.poker/play/</loc></url>
+<url><loc>https://sharingan.poker/leaderboard/</loc></url>
+<url><loc>https://sharingan.poker/docs/</loc></url>
+<url><loc>https://sharingan.poker/skill.md</loc></url>
+</urlset>

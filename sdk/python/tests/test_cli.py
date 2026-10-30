@@ -1,3 +1,4 @@
+import os
 import asyncio
 import subprocess
 import sys
@@ -7,6 +8,33 @@ import pytest
 from sharingan.cli import FunctionBot, load_bot, main, format_score
 from sharingan.mock import MockArena
 from sharingan import Bot
+
+
+def test_bot_token_is_saved_and_reused(tmp_path):
+    from sharingan import cli
+
+    class FakeApi:
+        base_url = "http://arena.test"
+        registered = 0
+
+        def register_bot(self, name):
+            FakeApi.registered += 1
+            from types import SimpleNamespace
+            return SimpleNamespace(player_id=f"p_{FakeApi.registered}", token=f"sk_{FakeApi.registered}")
+
+        def request(self, method, path, body=None, token=None, query=None):
+            if token != "sk_1":
+                raise cli.ApiException(401, "unauthorized", "bad token")
+            return {"player_id": "p_1"}
+
+    api = FakeApi()
+    assert cli.bot_token(api, "mybot") == "sk_1"
+    assert cli.bot_token(api, "mybot") == "sk_1", "second run reuses the saved token"
+    assert FakeApi.registered == 1
+    assert oct(os.stat(cli.TOKENS_FILE).st_mode & 0o777) == "0o600"
+    assert cli.bot_token(api, "other") == "sk_2" and FakeApi.registered == 2, "another bot name is another bot"
+    assert cli.bot_token(api, "other") == "sk_3" and FakeApi.registered == 3, "a rejected saved token is replaced"
+    assert cli.leaderboard_url("https://arena.sharingan.poker", "ladder-v1") == "https://sharingan.poker/leaderboard/"
 
 
 def test_load_bot_variants(tmp_path):

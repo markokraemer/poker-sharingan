@@ -11,6 +11,8 @@ EnvironmentFile=/srv/sharingan/secrets/core.env
 Environment=ROLE=core ASSETS_DIR=/models BLUEPRINT_FILE=sharingan-1.plcp SIZING=medium WARM=1
 Environment=ARENA_OPEN_REGISTRATION=true ARENA_TRUST_PROXY=true ARENA_RATE_LIMIT_RPS=50 ARENA_RATE_LIMIT_BURST=100
 Environment=SHARINGAN_SEARCH_THREADS=16 SHARINGAN_SEARCH_CONCURRENCY=2
+# public inference: any arena player token may call /v1/act (checked via the arena's /v1/me), 10 decisions/s each
+Environment=SHARINGAN_ARENA_AUTH_URL=http://127.0.0.1:8080 SHARINGAN_PUBLIC_RPS=10 SHARINGAN_PUBLIC_BURST=20
 # model: read-only, shared with every sandbox through the host page cache
 Volume=/srv/sharingan/models:/models:ro
 Volume=/srv/sharingan/arena-data:/data

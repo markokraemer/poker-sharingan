@@ -6,6 +6,7 @@
 //   recover()        after a crash: fail orphaned jobs, settle finished-but-unsettled ones, release dangling reservations
 import { randomBytes } from "node:crypto";
 import type { ArenaClient } from "./arena.ts";
+import { ArchiveError, scanTgz } from "./archive.ts";
 import type { Config, JobMode } from "./config.ts";
 import { chargeMicro, reserveMicro, roundHands } from "./cost.ts";
 import { executeJob, reapOrphans } from "./job.ts";
@@ -155,7 +156,11 @@ export class Service {
 
   // ------------------------------------------------------------------------------------------ jobs
 
-  private validate(req: SubmitRequest): { input: JobInput; artifact: Buffer } {
+  /**
+   * Everything that can be decided from the request alone, cheapest first. Runs BEFORE the quota / credit checks, so garbage
+   * is a 400 and never a 429 / 402 (and never costs a reservation).
+   */
+  private async validate(req: SubmitRequest): Promise<{ input: JobInput; artifact: Buffer }> {
     const cfg = this.d.cfg;
     function bad(m: string): never { throw new ServiceError(400, "bad_request", m); }
     const str = (k: keyof SubmitRequest, max = 200): string => {
@@ -190,10 +195,22 @@ export class Service {
     if (mode === "worker" && language === "typescript" && !cfg.worker.pipeCmd.typescript) bad("worker mode does not support typescript bots yet; use mode:\"connect\"");
 
     const b64 = str("artifactTgzBase64", Math.ceil(cfg.limits.maxArtifactBytes * 1.4) + 1024);
-    const artifact = Buffer.from(b64, "base64");
+    const compact = b64.replace(/\s+/g, "");
+    if (compact.length === 0 || compact.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) bad("artifactTgzBase64 is not valid base64");
+    const artifact = Buffer.from(compact, "base64");
     if (artifact.length === 0) bad("artifactTgzBase64 is empty");
     if (artifact.length > cfg.limits.maxArtifactBytes) bad(`artifact too large (max ${cfg.limits.maxArtifactBytes} bytes)`);
-    return { input: { userId, botName, language, entry, requirementsFile, track, hands, lanes, idempotencyKey, mode }, artifact };
+    // a gzip tarball that actually contains the entry file (and the requirements file, if named); stops early, never unpacks
+    try {
+      const scan = await scanTgz(artifact, [entry, ...(requirementsFile ? [requirementsFile] : [])]);
+      if (scan.missing.includes(entry.replace(/^(\.\/)+/, ""))) bad(`entry file ${entry} not found in the archive`);
+      if (requirementsFile && scan.missing.includes(requirementsFile.replace(/^(\.\/)+/, ""))) bad(`requirements file ${requirementsFile} not found in the archive`);
+    } catch (e) {
+      if (e instanceof ArchiveError) bad(e.message);
+      throw e;
+    }
+    // hands are echoed back rounded up to whole deals (6 hands), so the job says what is actually played
+    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode }, artifact };
   }
 
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
@@ -222,7 +239,8 @@ export class Service {
   async submit(req: SubmitRequest, asUser?: string): Promise<{ job: Job; deduped: boolean }> {
     // public players only get worker mode (no network at all); connect mode needs the sandbox on the arena's network
     if (asUser) req = { ...req, mode: "worker", userId: asUser, idempotencyKey: typeof req.idempotencyKey === "string" ? `${asUser}:${req.idempotencyKey}`.slice(0, 200) : req.idempotencyKey };
-    const { input, artifact } = this.validate(req);
+    const { input, artifact } = await this.validate(req);
+    if (asUser) input.playerId = asUser;
     const existing = await this.d.store.byKey(input.idempotencyKey);
     if (existing) return { job: existing, deduped: true };
 

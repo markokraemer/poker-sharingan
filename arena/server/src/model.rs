@@ -238,6 +238,10 @@ pub struct RunRecord {
     pub name: String,
     pub match_id: String,
     pub seed: String,
+    /// Hosted worker results only: `"frozen"` (played on the track's public seed) or `"fresh"` (a secret per-run seed
+    /// the bot could not know in advance). Absent on server-played runs (always the track seed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deals: Option<String>,
     pub hands_planned: u32,
     pub hands_done: u32,
     /// "running" | "finished" | "aborted"

@@ -10,6 +10,8 @@ export interface Env { UPSTREAM: string; EDGE_SECRET: string }
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    // The API has no page of its own: send people who open it in a browser to the docs.
+    if (url.pathname === "/" && (req.method === "GET" || req.method === "HEAD")) return Response.redirect("https://sharingan.poker/docs/", 302);
     const target = new URL(url.pathname + url.search, env.UPSTREAM);
     const headers = new Headers(req.headers);
     headers.delete("host");

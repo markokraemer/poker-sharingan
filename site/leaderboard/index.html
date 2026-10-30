@@ -31,7 +31,7 @@
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span class="p">Score is mbb per game (1000 mbb = 1 big blind), luck-corrected, ± 95% interval. Higher is better.</span></div>
-  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. SHARINGAN-1 sits at 0 on the sharingan-1 track by definition: that track is five copies of it.</span></div>
+  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. On the sharingan-1 track SHARINGAN-1 plays five copies of itself, so its true score is 0; the ± is the noise of 20,004 hands. ✓ = verified: our machines ran the bot.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span id="status" class="p muted">LOADING...</span></div>
   <div class="l"></div>
@@ -50,10 +50,8 @@
   function render() {
     const st = document.getElementById("status"), el = document.getElementById("board");
     const k = KEY[sortBy], other = sortBy === "sharingan-1" ? "ladder-v1" : "sharingan-1", ko = KEY[other];
-    const list = rows.filter(r => r[KEY["sharingan-1"]] || r[KEY["ladder-v1"]]).sort((a, b) => {
-      const x = a[k] ? a[k].mbb : -Infinity, y = b[k] ? b[k].mbb : -Infinity;
-      return y - x;
-    });
+    const v = (r, key) => r[key] ? r[key].mbb : -Infinity;
+    const list = rows.filter(r => r[KEY["sharingan-1"]] || r[KEY["ladder-v1"]]).sort((a, b) => (v(b, k) - v(a, k)) || (v(b, ko) - v(a, ko)) || 0);
     const subs = list.filter(r => !r.house).length;
     const tog = t => '<a href="#" data-sort="' + t + '"' + (t === sortBy ? ' class="red"' : "") + ">" + (t === sortBy ? "[" + t + "]" : t) + "</a>";
     st.className = "p muted";
@@ -62,7 +60,7 @@
     list.forEach((r, i) => {
       const name = String(r.name == null ? r.player_id : r.name).replace(/^house:/, "");
       const nm = window.esc(name) + (r.house ? ' <span class="muted">REFERENCE</span>' : "");
-      const ok = r.verified ? '<span class="red">✓</span>' : "";
+      const t = r.tracks && r.tracks[sortBy], ok = t && t.verified ? '<span class="red">✓</span>' : "";
       const hands = (r.hands || 0).toLocaleString("en-US");
       h += row([String(i + 1), nm, cell(r[k]), cell(r[ko]), hands, ok], r.house ? "muted" : "",
         cell(r[k]) + " vs " + sortBy + ", " + cell(r[ko]) + " vs " + other + ", " + hands + " hands");

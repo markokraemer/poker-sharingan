@@ -119,7 +119,7 @@ pub async fn create_run(
     };
     let rec = app.store.get_player(&pid)?.ok_or_else(|| ApiError::not_found("player"))?;
     if !who.is_admin() && !runner && who.owner_id() != rec.player_id {
-        return Err(ApiError::forbidden("you can only run your own bot (admins can run any, including house bots)"));
+        return Err(ApiError::forbidden(crate::api::YOUR_OWN_BOT));
     }
     let mut panel = Vec::new();
     for k in t.panel {
@@ -168,6 +168,7 @@ pub async fn create_run(
         name: rec.name.clone(),
         match_id: rt.id.clone(),
         seed,
+        deals: None,
         hands_planned: hands,
         hands_done: 0,
         status: "running".into(),

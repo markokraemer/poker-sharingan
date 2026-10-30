@@ -21,6 +21,8 @@ export interface JobInput {
   lanes?: number;
   idempotencyKey: string;        // one job per key; the credit reservation is keyed by it too
   mode: JobMode;
+  /** Set when a public player submits with their own arena token: the run is credited to that player (worker mode). */
+  playerId?: string;
 }
 
 export interface Job {
@@ -53,6 +55,8 @@ export interface Job {
   settled: boolean;
   botLogTail?: string;
   resultAck?: Record<string, unknown>;
+  /** worker mode: the secret deal seed (`run:<64 hex>`) of this run. Set only when the job is over; never shown before. */
+  dealsSeed?: string;
 }
 
 export interface JobStore {

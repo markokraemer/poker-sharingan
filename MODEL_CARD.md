@@ -20,28 +20,57 @@ model-index:
 
 # SHARINGAN-1: the Poker Sharingan house bot
 
-SHARINGAN-1 is the reference bot at the top of the [Poker Sharingan](https://sharingan.poker) arena: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
+SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poker) arena, the #1 open-source poker bot: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
 **trained strategy files** and the **card abstraction tables**. Code, training and evaluation tooling: https://github.com/markokraemer/poker-sharingan
 (Rust workspace, "library: custom": there is no `transformers`/`pytorch` loader; the weights are read by the Rust crates `blueprint` and `bench`).
 
-> TODO(final): this card describes the checkpoints evaluated so far. Fill in the final-run row of every table once the full-budget run is evaluated and uploaded.
+SHARINGAN-1 = blueprint **C@2e10** (`medium` bet sizes) + turn/river real-time search: the bot the arena runs and every result on the leaderboard's
+`sharingan-1` track is played against. The full-budget run (1.83e11 iterations) is training and will be released as SHARINGAN-2.
 
 ## What is in this repository
 
-| file | format | size | what it is |
-|---|---|---|---|
-| `buckets-200.tar` | raw u16 tables + `meta.txt` | ~0.28 GB | 200-bucket card abstraction per postflop street (extract to `data/buckets-200/`). Required to use any blueprint. |
-| `search-buckets-500.tar` | raw tables | ~6.4 GB | optional per-flop 500-bucket search abstraction (built, unused by the final config) |
-| `C-medium-4.77e10.plcp` | PLCP1 compact | ~142 GB | blueprint C after 4.77e10 iterations: strongest evaluated compact file |
-| `C-medium-2e10.plcp` | PLCP1 compact | ~125 GB | blueprint C after 2e10 iterations (the bot that played live) |
-| `B-local-2e10.plcp` | PLCP1 compact | ~28 GB | blueprint B (smaller `local` menu), the lightest option |
-| `A-paper-2e10.plcp` | PLCP1 compact | ~187 GB | blueprint A (paper-style menu) |
-| `C-medium-5.55e10/` | PLBP4 full checkpoint + `snapshots.sum` (PLSA1) | ~338 GB + 59 GB | latest C training state; resumable |
-| `C-medium-final.plcp` | PLCP1 compact | TODO(final) | final full-budget checkpoint |
-| `C-medium-final/` | PLBP4 | TODO(final) | final full training state |
+| file | size | what it is |
+|---|---|---|
+| `sharingan-1.plcp.part-*` | 124.7 GB | **SHARINGAN-1**: blueprint C after 2e10 iterations (PLCP1 compact). The bot that played live and runs the arena |
+| `C-medium-4.77e10.plcp.part-*` | 141.7 GB | blueprint C after 4.77e10 iterations: strongest checkpoint evaluated (+3.8 mbb/game vs SHARINGAN-1) |
+| `B-local-2e10.plcp.part-*` | 28.3 GB | blueprint B (smaller `local` menu): the light option for normal machines |
+| `A-paper-2e10.plcp.part-*` | 186.9 GB | blueprint A (paper-style menu) |
+| `buckets-200.tar` | 0.28 GB | the 200-bucket card abstraction for postflop streets. Required by every blueprint |
+| `SHA256SUMS.models`, `SHA256SUMS.parts` | | checksums of the reassembled files and of every part |
 
-Not all rows may be uploaded in the first release; check the file list of this repository. Sizes are from the training archive; intermediate
-and raw checkpoints (A@3.43e10 at 17.0B infosets, 476 GB + 85 GB, and several earlier C states) exist but are not necessarily published.
+Files are split into 25 GB parts for upload. Reassemble and check:
+
+```bash
+pip install -U huggingface_hub
+hf download markokraemer/sharingan-1 --local-dir weights --include "sharingan-1.plcp.part-*" "buckets-200.tar" "SHA256SUMS.*"   # or everything
+cd weights && sha256sum -c --ignore-missing SHA256SUMS.parts
+cat sharingan-1.plcp.part-* > sharingan-1.plcp && sha256sum -c --ignore-missing SHA256SUMS.models && rm sharingan-1.plcp.part-*
+mkdir -p ../data && tar xf buckets-200.tar -C ../data          # -> data/buckets-200/
+```
+
+## Use it
+
+From a clone of [the repo](https://github.com/markokraemer/poker-sharingan) (`RUSTFLAGS="-C target-cpu=native" cargo build --release`). The files are
+memory-mapped: disk is required, RAM only makes it faster.
+
+```bash
+# inference server: POST /v1/act with a hand, get SHARINGAN-1's action (format: sharingan-1/serve/README.md)
+./target/release/sharingan-serve --blueprint weights/sharingan-1.plcp --buckets data/buckets-200 --sizing medium --no-auth
+
+# your own arena with SHARINGAN-1 as the house bot (same scores as the public leaderboard)
+ARENA_BLUEPRINT=$PWD/weights/sharingan-1.plcp ARENA_BUCKETS=tables:$PWD/data/buckets-200 ARENA_SIZING=medium ./target/release/sharingan-arena --port 8080
+
+# duplicate head-to-head of two blueprints, 6-max, 4M deals
+./target/release/pluribus h2h --a weights/C-medium-4.77e10.plcp --sizing-a medium --b weights/sharingan-1.plcp --sizing-b medium \
+    --buckets data/buckets-200 --players 6 --deals 4000000 --threads 32 --warm --out h2h.json
+
+# gauntlet against the built-in bots; trained best response against a frozen blueprint
+./target/release/bench gauntlet --hero compact:weights/sharingan-1.plcp --bucketer tables:data/buckets-200 --sizing medium --deals 20000
+./target/release/pluribus exploit-compact --target weights/sharingan-1.plcp --sizing medium --buckets data/buckets-200 \
+    --players 6 --iters 12000000 --threads 32 --mem-gb 120 --seat all --warm --eval-deals 20000 --seed 1 --out exploit.json
+```
+
+Each blueprint must be loaded with its own menu: `medium` for C and SHARINGAN-1, `local` for B, `paper` for A.
 
 ### Formats
 
@@ -72,9 +101,9 @@ Infoset counts: C reached 12.2B infosets (78% of a 460 GB store); A reached 17.0
 | B | `local` | 2e10 (finished) | ~9.5 h | |
 | C | `medium` | 5.55e10 (stopped) | ~58 h | 180k -> 355k it/s; still improving |
 | A | `paper` | 3.43e10 (stopped) | ~66 h | store full at 17.0B infosets |
-| **C final** | `medium` | TODO(final) | TODO(final) | target 1.83e11 iterations (about 8 days of total compute, matching the paper) |
+| C final (SHARINGAN-2) | `medium` | training | | target 1.83e11 iterations (about 8 days of total compute, matching the paper) |
 
-Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each; total compute spend so far about EUR 480. TODO(final): add the final run's hours and cost.
+Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each; total compute for the released checkpoints about EUR 480.
 
 ## Evaluation
 
@@ -89,9 +118,7 @@ All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100),
 | search (turn+river) vs 5 x C@2e10 | +87 +- 27 |
 | search (turn+river) vs rule bots chart6 / loose / tight | +59 / +108 / +66 |
 | Open Poker live, final config, 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |
-| offline vs SvanBot at its live budget: 1 SvanBot vs 5 x blueprint / 1 blueprint vs 5 x SvanBot | SvanBot -46.9 +- 21.2 / blueprint +56.7 +- 34.7 |
-| **C@final vs C@4.77e10** | TODO(final) |
-| **C@final exploiter** | TODO(final) |
+| offline vs SvanBot at its live budget, C@4.77e10 blueprint: 1 SvanBot vs 5 x blueprint / 1 blueprint vs 5 x SvanBot | SvanBot -46.9 +- 21.2 / blueprint +56.7 +- 34.7 |
 
 ## Intended use
 

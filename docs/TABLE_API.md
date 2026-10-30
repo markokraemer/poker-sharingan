@@ -1,4 +1,4 @@
-# Table API — contract for running the Pluribus bot (and any other bot or human) in 6-max NLHE
+# Table API: the Poker Sharingan arena protocol (6-max no-limit hold'em, bots and humans)
 
 This is the contract the bot needs to play **flawlessly** and to be **measured rigorously**: AIVAT and duplicate
 dealing, as in the paper. The server is the single source of truth. Clients (bots, human UIs) only send actions.
@@ -118,15 +118,22 @@ Auth: `Authorization: Bearer <token>`. Tokens are per player (bot) or per admin.
 | `GET` | `/v1/tables/{table_id}` | | `Table` + the current public `HandState` |
 | `POST` | `/v1/tables/{table_id}/seats/{seat}` | `{player_id}` | `Seat` (sit down; admin or the player) |
 | `DELETE` | `/v1/tables/{table_id}/seats/{seat}` | | stand up (takes effect after the current hand) |
-| `POST` | `/v1/matches` | `{table_config, participants[6], hands_planned, duplicate?, seed?}` | `Match` (server creates and seats the table) |
-| `POST` | `/v1/matches/{match_id}/start` / `pause` / `abort` | | `Match` |
+| `POST` | `/v1/matches` | `{table_config, participants[6], hands_planned, duplicate?, seed?}` | `Match` (server creates and seats the table). Every non-house participant must be the caller's own bot (`403 forbidden`, "you can only run your own bot"); admins may enter any bot. |
+| `POST` | `/v1/matches/{match_id}/start` / `resume` / `pause` / `abort` | | `Match`. `start`/`resume` answer `409 not_connected` (`details.player_id`) while a non-house participant has no live `/v1/play` socket (a webhook bot counts as connected); admins are exempt and the match then plays on with auto-folds for the missing bot. |
 | `GET` | `/v1/matches/{match_id}` | | `Match` + `standings` (§9) |
-| `GET` | `/v1/matches/{match_id}/hands` | `?after_hand_no=&limit=500` | `HandHistory[]` (§8), paginated, **all hole cards** |
+| `GET` | `/v1/matches/{match_id}/hands` | `?after_hand_no=&limit=500` | `HandHistory[]` (§8), paginated, **all hole cards**. `limit` defaults to and is capped at 500; `limit=0` is `400 bad_request` |
 | `GET` | `/v1/matches/{match_id}/hands.jsonl` | | full export, one `HandHistory` per line (streamed) |
 | `GET` | `/v1/hands/{hand_id}` | | `HandHistory` |
 | `GET` | `/v1/hands/{hand_id}/events` | | the exact WebSocket event list of that hand (for replay or debug) |
 
-Errors are `{ "error": { "code": "...", "message": "...", "details": {...} } }` with an HTTP status (§10).
+Errors are `{ "error": { "code": "...", "message": "...", "details": {...} } }` with an HTTP status (§10), always `application/json`: that includes
+malformed or incomplete JSON bodies and bad query/path parameters (`400 bad_request`), a body that is not `application/json` (`415 unsupported_media_type`),
+unknown routes (`404 not_found`) and wrong methods (`405 method_not_allowed`, with `Allow`).
+
+Player names (`POST /v1/players`, `/v1/bots`) are 1 to 64 characters (not bytes) after trimming and must not contain control characters (NUL, newlines, tabs), bidirectional
+overrides/isolates (U+202A-202E, U+2066-2069), zero-width or invisible formatting characters (U+200B-200F, U+2028/2029, U+2060-2064, U+FEFF, U+061C): `400 bad_request`.
+Accents, emoji and other ordinary Unicode are fine. The same rule applies to `owner` (at most 128 characters) and a match `seed` (1-256 characters). `owner` is a free-text label, not an ownership proof.
+`DELETE /v1/tables/{id}` on an already closed table is idempotent (`200`, `status: "closed"`).
 
 ---
 
@@ -157,6 +164,7 @@ type Envelope = {
 | `act` | `{hand_id, decision_id, type, to?}` | answer to `your_turn` (exactly one per `decision_id`) |
 | `ping` | `{}` | keep-alive every 15 s (the server answers `pong`) |
 | `leave` | `{table_id}` | stand up after the current hand |
+| `next_hand` | `{}` (envelope `table_id`) | free tables only: end the pause between hands now (`TableConfig.hand_delay_ms`). A human UI sets a long `hand_delay_ms` and sends `next_hand` when the player is ready |
 
 `act` rules: `decision_id` must echo `your_turn.decision_id`. A duplicate `act` with the same `decision_id` is
 ignored (idempotent). `to` is required for `raise`/`bet`. For `call` it is optional; the server computes it.
@@ -387,7 +395,13 @@ policy probabilities.
 
 | code | http | meaning |
 |---|---|---|
+| `bad_request` | 400 | malformed JSON, missing or mistyped field, bad query parameter, invalid value (also the status of what axum would call 422) |
 | `unauthorized` | 401 | bad/missing token |
+| `forbidden` | 403 | not allowed, e.g. entering someone else's bot in a match or run |
+| `not_found` | 404 | unknown route or entity |
+| `method_not_allowed` | 405 | |
+| `unsupported_media_type` | 415 | body is not `application/json` |
+| `not_connected` | 409 | a non-house participant has no live `/v1/play` socket (match `start`/`resume`, benchmark runs) |
 | `not_your_turn` | 409 | `act` without a pending `your_turn` |
 | `stale_decision` | 409 | `decision_id` already answered or expired |
 | `illegal_action` | 422 | action type not in `legal` |
@@ -470,32 +484,6 @@ scripted actions, plus these vectors:
 
 ---
 
-## 13. What our bot does with this, and what still has to be built on our side
-
-**Already true.** The bot's NLHE engine (`engine/nlhe`) implements exactly the rules in §6: `to` semantics,
-`min_raise_to = current_bet + max(last full raise, bb)`, a short all-in does not reopen betting, the odd chip goes
-left of the button, and a fold when check is free is treated as a check. The Open Poker client
-(`arena/openpoker`) already shows the pattern it uses:
-* it rebuilds its own engine from the server's events and cross-checks stacks and pot on every event;
-* it runs the blueprint or turn/river search with a hard 5 s budget and a blueprint fallback;
-* it clamps each action to the legal set;
-* it applies a stack guard and a reset above 150 bb, and writes a full decision trace.
-
-**To build once this API exists** (about a day):
-1. **Protocol client** `arena/tableapi`, a sibling of `arena/openpoker`: WebSocket client for §4/§5, `decision_id`
-   handling, seq-gap detection with `hello{resume}` resync, reconnect, and mapping `your_turn` to the existing
-   session/engine/policy stack.
-2. **Live AIVAT**: Open Poker hides folded cards, so the live analyzer only does an all-in luck adjustment today.
-   With `hand_end.hole_cards` and `runout` (§5.4, §8), compute full AIVAT per hand from our logged policy
-   probabilities. This is the same estimator as the offline `bench::aivat`.
-3. **Duplicate standings**: aggregate results per `deal_no` across the 6 rotations (§7).
-4. **Conformance run**: play the §12 vectors against the sandbox table before any real match.
-
-**What we need from you:** the `wss://` URL, one bot token per seat we run, and a `match_id` with
-`stack_mode:"reset"`, `starting_stack:10000`, `sb:50`, `bb:100` and `decision_time_ms ≥ 3000`.
-
----
-
 ## 14. Pipe protocol and the match worker (high-throughput evals)
 
 Over WebSocket a bot plays about 200 hands/s; in-process about 4,800. For evals at scale a job runs in one isolated
@@ -533,7 +521,7 @@ Unknown message types and unknown fields are ignored in both directions. A bot m
 
 ### 14.3 Failure handling (what a result means)
 
-* **Decision timeout** (`--decision-timeout-ms`, default 5000, measured from sending `your_turn`): the decision is played as check-if-free-else-fold with
+* **Decision timeout** (`--decision-timeout-ms`, default 5000, measured from sending `your_turn`; enforced even when the bot floods stdout with noise or an endless line, and the kill never blocks on a process that refuses to die): the decision is played as check-if-free-else-fold with
   `timeout: true`, the bot's process group is **killed** and a **fresh process** takes over for the next decision (hello/welcome again; it has lost its state).
   After `--max-restarts` (default 3) restarts the lane is dead.
 * **Crash** (exit, EOF, broken pipe, `bye`, a line over 4 MiB, no `hello` in time, spawn failure): the lane is dead at once. A dead lane is a **forfeit**: the
@@ -545,7 +533,7 @@ Unknown message types and unknown fields are ignored in both directions. A bot m
 ### 14.4 `sharingan-arena run`
 
 ```
-sharingan-arena run --bot "<command>" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S]
+sharingan-arena run --bot "<command>" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S | --seed-file F]
     [--out result.json] [--sign-key-file F] [--player-id ID] [--decision-timeout-ms 5000] [--startup-timeout-ms 30000]
     [--max-restarts 3] [--aivat full|cards|off] [--hands-out FILE] [--quiet]
 ```
@@ -556,7 +544,14 @@ track's frozen panel and seed (`bench:<track>:v<version>`), deal `d` with its bu
 deals, house-bot randomness `mix(mix(seed, hand_no), seat)` and the common-random-number stream per deal, `hands` rounded up to whole deals (default 20,000 -> 20,004), AIVAT with the bench
 `EquityEstimator` as in §9. A server run of a remote bot that checks/calls and a worker run of the same bot give the identical chips and duplicate score (tested);
 the AIVAT estimate differs only by the preflop Monte-Carlo noise of the equity sampler. Results do not depend on `--lanes` (a lane plays blocks `L, L+N, ...`), nor
-on the bot's language. `--seed S` replaces the track seed (other deals: for experiments, not comparable, and refused by `POST /v1/results`).
+on the bot's language. `--seed S` replaces the track seed (other deals: for experiments, not comparable, and refused by `POST /v1/results` unless it has the `run:<hex>` form below).
+
+**Fresh secret deals (hosted runs).** The track seed is public and past deals are downloadable from hand histories, so a verified hosted run must not be played on it.
+`--seed-file F` reads the seed from a file (contents trimmed; unreadable or empty is exit code 2, nothing runs) and takes precedence over `--seed`. The hosted runner draws a new
+seed per job, `run:<64 hex>` (at least 32 hex characters are accepted), writes it root-only (mode 0400, e.g. `/opt/sharingan/run.seed`) where the bot's uid cannot read it, and passes only the path.
+The worker never forwards the seed to the bot: not in its argv or environment (the worker also strips `ARENA_ADMIN_TOKEN`, `ARENA_RUNNER_TOKEN`, `ARENA_WORKER_KEYS`, `ARENA_DATABASE_URL` from it), and no pipe message carries it:
+for any seed other than the track seed the `hand_id` prefix is `run-<16 hex>`, a one-way hash (for the track seed it stays `<seed>-h<n>`). `result.json` contains the seed, so it must be written where the bot cannot read it, and
+the bot must be gone when it is published. A finished run's seed may be public (anyone can then re-simulate its deals).
 `--hands-out` writes one JSON line per hand (`hand_no, deal_no, rotation, deck_digest, nets`).
 
 `sharingan-arena pipe-house <name>` is a reference bot on the pipe protocol (any house bot; `sharingan-1` with `ARENA_BLUEPRINT`): it rebuilds the engine state from each `your_turn`.
@@ -591,11 +586,11 @@ unset means no result is ever accepted.
 | status | when |
 |---|---|
 | `401 invalid_signature` | unsigned, wrong key, unknown `key_id`, any member changed after signing, no keys configured |
-| `400` | wrong `schema`, `panel_version`, `panel` or `seed` (a verified result is played on the frozen deals), bad `run_id`, `hands != hands_planned`, non-finite score, no `player_id` |
+| `400` | wrong `schema`, `panel_version`, `panel`, a `seed` that is neither the track seed (`deals: "frozen"`) nor `run:<32-128 hex>` (`deals: "fresh"`), bad `run_id`, `hands != hands_planned`, non-finite score, no `player_id` |
 | `404` | unknown track or player |
 | `409 duplicate_result` | `run_id` already accepted (replay) |
 | `409 blueprint_mismatch` | this arena has a SHARINGAN-1 blueprint and the worker's `blueprint_fingerprint` differs |
-| `201` | stored as a finished benchmark run: `verified: true, hosted: true`, `mbb_per_game`, `ci95_mbb`, `method`, `hands_done`; the response adds `key_id` and `forfeit_hands` |
+| `201` | stored as a finished benchmark run: `verified: true, hosted: true`, `seed`, `deals: "frozen"\|"fresh"`, `mbb_per_game`, `ci95_mbb`, `method`, `hands_done`; the response adds `key_id` and `forfeit_hands` |
 
 The run is readable at `GET /v1/benchmarks/{track}/runs/{run_id}` and the leaderboard (§12b item 15) counts it like any run (`tracks[track].verified`, `vs_ladder_v1`, `?track=`; the latest finished run per bot and track counts).
 

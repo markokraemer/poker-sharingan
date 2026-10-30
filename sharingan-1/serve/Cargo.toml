@@ -23,6 +23,7 @@ search = { path = "../search" }
 blueprint = { path = "../blueprint" }
 abstraction = { path = "../abstraction" }
 axum = "0.7"
+ureq = { version = "2.10", features = ["json"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
 
 [dev-dependencies]

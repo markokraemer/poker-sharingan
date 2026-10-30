@@ -12,6 +12,10 @@
 //   GET  /v1/jobs?userId=U                recent jobs
 //   GET  /v1/jobs/:id                     status, progress, result, cost
 //   POST /v1/jobs/:id/abort
+//
+// Every response carries CORS headers (any origin: auth is a bearer token, never a cookie) and OPTIONS is answered 204
+// without auth, so the sharingan.poker web page can call the public routes (/v1/jobs*, /v1/quota) straight from the browser.
+// A public player (arena bot token) gets publicJobView(); the service token gets the full jobView().
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { ArenaClient } from "./arena.ts";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -19,7 +23,14 @@ import type { Config } from "./config.ts";
 import type { Logger } from "./log.ts";
 import { microToUsd } from "./money.ts";
 import { Service, ServiceError } from "./service.ts";
-import type { Job } from "./store.ts";
+import { TERMINAL, type Job } from "./store.ts";
+
+export const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+  "access-control-allow-headers": "authorization, content-type",
+  "access-control-max-age": "86400",
+} as const;
 
 export function jobView(j: Job) {
   return {
@@ -52,6 +63,32 @@ export function jobView(j: Job) {
     cogs_micro: j.cogsMicro ?? null,
     platinum_usd: j.platinumUsd ?? null,
     bot_log_tail: j.botLogTail ?? null,
+    deals_seed: TERMINAL.has(j.status) ? j.dealsSeed ?? null : null,   // secret while the run is in flight
+    created_at: new Date(j.createdAt).toISOString(),
+    finished_at: j.finishedAt ? new Date(j.finishedAt).toISOString() : null,
+  };
+}
+
+/** What a public player needs to see about their own job, and nothing about our sandboxes, money or config. */
+export function publicJobView(j: Job) {
+  const ours = j.status === "failed" && j.errorClass !== "bot";   // infrastructure failure: details stay in our logs
+  return {
+    id: j.id,
+    status: j.status,
+    bot_name: j.input.botName,
+    track: j.input.track,
+    hands: j.input.hands,
+    hands_total: j.handsTotal ?? j.input.hands,
+    hands_done: j.handsDone ?? 0,
+    mbb_per_game: j.mbbPerGame ?? null,
+    ci95_mbb: j.ci95Mbb ?? null,
+    verified: j.verified ?? false,
+    forfeit_hands: j.forfeitHands ?? null,
+    error: ours ? "internal error while running your bot; it does not count against your quota, please retry" : j.error ?? null,
+    bot_log_tail: j.botLogTail ?? null,
+    run_id: j.runId ?? null,
+    arena_player_id: j.arenaPlayerId ?? null,
+    deals_seed: TERMINAL.has(j.status) ? j.dealsSeed ?? null : null,
     created_at: new Date(j.createdAt).toISOString(),
     finished_at: j.finishedAt ? new Date(j.finishedAt).toISOString() : null,
   };
@@ -99,7 +136,7 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
 
   const send = (res: ServerResponse, code: number, body: unknown) => {
     const text = JSON.stringify(body);
-    res.writeHead(code, { "content-type": "application/json", "content-length": Buffer.byteLength(text) });
+    res.writeHead(code, { ...CORS_HEADERS, "content-type": "application/json", "content-length": Buffer.byteLength(text) });
     res.end(text);
   };
   const json = async (req: IncomingMessage, limit = 64 * 1024): Promise<any> => {
@@ -112,6 +149,9 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
       const url = new URL(req.url ?? "/", "http://x");
       const path = url.pathname;
       const method = req.method ?? "GET";
+
+      // CORS preflight: no auth (browsers never send credentials on it)
+      if (method === "OPTIONS") { res.writeHead(204, { ...CORS_HEADERS, "content-length": 0 }); return res.end(); }
 
       if (path === "/healthz") return send(res, 200, { ok: true, backend: svc.d.platinum.kind, in_flight: svc.inFlight() });
       if (path === "/readyz") {
@@ -151,17 +191,17 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
       }
       if (method === "POST" && path === "/v1/jobs") {
         const { job, deduped } = await svc.submit(await json(req, jobBodyLimit), player);
-        return send(res, deduped ? 200 : 202, { id: job.id, status: job.status, deduped, reserved_micro: job.reservedMicro });
+        return send(res, deduped ? 200 : 202, { id: job.id, status: job.status, deduped, hands: job.input.hands, ...(player ? {} : { reserved_micro: job.reservedMicro }) });
       }
       if (method === "GET" && path === "/v1/jobs") {
         const userId = player ?? url.searchParams.get("userId");
         if (!userId) throw new ServiceError(400, "bad_request", "userId required");
-        return send(res, 200, { jobs: (await svc.listJobs(userId, Number(url.searchParams.get("limit") ?? 20))).map(jobView) });
+        return send(res, 200, { jobs: (await svc.listJobs(userId, Number(url.searchParams.get("limit") ?? 20))).map(player ? publicJobView : jobView) });
       }
       if (method === "GET" && (m = path.match(/^\/v1\/jobs\/([\w-]+)$/))) {
         const j = await svc.getJob(m[1]!);
         if (j && player && j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } });
-        return j ? send(res, 200, jobView(j)) : send(res, 404, { error: { code: "not_found", message: "no such job" } });
+        return j ? send(res, 200, player ? publicJobView(j) : jobView(j)) : send(res, 404, { error: { code: "not_found", message: "no such job" } });
       }
       if (method === "POST" && (m = path.match(/^\/v1\/jobs\/([\w-]+)\/abort$/))) {
         if (player) { const j = await svc.getJob(m[1]!); if (!j || j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } }); }

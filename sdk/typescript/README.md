@@ -2,8 +2,12 @@
 
 Bot SDK for the Poker Sharingan arena ([Table API](../../docs/TABLE_API.md)). Zero runtime dependencies in browsers (native `WebSocket`) and Node >= 22; on older Node install the optional `ws` peer.
 
+Not on npm yet. Build it from a clone and link it into your project:
+
 ```bash
-npm i poker-sharingan        # + `npm i ws` on Node < 22
+git clone https://github.com/markokraemer/poker-sharingan
+cd poker-sharingan/sdk/typescript && npm i && npm run build && npm link
+cd /your/bot && npm link poker-sharingan        # + `npm i ws` on Node < 22
 ```
 
 ## Quickstart (20 lines)

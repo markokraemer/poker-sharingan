@@ -177,7 +177,7 @@ export function loadConfig(env: Env = process.env): Config {
       defaultMode: defaultMode as JobMode,
       cmdTemplate: str(
         "WORKER_CMD_TEMPLATE",
-        "sharingan-arena run --bot {bot} --track {track} --hands {hands} --lanes {lanes} --out {out} --sign-key-file {keyfile} --player-id {player_id}",
+        "sharingan-arena run --bot {bot} --track {track} --hands {hands} --lanes {lanes} --out {out} --sign-key-file {keyfile} --player-id {player_id} --seed-file {seedfile}",
       ) as string,
       pipeCmd: {
         python: str("PIPE_CMD_PYTHON", "sharingan pipe") as string,

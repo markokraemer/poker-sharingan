@@ -3,7 +3,8 @@
 //! A worker (`sharingan-arena run --sign-key-file`) plays a benchmark on operator-controlled
 //! infrastructure and signs its `result.json` with HMAC-SHA256. The runner/admin posts it here; if the
 //! signature matches one of `ARENA_WORKER_KEYS` and the result is for the track's frozen panel and seed,
-//! it is stored as a finished benchmark run with `verified: true, hosted: true`, which the leaderboard
+//! it is stored as a finished benchmark run with `verified: true, hosted: true`
+//! (`deals: "frozen"` on the track seed, `"fresh"` on a per-run `run:<hex>` seed), which the leaderboard
 //! picks up like any other run.
 
 use crate::benchmarks;
@@ -18,6 +19,18 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde_json::{json, Value};
 use std::sync::Arc;
+
+pub const MIN_RUN_SEED_HEX: usize = 32;
+pub const MAX_RUN_SEED_HEX: usize = 128;
+
+/// A per-run secret seed of a hosted run: `run:` + 32..128 hex characters. The runner draws it fresh for every job and
+/// keeps it from the bot until the run is over, so the deals cannot be known (or tabulated) in advance.
+pub fn is_run_seed(s: &str) -> bool {
+    match s.strip_prefix("run:") {
+        Some(h) => (MIN_RUN_SEED_HEX..=MAX_RUN_SEED_HEX).contains(&h.len()) && h.bytes().all(|b| b.is_ascii_hexdigit()),
+        None => false,
+    }
+}
 
 fn bad(m: impl Into<String>) -> ApiError {
     ApiError::bad_request(m)
@@ -47,10 +60,17 @@ pub async fn post_result(State(app): State<Arc<AppState>>, headers: HeaderMap, J
     if result["panel"] != json!(panel) {
         return Err(bad("panel is not the track's frozen panel"));
     }
-    let seed = benchmarks::seed_of(t);
-    if result["seed"].as_str() != Some(seed.as_str()) {
-        return Err(bad(format!("seed must be the track seed {seed}: a verified result is played on the frozen deals")));
-    }
+    let track_seed = benchmarks::seed_of(t);
+    let seed = result["seed"].as_str().unwrap_or("").to_string();
+    let deals = if seed == track_seed {
+        "frozen"
+    } else if is_run_seed(&seed) {
+        "fresh"
+    } else {
+        return Err(bad(format!(
+            "seed must be the track seed {track_seed} (frozen deals) or a per-run seed run:<{MIN_RUN_SEED_HEX}-{MAX_RUN_SEED_HEX} hex characters> (fresh secret deals)"
+        )));
+    };
     let run_id = result["run_id"].as_str().unwrap_or("");
     if !(8..=64).contains(&run_id.len()) || !run_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
         return Err(bad("run_id must be 8-64 characters of [A-Za-z0-9_-]"));
@@ -90,6 +110,7 @@ pub async fn post_result(State(app): State<Arc<AppState>>, headers: HeaderMap, J
         name: player.name.clone(),
         match_id: format!("worker:{run_id}"),
         seed,
+        deals: Some(deals.into()),
         hands_planned: planned,
         hands_done: hands,
         status: "finished".into(),

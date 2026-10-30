@@ -395,3 +395,53 @@ fn generator_requests_replay_cleanly() {
         }
     }
 }
+
+/// Public access: any arena player token works, vouched for once by the arena's `GET /v1/me` (cached),
+/// with the public rate limit per player.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn arena_player_tokens() {
+    use axum::http::HeaderMap as H;
+    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+    let mut cfg = need!(base_cfg());
+    let calls = std::sync::Arc::new(AtomicUsize::new(0));
+    let c2 = calls.clone();
+    let fake = axum::Router::new().route(
+        "/v1/me",
+        axum::routing::get(move |h: H| {
+            let c = c2.clone();
+            async move {
+                c.fetch_add(1, SeqCst);
+                match h.get("authorization").and_then(|v| v.to_str().ok()) {
+                    Some("Bearer sk_good") => (axum::http::StatusCode::OK, r#"{"player_id":"p_good","name":"good"}"#),
+                    _ => (axum::http::StatusCode::UNAUTHORIZED, r#"{"error":{"code":"unauthorized"}}"#),
+                }
+            }
+        }),
+    );
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, fake).await.unwrap() });
+    cfg.api_keys = vec![];
+    cfg.arena_auth_url = Some(url);
+    cfg.public_rps = 0.5;
+    cfg.public_burst = 3.0;
+    sharingan_serve::log::set_enabled(false);
+    let core = std::sync::Arc::new(sharingan_serve::decide::Core::new(&cfg).expect("load tiny blueprint"));
+    let app = app(&core);
+    let sp = &gen_spots(12, 1, STD, &|_| true)[0];
+    let body = no_search(sp.req.clone());
+    for i in 0..3 {
+        let (s, _, v) = call(&app, "POST", "/v1/act", Some("sk_good"), &body).await;
+        assert_eq!(s, 200, "request {i}: {v}");
+    }
+    let (s, _, v) = call(&app, "POST", "/v1/act", Some("sk_good"), &body).await;
+    assert_eq!((s, v["error"]["code"].as_str()), (429, Some("rate_limited")), "public burst is 3: {v}");
+    assert_eq!(calls.load(SeqCst), 1, "the arena is asked once per token, then cached");
+    for _ in 0..2 {
+        let (s, _, v) = call(&app, "POST", "/v1/act", Some("sk_bad"), &body).await;
+        assert_eq!((s, v["error"]["code"].as_str()), (401, Some("unauthorized")));
+    }
+    assert_eq!(calls.load(SeqCst), 2, "a rejected token is cached too");
+    let (s, _, _) = call(&app, "POST", "/v1/act", None, &body).await;
+    assert_eq!(s, 401);
+}

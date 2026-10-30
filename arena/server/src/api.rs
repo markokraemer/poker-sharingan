@@ -57,7 +57,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .route("/v1/benchmarks/{track}/runs/{run}/abort", post(crate::benchmarks::abort_run))
         .route("/v1/play", get(crate::ws::play))
         .layer(axum::extract::DefaultBodyLimit::max(app.cfg.max_body_bytes))
-        .layer(axum::middleware::from_fn_with_state(app.clone(), json_413))
+        .layer(axum::middleware::from_fn_with_state(app.clone(), json_errors))
         .layer(axum::middleware::from_fn_with_state(app.clone(), rate_limit))
         .layer(axum::middleware::from_fn(cors))
         .with_state(app)
@@ -100,13 +100,43 @@ async fn rate_limit(State(app): App, req: axum::extract::Request, next: axum::mi
     }
 }
 
-/// Body-limit rejections come back as plain text; give them the contract's error format.
-async fn json_413(State(app): App, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+/// Rejections raised by axum itself (malformed JSON or query string, missing fields, wrong content type,
+/// body limit, unknown route, wrong method) come back as plain text or an empty body. Give every non-JSON
+/// 4xx the contract's error envelope (TABLE_API.md section 10) so clients can always parse `error.code`.
+async fn json_errors(State(app): App, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let res = next.run(req).await;
-    if res.status() == StatusCode::PAYLOAD_TOO_LARGE {
+    let status = res.status();
+    if !status.is_client_error() {
+        return res;
+    }
+    let is_json = res.headers().get(axum::http::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|v| v.starts_with("application/json")).unwrap_or(false);
+    if is_json {
+        return res;
+    }
+    if status == StatusCode::PAYLOAD_TOO_LARGE {
         return ApiError::payload_too_large(app.cfg.max_body_bytes).into_response();
     }
-    res
+    let (parts, body) = res.into_parts();
+    let text = match axum::body::to_bytes(body, 8 * 1024).await {
+        Ok(b) => String::from_utf8_lossy(&b).trim().to_string(),
+        Err(_) => String::new(),
+    };
+    let (code, default_msg): (&'static str, &str) = match status {
+        StatusCode::NOT_FOUND => ("not_found", "no such route"),
+        StatusCode::METHOD_NOT_ALLOWED => ("method_not_allowed", "method not allowed for this route"),
+        StatusCode::UNSUPPORTED_MEDIA_TYPE => ("unsupported_media_type", "send the body as application/json"),
+        _ => ("bad_request", "bad request"),
+    };
+    let msg = if text.is_empty() { default_msg.to_string() } else { text.chars().take(500).collect() };
+    // a body that parses as JSON but misses fields or has the wrong types is a 400 like any other bad request
+    let http = if status == StatusCode::UNPROCESSABLE_ENTITY { 400 } else { status.as_u16() };
+    let mut out = ApiError::new(http, code, msg).into_response();
+    for h in [axum::http::header::ALLOW, axum::http::header::WWW_AUTHENTICATE, axum::http::header::RETRY_AFTER] {
+        if let Some(v) = parts.headers.get(&h) {
+            out.headers_mut().insert(h, v.clone());
+        }
+    }
+    out
 }
 
 /// Load-balancer readiness: 200 only when the database answers and the server is not draining.
@@ -205,6 +235,23 @@ struct RegisterReq {
     secret: Option<String>,
 }
 
+/// Longest player name, in characters (not bytes).
+pub const MAX_NAME_CHARS: usize = 64;
+
+/// Free text that is stored and shown to other users (player names, owners, seeds) must not carry control
+/// characters (NUL, newlines, tabs, escapes), bidirectional overrides/isolates (U+202A-202E, U+2066-2069), zero-width and
+/// invisible formatting characters (U+200B-200F, U+2028/2029, U+2060-2064, U+FEFF, U+061C). Accents, emoji and other ordinary Unicode are fine.
+pub fn check_text(what: &str, s: &str) -> Res<()> {
+    let bad = |c: char| {
+        c.is_control()
+            || matches!(c as u32, 0x200B..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069 | 0x2028 | 0x2029 | 0x2060..=0x2064 | 0xFEFF | 0x061C)
+    };
+    if let Some(c) = s.chars().find(|&c| bad(c)) {
+        return Err(ApiError::bad_request(format!("{what} must not contain control, invisible or bidirectional-override characters (found U+{:04X})", c as u32)));
+    }
+    Ok(())
+}
+
 async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterReq>) -> Res<(StatusCode, Json<Value>)> {
     if !app.cfg.open_registration {
         let p = app.authenticate(&headers)?;
@@ -213,8 +260,20 @@ async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterR
         }
     }
     let name = req.name.trim().to_string();
-    if name.is_empty() || name.len() > 64 {
-        return Err(ApiError::bad_request("name must be 1..64 characters"));
+    if name.is_empty() || name.chars().count() > MAX_NAME_CHARS {
+        return Err(ApiError::bad_request(format!("name must be 1..{MAX_NAME_CHARS} characters")));
+    }
+    check_text("name", &name)?;
+    if let Some(o) = &req.owner {
+        if o.chars().count() > 128 {
+            return Err(ApiError::bad_request("owner must be at most 128 characters"));
+        }
+        check_text("owner", o)?;
+    }
+    for (what, v) in [("webhook_url", &req.webhook_url), ("secret", &req.secret)] {
+        if v.as_deref().map(|x| x.contains('\0')).unwrap_or(false) {
+            return Err(ApiError::bad_request(format!("{what} must not contain NUL bytes")));
+        }
     }
     let kind = req.kind.unwrap_or_else(|| "bot".into());
     if kind != "bot" && kind != "human" {
@@ -502,6 +561,9 @@ fn match_json(rt: &MatchRuntime, app: &AppState) -> Value {
     v
 }
 
+/// Shared by match creation/start and benchmark runs.
+pub const YOUR_OWN_BOT: &str = "you can only run your own bot (admins can run any, including house bots)";
+
 async fn create_match(State(app): App, headers: HeaderMap, Json(req): Json<MatchReq>) -> Res<(StatusCode, Json<Value>)> {
     app.ensure_accepting()?;
     let who = app.authenticate(&headers)?;
@@ -519,6 +581,10 @@ async fn create_match(State(app): App, headers: HeaderMap, Json(req): Json<Match
     for p in &parts {
         let id = if HouseRegistry::looks_like_house(p) { house_id(&app.house.resolve(p)?) } else { p.clone() };
         let rec = app.store.get_player(&id)?.ok_or_else(|| ApiError::not_found(&format!("participant {p}")))?;
+        // A match scores its participants on the leaderboard: nobody may enter someone else's bot.
+        if !rec.house && !who.is_admin() && rec.player_id != who.owner_id() {
+            return Err(ApiError::forbidden(YOUR_OWN_BOT).with(json!({"player_id": rec.player_id})));
+        }
         if !rec.house && ids.contains(&rec.player_id) {
             return Err(ApiError::bad_request(format!("{} appears twice; only house bots can fill several seats", rec.player_id)));
         }
@@ -565,7 +631,16 @@ async fn create_match(State(app): App, headers: HeaderMap, Json(req): Json<Match
             participants: ids,
             hands: req.hands_planned,
             duplicate,
-            seed: req.seed.unwrap_or_else(|| random_hex()[..32].to_string()),
+            seed: match req.seed {
+                Some(sd) => {
+                    if sd.is_empty() || sd.chars().count() > 256 {
+                        return Err(ApiError::bad_request("seed must be 1..256 characters"));
+                    }
+                    check_text("seed", &sd)?;
+                    sd
+                }
+                None => random_hex()[..32].to_string(),
+            },
             aivat,
             block_deals: req.block_deals.unwrap_or(12),
             hide_cards: reveal == "match_end",
@@ -609,10 +684,35 @@ fn controls(app: &AppState, who: &Principal, rt: &MatchRuntime) -> Res<Arc<crate
     Ok(t)
 }
 
+/// Starting (or resuming) a match plays every non-house participant: it must be the caller's own bot, and it
+/// must be connected (a missing bot would just auto-fold and its result would be recorded). Admins are exempt from both.
+fn check_can_start(app: &AppState, who: &Principal, rt: &MatchRuntime) -> Res<()> {
+    if who.is_admin() {
+        return Ok(());
+    }
+    let waiting = matches!(rt.record().status.as_str(), "scheduled" | "paused");
+    for pid in &rt.participants {
+        let rec = app.store.get_player(pid)?.ok_or_else(|| ApiError::not_found(&format!("participant {pid}")))?;
+        if rec.house {
+            continue;
+        }
+        if rec.player_id != who.owner_id() {
+            return Err(ApiError::forbidden(YOUR_OWN_BOT).with(json!({"player_id": rec.player_id})));
+        }
+        let reachable = app.hub.connected(&rec.player_id) || (app.cfg.enable_webhooks && rec.webhook_url.is_some());
+        if waiting && !reachable {
+            return Err(ApiError::conflict("not_connected", "connect to /v1/play with your bot token before starting the match")
+                .with(json!({"player_id": rec.player_id})));
+        }
+    }
+    Ok(())
+}
+
 async fn start_match(State(app): App, headers: HeaderMap, Path(id): Path<String>) -> Res<Json<Value>> {
     let who = app.authenticate(&headers)?;
     let rt = app.match_rt(&id)?;
     controls(&app, &who, &rt)?;
+    check_can_start(&app, &who, &rt)?;
     matches::start(&app, &rt)?;
     Ok(Json(match_json(&rt, &app)))
 }
@@ -670,6 +770,9 @@ fn can_read_match_hands(app: &AppState, who: &Principal, match_id: &str) -> Res<
     Err(ApiError::forbidden("hand histories of a running match are only visible to its owner"))
 }
 
+/// Page size of `GET /v1/matches/{id}/hands` (default and maximum).
+const MAX_HANDS_PAGE: u32 = 500;
+
 #[derive(Deserialize)]
 struct HandsQ {
     #[serde(default)]
@@ -682,7 +785,11 @@ async fn match_hands(State(app): App, headers: HeaderMap, Path(id): Path<String>
     let who = app.authenticate(&headers)?;
     can_read_match_hands(&app, &who, &id)?;
     app.writer.flush().await;
-    let h = app.store.list_hands(&id, q.after_hand_no, q.limit.unwrap_or(500).clamp(1, 5000))?;
+    let limit = q.limit.unwrap_or(MAX_HANDS_PAGE);
+    if limit == 0 {
+        return Err(ApiError::bad_request(format!("limit must be 1..{MAX_HANDS_PAGE}")));
+    }
+    let h = app.store.list_hands(&id, q.after_hand_no, limit.min(MAX_HANDS_PAGE))?;
     Ok(Json(serde_json::to_value(h)?))
 }
 
