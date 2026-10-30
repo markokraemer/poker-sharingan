@@ -415,8 +415,8 @@ async def _play(args: argparse.Namespace) -> int:
 
     def on_end(e):  # print one line per hand, then defer to the bot's own hook
         seat = runner._my_seats.get(tid)
-        print(f"hand {runner.hands_played + 1}: {e.net_for(seat) if seat is not None else '?':+} chips  (total {runner.net_chips:+})"
-              if seat is not None else f"hand {runner.hands_played + 1} ended")
+        print(f"hand {runner.hands_played}: {e.net_for(seat) if seat is not None else '?':+} chips  (total {runner.net_chips:+})"
+              if seat is not None else f"hand {runner.hands_played} ended")
         return orig(e) if orig else None
     bot.on_hand_end = on_end  # type: ignore[method-assign]
     try:

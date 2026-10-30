@@ -47,7 +47,7 @@ Actions: `Action.fold()`, `Action.check()`, `Action.call()`, `Action.raise_to(n)
 ## 3. Try it (seconds, not ranked)
 
 ```bash
-sharingan play mybot.py --vs sharingan-1 --hands 12     # prints every hand
+sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: your chips won or lost
 ```
 
 ## 4. Submit: verified score on the leaderboard
@@ -57,7 +57,7 @@ sharingan submit mybot.py                               # track ladder-v1, 20,00
 sharingan submit mybot.py --track sharingan-1           # the hard track: 5 copies of SHARINGAN-1
 ```
 
-* The first run registers the bot (named after the file) and prints its token `sk_...` on stderr. Save it right away and `export SHARINGAN_TOKEN=sk_...` before every later run (`submit`, `benchmark`, `eval` all read it), so new scores land on the **same leaderboard row**. Without it each run can become a new bot.
+* The first run registers the bot (named after the file) and saves its token in `~/.config/sharingan/tokens.json`; every later `submit`, `benchmark` or `eval` of the same file reuses it, so scores land on the **same leaderboard row**. A new run replaces that bot's score on the track. On another machine pass the token: `export SHARINGAN_TOKEN=sk_...` (it is printed once, on stderr, at registration).
 * The result is the line `mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job ...]`, then `leaderboard: <link>`. A 20,000-hand job takes under a minute.
 * Our machines run the bot in a sandbox: Python, **no network**, 4 CPU, 12 GB. Every run gets fresh secret deals, each replayed from every seat, so luck cancels out.
 * More files or dependencies: put them in a directory, then `sharingan submit botdir/ --entry bot.py --requirements requirements.txt`.
@@ -77,22 +77,23 @@ The bot runs on your machine and plays over a WebSocket. Same score and leaderbo
 curl -s "https://arena.sharingan.poker/v1/leaderboard?track=ladder-v1"     # JSON, ranked by that track
 ```
 
-Each row: `rank`, `name`, `player_id`, `verified`, and per track `tracks.<track>.mbb_per_game` / `.ci95_mbb` / `.hands`. Without `?track=` rows are ranked like the site: sharingan-1, then ladder-v1.
+The answer is `{"track": ..., "min_hands": ..., "rows": [...]}`; each row has `rank`, `name`, `player_id`, and per track `tracks.<track>.mbb_per_game` / `.ci95_mbb` / `.hands` / `.verified`. Without `?track=` rows are ranked like the site: sharingan-1, then ladder-v1.
 
 ## 7. Ask SHARINGAN-1 directly (inference)
 
 Use our bot inside your own code, sim or analysis: send a spot, get its action and probabilities. Any arena token works (10 decisions/s).
 
 ```bash
+export SHARINGAN_TOKEN=$(python3 -c "import json,os; print(next(iter(json.load(open(os.path.expanduser('~/.config/sharingan/tokens.json'))).values()))['token'])")
 curl -s https://arena.sharingan.poker/v1/act -H "authorization: Bearer $SHARINGAN_TOKEN" -H 'content-type: application/json' -d '{
   "small_blind": 50, "big_blind": 100, "button_seat": 3, "hero_seat": 0, "hole_cards": ["Ah", "Kd"], "board": [],
   "players": [{"seat":0,"stack_start":10000},{"seat":1,"stack_start":10000},{"seat":2,"stack_start":10000},
               {"seat":3,"stack_start":10000},{"seat":4,"stack_start":10000},{"seat":5,"stack_start":10000}],
   "history": []}'
-# {"action": {"type": "raise", "to": 250, ...}, "probs": [...], "source": "blueprint", ...}
+# {"action": {"type": "raise", "to": 200, ...}, "probs": [{"type": "raise", "to": 200, "p": 0.42}, ...], "source": "blueprint", ...}
 ```
 
-`history` is every action so far (`{"seat": 1, "type": "raise", "to": 300}`, types `fold` `check` `call` `bet` `raise` `all_in`), `board` holds the cards of the current street, `hero_seat` must be the player to act. Full format: https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md
+The bot plays a mixed strategy: `action` is sampled from `probs`; add `"options": {"sample": false}` for the most likely action, or `"options": {"seed": 1}` to make the draw repeatable. `history` is every action so far (`{"seat": 1, "type": "raise", "to": 300}`, types `fold` `check` `call` `bet` `raise` `all_in`), `board` holds the cards of the current street, `hero_seat` must be the player to act. Full format: https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md
 
 ## Report back to the user
 
