@@ -43,20 +43,17 @@ forfeit_hands, error, bot_log_tail, run_id, arena_player_id, deals_seed, created
 submitted.`) followed by one de-duplicated traceback / log excerpt. Progress lines are removed, and a forfeited or rejected run never
 shows a score line. `bot_log_tail` is de-duplicated the same way.
 
-## Kept bots and the competition final run
+## Kept bots and the competition final table
 
 Every accepted job keeps its upload in Postgres (`job_artifacts`). `GET /v1/jobs/:id/artifact` (service token only, `403` for players)
-returns the exact `.tar.gz` that was submitted. This is what makes the [competition](../../../COMPETITION.md) final run possible:
+returns the exact `.tar.gz` that was submitted. This is what the [competition](../../../COMPETITION.md) final table plays:
 
-1. Rank: at the deadline, save the non-house rows of `GET https://arena.sharingan.poker/v1/leaderboard`, in its default order (score vs SHARINGAN-1). Take about the top 10.
-2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token. Pick the latest job created before the deadline that is
-   `finished`, `verified` and on `track: sharingan-1`. Its `contact` (or an earlier job's) is how to reach the owner.
-3. `GET /v1/jobs/<job id>/artifact > bot.tgz`.
-4. Re-run with the service token: `POST /v1/jobs` with `userId: "final-<player_id>"` (one quota per bot), the original `botName`
-   prefixed `final-`, `language`, `entry`, `requirementsFile`, `track: "sharingan-1"`, `hands: 200000`,
-   `idempotencyKey: "final-<player_id>"` and `artifactTgzBase64` of `bot.tgz`. Every job gets new secret deals.
-5. Rank the final jobs by `mbb_per_game`. They show on the leaderboard as `final-<name>` rows; remove them afterwards with the arena's
-   admin `DELETE /v1/bots/{id}` if wanted.
+1. At the deadline, save the non-house rows of `GET https://arena.sharingan.poker/v1/leaderboard` in its default order (score vs
+   SHARINGAN-1) and take the top 6, one bot per person.
+2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token and pick the latest job created before the
+   deadline that is `finished`, `verified` and on `track: sharingan-1`. Its `contact` (or an earlier job's) reaches the owner.
+3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz`.
+4. Play the six bots against each other at one table, every deal from every seat, in a sandbox without network.
 
 ## Fresh secret deals
 

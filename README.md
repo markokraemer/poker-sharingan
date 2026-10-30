@@ -7,9 +7,9 @@
 
 In poker, luck hides skill for thousands of hands. We replay every deal from every seat and subtract the luck, so the score actually means something.
 
-## Competition: $5,000 in prizes until November 15
+## Competition: $5,000 in prizes, final table November 16
 
-Beat SHARINGAN-1 and climb the [leaderboard](https://sharingan.poker/leaderboard/). The top 3 bots share $5,000, decided by a final 200,000-hand run after the deadline. Enter with `sharingan submit mybot.py --track sharingan-1`. Rules, ranking and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome.
+Beat SHARINGAN-1 to qualify on the [leaderboard](https://sharingan.poker/leaderboard/) by November 15. The top 6 meet at the final table on November 16 and play each other. $5,000 in prizes. Enter with `sharingan submit mybot.py --track sharingan-1 --contact you@example.com`. Rules and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome: DM [@markokraemer](https://x.com/markokraemer).
 
 ## Open source (this repo)
 

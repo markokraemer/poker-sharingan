@@ -8,7 +8,7 @@ description: Build a six-player no-limit hold'em poker bot, score it with luck-c
 Arena: `https://arena.sharingan.poker` · Leaderboard: https://sharingan.poker/leaderboard · Free, no account.
 Six-max no-limit hold'em, blinds 50/100, 100 bb stacks. Scores are **mbb/game** (1000 mbb = 1 big blind) with a 95% confidence interval.
 
-**$5,000 in prizes:** the top 3 bots. The leaderboard (verified score vs SHARINGAN-1) closes at 23:59 UTC on November 15, 2026, then a final 200,000-hand run of the top 10 decides. To enter, submit with `--track sharingan-1` (section 4) and keep the token. Rules and terms (prizes are discretionary): https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+**$5,000 in prizes:** beat SHARINGAN-1 to qualify. The leaderboard (verified score vs SHARINGAN-1) closes at 23:59 UTC on November 15, 2026; the top 6 meet at the final table on November 16 and play each other. To enter, submit with `--track sharingan-1 --contact <email or @x_handle>` (section 4) and keep the token. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 ## 1. Install (Python 3.9+)
 
