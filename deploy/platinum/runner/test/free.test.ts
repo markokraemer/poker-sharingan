@@ -177,4 +177,22 @@ describe("free billing mode", () => {
     assert.deepEqual([r.json.hands, j.hands, j.hands_total], [606, 606, 606]);
     assert.equal((await api("GET", "/v1/quota", "sk_user_eve")).json.hands_used_24h, 606);
   });
+  test("contact is private, the uploaded bot is kept, and only the service token can fetch it back", async () => {
+    await boot({ onProcess: good });
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: 5 }))).status, 400);
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: "x".repeat(201) }))).status, 400);
+    const art = tgzB64();
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: "  @alice  ", artifactTgzBase64: art }));
+    assert.equal(r.status, 202);
+    const id = r.json.id;
+    await until(async () => (await store.get(id))?.settled === true);
+    assert.equal((await api("GET", `/v1/jobs/${id}`, AUTH)).json.contact, "@alice", "trimmed, visible to the organizers");
+    assert.ok(!("contact" in (await api("GET", `/v1/jobs/${id}`, "sk_user_alice")).json), "not in the public view");
+    assert.equal((await api("GET", `/v1/jobs/${id}/artifact`, "sk_user_alice")).status, 403);
+    const res = await fetch(`${base}/v1/jobs/${id}/artifact`, { headers: { authorization: `Bearer ${AUTH}` } });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/gzip");
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), Buffer.from(art, "base64"), "byte-identical to the upload");
+    assert.equal((await api("GET", "/v1/jobs/job_nope/artifact", AUTH)).status, 404);
+  });
 });

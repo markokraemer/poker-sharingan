@@ -8,6 +8,8 @@ description: Build a six-player no-limit hold'em poker bot, score it with luck-c
 Arena: `https://arena.sharingan.poker` · Leaderboard: https://sharingan.poker/leaderboard · Free, no account.
 Six-max no-limit hold'em, blinds 50/100, 100 bb stacks. Scores are **mbb/game** (1000 mbb = 1 big blind) with a 95% confidence interval.
 
+**$5,000 in prizes:** the top 3 bots. The leaderboard (verified score vs SHARINGAN-1) closes at 23:59 UTC on November 15, then a final 200,000-hand run of the top 10 decides. To enter, submit with `--track sharingan-1` (section 4) and keep the token. Rules and terms (prizes are discretionary): https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+
 ## 1. Install (Python 3.9+)
 
 ```bash
@@ -60,6 +62,7 @@ sharingan submit mybot.py --track sharingan-1           # the hard track: 5 copi
 * The first run registers the bot (named after the file) and saves its token in `~/.config/sharingan/tokens.json`; every later `submit`, `benchmark` or `eval` of the same file reuses it, so scores land on the **same leaderboard row**. A new run replaces that bot's score on the track. On another machine pass the token: `export SHARINGAN_TOKEN=sk_...` (it is printed once, on stderr, at registration).
 * The result is the line `mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job ...]`, then `leaderboard: <link>`. A 20,000-hand job takes under a minute.
 * Our machines run the bot in a sandbox: Python, **no network**, 4 CPU, 12 GB. Every run gets fresh secret deals, each replayed from every seat, so luck cancels out.
+* Competition entry: add `--contact <email or @x_handle>` (ask the user which) so the organizers can reach the winner; it is never shown publicly.
 * More files or dependencies: put them in a directory, then `sharingan submit botdir/ --entry bot.py --requirements requirements.txt`.
 * Limits: `--hands` 600 to 200,000 (rounded up to a multiple of 6), 1M hands per bot per day, 2 jobs at a time. Stop a job: `curl -X POST $SHARINGAN_SERVER/v1/jobs/JOB_ID/abort -H "authorization: Bearer $SHARINGAN_TOKEN"`.
 

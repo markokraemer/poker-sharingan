@@ -23,6 +23,8 @@ export interface JobInput {
   mode: JobMode;
   /** Set when a public player submits with their own arena token: the run is credited to that player (worker mode). */
   playerId?: string;
+  /** Optional email or X handle, so the organizers can reach the bot's owner (competition prizes). Never shown publicly. */
+  contact?: string;
 }
 
 export interface Job {
@@ -70,10 +72,17 @@ export interface JobStore {
   /** Terminal but credits not settled yet (crash between teardown and settle). */
   unsettled(): Promise<Job[]>;
   listByUser(userId: string, limit: number): Promise<Job[]>;
+  /** The uploaded bot archive of a job, kept so the organizers can re-run the bot (competition final run). */
+  putArtifact(id: string, tgz: Uint8Array): Promise<void>;
+  getArtifact(id: string): Promise<Uint8Array | undefined>;
 }
 
 export class MemoryJobStore implements JobStore {
   private jobs = new Map<string, Job>();
+  private artifacts = new Map<string, Uint8Array>();
+
+  async putArtifact(id: string, tgz: Uint8Array) { if (!this.artifacts.has(id)) this.artifacts.set(id, new Uint8Array(tgz)); }
+  async getArtifact(id: string) { const a = this.artifacts.get(id); return a ? new Uint8Array(a) : undefined; }
 
   async get(id: string) { const j = this.jobs.get(id); return j ? structuredClone(j) : undefined; }
   async byKey(key: string) {
@@ -140,5 +149,12 @@ export class PgJobStore implements JobStore {
   }
   async listByUser(userId: string, limit: number) {
     return (await this.pool.query("SELECT doc FROM jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2", [userId, limit])).rows.map((r: { doc: Job }) => r.doc);
+  }
+  async putArtifact(id: string, tgz: Uint8Array) {
+    await this.pool.query("INSERT INTO job_artifacts(job_id, tgz) VALUES ($1, $2) ON CONFLICT (job_id) DO NOTHING", [id, Buffer.from(tgz)]);
+  }
+  async getArtifact(id: string) {
+    const r = await this.pool.query("SELECT tgz FROM job_artifacts WHERE job_id = $1", [id]);
+    return r.rows[0] ? new Uint8Array(r.rows[0].tgz as Buffer) : undefined;
   }
 }

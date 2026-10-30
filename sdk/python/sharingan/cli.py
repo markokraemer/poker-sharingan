@@ -523,6 +523,8 @@ def _submit(args: argparse.Namespace) -> int:
         body["lanes"] = args.lanes
     if args.requirements:
         body["requirementsFile"] = args.requirements
+    if args.contact:
+        body["contact"] = args.contact
     api.timeout = 120.0
     try:
         job = api.request("POST", "/v1/jobs", body, token=token)
@@ -604,6 +606,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--lanes", type=int, default=0)
     sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
     sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")
+    sm.add_argument("--contact", default=os.environ.get("SHARINGAN_CONTACT"), help="email or X handle so the organizers can reach you (competition prizes); never shown publicly")
     sm.add_argument("--key", default=None, help="idempotency key (resubmitting the same key returns the same job)")
     sm.add_argument("--timeout", type=float, default=0)
     sm.add_argument("--quiet", action="store_true")

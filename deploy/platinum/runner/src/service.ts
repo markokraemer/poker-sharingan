@@ -46,6 +46,7 @@ export interface ServiceDeps {
 export interface SubmitRequest {
   userId?: unknown; botName?: unknown; language?: unknown; artifactTgzBase64?: unknown; entry?: unknown;
   requirementsFile?: unknown; track?: unknown; hands?: unknown; lanes?: unknown; idempotencyKey?: unknown; mode?: unknown;
+  contact?: unknown;
 }
 
 const TRACKS = new Set(["ladder-v1", "sharingan-1"]);
@@ -194,6 +195,12 @@ export class Service {
     if (mode !== "worker" && mode !== "connect") bad("mode must be worker|connect");
     if (mode === "worker" && language === "typescript" && !cfg.worker.pipeCmd.typescript) bad("worker mode does not support typescript bots yet; use mode:\"connect\"");
 
+    let contact: string | undefined;
+    if (req.contact !== undefined && req.contact !== null && req.contact !== "") {
+      contact = typeof req.contact === "string" ? req.contact.trim() : bad("contact must be a string");
+      if (!contact || contact.length > 200 || /[\u0000-\u001f\u007f]/.test(contact)) bad("contact: an email or X handle, max 200 characters");
+    }
+
     const b64 = str("artifactTgzBase64", Math.ceil(cfg.limits.maxArtifactBytes * 1.4) + 1024);
     const compact = b64.replace(/\s+/g, "");
     if (compact.length === 0 || compact.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) bad("artifactTgzBase64 is not valid base64");
@@ -210,7 +217,7 @@ export class Service {
       throw e;
     }
     // hands are echoed back rounded up to whole deals (6 hands), so the job says what is actually played
-    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode }, artifact };
+    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode, ...(contact ? { contact } : {}) }, artifact };
   }
 
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
@@ -256,6 +263,7 @@ export class Service {
       const put = await run;
       if (!put.created) return { job: put.job, deduped: true };
       const job = put.job;
+      await this.keepArtifact(job.id, artifact);
       this.d.log("job_accepted", { job: job.id, user: input.userId, track: input.track, hands: input.hands, mode: input.mode, billing: "free" });
       const p = this.run(job.id, artifact).catch((e) => this.d.log("job_run_crashed", { job: job.id, error: String(e) }));
       this.running.set(job.id, p);
@@ -277,12 +285,20 @@ export class Service {
     const job: Job = { id: `job_${randomBytes(8).toString("hex")}`, input, status: "queued", createdAt: Date.now(), reservedMicro: amount, settled: false };
     const put = await this.d.store.put(job);
     if (!put.created) return { job: put.job, deduped: true };
+    await this.keepArtifact(job.id, artifact);
     this.d.log("job_accepted", { job: job.id, user: input.userId, track: input.track, hands: input.hands, mode: input.mode, reserved_micro: amount });
     const p = this.run(job.id, artifact).catch((e) => this.d.log("job_run_crashed", { job: job.id, error: String(e) }));
     this.running.set(job.id, p);
     void p.finally(() => this.running.delete(job.id));
     return { job, deduped: false };
   }
+
+  /** Keep the uploaded bot so the organizers can re-run it later. A storage hiccup is logged, never fails the job. */
+  private async keepArtifact(jobId: string, artifact: Uint8Array): Promise<void> {
+    try { await this.d.store.putArtifact(jobId, artifact); } catch (e) { this.d.log("artifact_store_failed", { job: jobId, error: String(e) }); }
+  }
+
+  async getArtifact(jobId: string): Promise<Uint8Array | undefined> { return this.d.store.getArtifact(jobId); }
 
   private async run(jobId: string, artifact: Uint8Array): Promise<void> {
     const ac = new AbortController();

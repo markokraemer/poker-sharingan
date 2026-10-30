@@ -76,6 +76,17 @@ const MIGRATIONS: Array<{ version: number; name: string; sql: string }> = [
       CREATE INDEX jobs_open ON jobs(status, settled);
     `,
   },
+  {
+    version: 2,
+    name: "job_artifacts",
+    sql: `
+      CREATE TABLE job_artifacts (
+        job_id     text PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+        tgz        bytea NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];
 
 export async function migrate(pool: Pool): Promise<void> {

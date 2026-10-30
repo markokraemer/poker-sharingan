@@ -195,3 +195,27 @@ def test_launch_bot_wrapper_maps_env(tmp_path, monkeypatch):
     monkeypatch.setenv("ARENA_TOKEN", "T")
     monkeypatch.setenv("MAX_HANDS", "7")
     assert lb.argv_from_env() == ["connect", "/x/bot.py", "--server", "https://a", "--token", "T", "--max-hands", "7"]
+
+
+def test_submit_sends_contact_only_when_given(tmp_path, monkeypatch, capsys):
+    from sharingan import cli
+    sent = []
+
+    class FakeApi:
+        def __init__(self, base_url):
+            self.base_url, self.timeout = base_url, 30.0
+
+        def request(self, method, path, body=None, token=None, query=None):
+            if method == "POST":
+                sent.append(body)
+                return {"id": "job_1"}
+            return {"status": "finished", "settled": True, "hands_done": 600, "hands_total": 600, "bot_name": "mybot",
+                    "mbb_per_game": 1.0, "ci95_mbb": 2.0, "track": "ladder-v1", "verified": True}
+
+    monkeypatch.setattr(cli, "ArenaClient", FakeApi)
+    monkeypatch.delenv("SHARINGAN_CONTACT", raising=False)
+    bot = _bot(tmp_path)
+    assert main(["submit", bot, "--token", "sk_x", "--server", "http://x", "--contact", "@me", "--quiet"]) == 0
+    assert main(["submit", bot, "--token", "sk_x", "--server", "http://x", "--quiet"]) == 0
+    assert sent[0]["contact"] == "@me" and "contact" not in sent[1]
+    assert "[VERIFIED, hosted job job_1]" in capsys.readouterr().out

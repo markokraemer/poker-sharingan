@@ -39,6 +39,7 @@ export function jobView(j: Job) {
     mode: j.input.mode,
     user_id: j.input.userId,
     bot_name: j.input.botName,
+    contact: j.input.contact ?? null,
     track: j.input.track,
     hands: j.input.hands,
     hands_done: j.handsDone ?? 0,
@@ -202,6 +203,13 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
         const j = await svc.getJob(m[1]!);
         if (j && player && j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } });
         return j ? send(res, 200, player ? publicJobView(j) : jobView(j)) : send(res, 404, { error: { code: "not_found", message: "no such job" } });
+      }
+      if (method === "GET" && (m = path.match(/^\/v1\/jobs\/([\w-]+)\/artifact$/))) {
+        if (player) throw new ServiceError(403, "forbidden", "service token only");
+        const tgz = await svc.getArtifact(m[1]!);
+        if (!tgz) return send(res, 404, { error: { code: "not_found", message: "no artifact for this job" } });
+        res.writeHead(200, { ...CORS_HEADERS, "content-type": "application/gzip", "content-length": tgz.length });
+        return res.end(Buffer.from(tgz));
       }
       if (method === "POST" && (m = path.match(/^\/v1\/jobs\/([\w-]+)\/abort$/))) {
         if (player) { const j = await svc.getJob(m[1]!); if (!j || j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } }); }
