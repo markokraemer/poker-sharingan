@@ -195,4 +195,16 @@ describe("free billing mode", () => {
     assert.deepEqual(Buffer.from(await res.arrayBuffer()), Buffer.from(art, "base64"), "byte-identical to the upload");
     assert.equal((await api("GET", "/v1/jobs/job_nope/artifact", AUTH)).status, 404);
   });
+  test("jobs per client address are capped across all of that address's bots", async () => {
+    await boot({ onProcess: hang }, { FREE_MAX_CONCURRENT_JOBS_PER_IP: "1" });
+    const post = (tok: string, ip: string, key: string) => fetch(base + "/v1/jobs", { method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${tok}`, "x-forwarded-for": ip }, body: JSON.stringify(sub({ idempotencyKey: key })) })
+      .then(async (r) => ({ status: r.status, json: await r.json() }));
+    assert.equal((await post("sk_user_alice", "203.0.113.7", "a1")).status, 202);
+    const r = await post("sk_user_bob", "203.0.113.7", "b1");
+    assert.equal(r.status, 429);
+    assert.equal(r.json.error.code, "quota_concurrent_ip");
+    assert.equal((await post("sk_user_bob", "198.51.100.9", "b2")).status, 202, "another address is unaffected");
+    assert.ok(!("client_ip" in (await api("GET", "/v1/jobs", "sk_user_bob")).json.jobs[0]), "never in the public view");
+  });
 });

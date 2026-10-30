@@ -20,7 +20,7 @@ export interface Config {
    * BILLING_MODE=free: jobs cost nothing; per-player quotas apply; public players authenticate with their ARENA bot token
    * (validated against GET /v1/me on the arena). RUNNER_AUTH_TOKEN stays the trusted service token.
    */
-  billing: { mode: "paid" | "free"; freeMaxHandsPerDay: number; freeMaxConcurrent: number; authCacheS: number };
+  billing: { mode: "paid" | "free"; freeMaxHandsPerDay: number; freeMaxConcurrent: number; freeMaxConcurrentPerIp: number; authCacheS: number };
   storage: "postgres" | "memory";
   databaseUrl?: string;
 
@@ -138,6 +138,8 @@ export function loadConfig(env: Env = process.env): Config {
       mode: billingMode,
       freeMaxHandsPerDay: num("FREE_MAX_HANDS_PER_DAY", 1_000_000),
       freeMaxConcurrent: num("FREE_MAX_CONCURRENT_JOBS", 2),
+      // per client address across all its bots (0 = off): one person cannot fill the queue by minting bots
+      freeMaxConcurrentPerIp: num("FREE_MAX_CONCURRENT_JOBS_PER_IP", 0),
       authCacheS: num("ARENA_AUTH_CACHE_S", 60),
     },
     storage: storage as Config["storage"],

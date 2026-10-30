@@ -25,6 +25,8 @@ export interface JobInput {
   playerId?: string;
   /** Optional email or X handle, so the organizers can reach the bot's owner (competition prizes). Never shown publicly. */
   contact?: string;
+  /** Public submits: the client address (from our proxy), for the per-address concurrency cap. Never shown publicly. */
+  clientIp?: string;
 }
 
 export interface Job {

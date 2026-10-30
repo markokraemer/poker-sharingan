@@ -191,7 +191,9 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
         return send(res, 200, svc.quote(hands));
       }
       if (method === "POST" && path === "/v1/jobs") {
-        const { job, deduped } = await svc.submit(await json(req, jobBodyLimit), player);
+        // behind our proxy chain (Cloudflare edge -> Caddy) X-Forwarded-For is the client address; the edge overwrites it
+        const ip = String(req.headers["x-forwarded-for"] ?? "").split(",")[0]!.trim() || req.socket.remoteAddress || undefined;
+        const { job, deduped } = await svc.submit(await json(req, jobBodyLimit), player, ip);
         return send(res, deduped ? 200 : 202, { id: job.id, status: job.status, deduped, hands: job.input.hands, ...(player ? {} : { reserved_micro: job.reservedMicro }) });
       }
       if (method === "GET" && path === "/v1/jobs") {

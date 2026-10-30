@@ -252,7 +252,22 @@ pub fn check_text(what: &str, s: &str) -> Res<()> {
     Ok(())
 }
 
-async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterReq>) -> Res<(StatusCode, Json<Value>)> {
+/// The caller's address: the first `X-Forwarded-For` hop behind our proxy (`ARENA_TRUST_PROXY`), else the socket peer.
+fn client_ip(app: &AppState, headers: &HeaderMap, peer: Option<std::net::SocketAddr>) -> String {
+    let fwd = if app.cfg.trust_proxy {
+        headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|s| s.trim().to_string())
+    } else {
+        None
+    };
+    fwd.or_else(|| peer.map(|a| a.ip().to_string())).unwrap_or_default()
+}
+
+async fn register(
+    State(app): App,
+    headers: HeaderMap,
+    peer: Option<axum::Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>,
+    Json(req): Json<RegisterReq>,
+) -> Res<(StatusCode, Json<Value>)> {
     if !app.cfg.open_registration {
         let p = app.authenticate(&headers)?;
         if !p.is_admin() {
@@ -289,6 +304,16 @@ async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterR
             .map(|p| p.name.trim_start_matches("house:").to_lowercase()).collect();
         if lower.starts_with("sharingan") || house_names.contains(&lower) {
             return Err(ApiError::bad_request(format!("the name {name} is reserved for a reference bot; pick another (the bot is named after its file)")));
+        }
+        let admin = crate::state::bearer(&headers).map(|t| ct_eq(&t, &app.admin_token)).unwrap_or(false);
+        if !admin && app.cfg.bots_per_ip_per_day > 0.0 {
+            let ip = client_ip(&app, &headers, peer.map(|c| (c.0).0));
+            if let Err(ms) = app.reg_limiter.check(&format!("reg:{ip}")) {
+                return Err(ApiError::rate_limited(
+                    "too many new bots from this address today; reuse a bot you have (its token is in ~/.config/sharingan/tokens.json)",
+                    json!({"limit": "ARENA_BOTS_PER_IP_PER_DAY", "per_day": app.cfg.bots_per_ip_per_day, "retry_after_ms": ms}),
+                ));
+            }
         }
     }
     if req.webhook_url.is_some() {

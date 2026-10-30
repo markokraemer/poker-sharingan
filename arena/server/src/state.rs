@@ -23,6 +23,8 @@ pub struct AppState {
     pub writer: HandWriter,
     pub admin_token: String,
     pub limiter: crate::limits::RateLimiter,
+    /// Bot registrations per client address (see `ServerConfig::bots_per_ip_per_day`).
+    pub reg_limiter: crate::limits::RateLimiter,
     /// Set when shutdown starts: readiness fails and new tables/matches/runs/sockets are refused.
     pub draining: AtomicBool,
     /// `true` once sockets must close (last phase of shutdown).

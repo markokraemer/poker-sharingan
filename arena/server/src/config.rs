@@ -45,6 +45,9 @@ pub struct ServerConfig {
     pub rate_limit_burst: f64,
     /// `ARENA_TRUST_PROXY` (default false): key anonymous requests by the first `X-Forwarded-For` hop.
     pub trust_proxy: bool,
+    /// `ARENA_BOTS_PER_IP_PER_DAY` (default 0 = off; production sets 10): new bot registrations per client address per day (token bucket,
+    /// so a burst of 10, then one more every 2.4 h). Stops one person from minting bots to get around per-bot quotas.
+    pub bots_per_ip_per_day: f64,
     /// `ARENA_MAX_TABLES_PER_PLAYER` (default 10): open free tables a player owns or sits at.
     pub max_tables_per_player: usize,
     /// `ARENA_MAX_MATCHES_PER_PLAYER` (default 4): unfinished matches/benchmark runs a player owns.
@@ -86,6 +89,7 @@ impl Default for ServerConfig {
             rate_limit_rps: 50.0,
             rate_limit_burst: 100.0,
             trust_proxy: false,
+            bots_per_ip_per_day: 0.0,
             max_tables_per_player: 10,
             max_matches_per_player: 4,
             max_ws_per_player: 4,
@@ -134,6 +138,7 @@ impl ServerConfig {
             rate_limit_rps: num("ARENA_RATE_LIMIT_RPS", d.rate_limit_rps),
             rate_limit_burst: num("ARENA_RATE_LIMIT_BURST", d.rate_limit_burst),
             trust_proxy: flag("ARENA_TRUST_PROXY", d.trust_proxy),
+            bots_per_ip_per_day: num("ARENA_BOTS_PER_IP_PER_DAY", d.bots_per_ip_per_day),
             max_tables_per_player: num("ARENA_MAX_TABLES_PER_PLAYER", d.max_tables_per_player),
             max_matches_per_player: num("ARENA_MAX_MATCHES_PER_PLAYER", d.max_matches_per_player),
             max_ws_per_player: num("ARENA_MAX_WS_PER_PLAYER", d.max_ws_per_player),

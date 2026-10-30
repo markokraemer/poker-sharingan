@@ -223,8 +223,15 @@ export class Service {
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
 
   /** FREE mode: per-player quotas (rolling 24 h hands, concurrent jobs). Called under the submit lock. */
-  private async checkFreeQuota(userId: string, hands: number): Promise<void> {
+  private async checkFreeQuota(userId: string, hands: number, clientIp?: string): Promise<void> {
     const b = this.d.cfg.billing;
+    if (clientIp && b.freeMaxConcurrentPerIp > 0) {
+      const fromIp = (await this.d.store.active()).filter((j) => j.input.clientIp === clientIp).length;
+      if (fromIp >= b.freeMaxConcurrentPerIp) {
+        throw new ServiceError(429, "quota_concurrent_ip", `at most ${b.freeMaxConcurrentPerIp} jobs at once from one address (all your bots together); wait for one to finish`,
+          { limit: b.freeMaxConcurrentPerIp, active: fromIp });
+      }
+    }
     const jobs = await this.d.store.listByUser(userId, 1000);
     const since = Date.now() - 24 * 3600_000;
     const active = jobs.filter((j) => !TERMINAL.has(j.status)).length;
@@ -243,18 +250,19 @@ export class Service {
    * `asUser`: set for a public player authenticated with an arena bot token. The job is forced onto that player and its
    * idempotency key is namespaced, so one player can never read or dedupe into another's jobs.
    */
-  async submit(req: SubmitRequest, asUser?: string): Promise<{ job: Job; deduped: boolean }> {
+  async submit(req: SubmitRequest, asUser?: string, clientIp?: string): Promise<{ job: Job; deduped: boolean }> {
     // public players only get worker mode (no network at all); connect mode needs the sandbox on the arena's network
     if (asUser) req = { ...req, mode: "worker", userId: asUser, idempotencyKey: typeof req.idempotencyKey === "string" ? `${asUser}:${req.idempotencyKey}`.slice(0, 200) : req.idempotencyKey };
     const { input, artifact } = await this.validate(req);
     if (asUser) input.playerId = asUser;
+    if (asUser && clientIp) input.clientIp = clientIp.slice(0, 64);
     const existing = await this.d.store.byKey(input.idempotencyKey);
     if (existing) return { job: existing, deduped: true };
 
     if (this.d.cfg.billing.mode === "free") {
       // serialise quota check + insert so two parallel submits cannot both pass the check
       const run = this.submitLock.p.then(async () => {
-        await this.checkFreeQuota(input.userId, input.hands);
+        await this.checkFreeQuota(input.userId, input.hands, input.clientIp);
         const job: Job = { id: `job_${randomBytes(8).toString("hex")}`, input, status: "queued", createdAt: Date.now(), reservedMicro: 0, settled: false };
         const put = await this.d.store.put(job);
         return put;

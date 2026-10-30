@@ -999,6 +999,26 @@ fn err_code(v: &Value) -> &str {
 }
 
 #[tokio::test]
+async fn bot_registrations_are_capped_per_address_humans_and_admin_are_not() {
+    let s = srv_cfg(None, |c| c.bots_per_ip_per_day = 2.0).await;
+    let reg = |name: &str, kind: &str, tok: Option<&str>| {
+        let body = json!({"name": name, "kind": kind});
+        let tok = tok.map(|t| t.to_string());
+        let s = &s;
+        async move { s.req("POST", "/v1/players", tok.as_deref(), Some(body)).await }
+    };
+    assert_eq!(reg("cap_a", "bot", None).await.0, 201);
+    assert_eq!(reg("cap_b", "bot", None).await.0, 201);
+    let (st, e) = reg("cap_c", "bot", None).await;
+    assert_eq!((st, err_code(&e)), (429, "rate_limited"), "{e}");
+    assert_eq!(e["error"]["details"]["limit"], "ARENA_BOTS_PER_IP_PER_DAY");
+    assert_eq!(reg("cap_human", "human", None).await.0, 201, "people at the play page are not capped");
+    assert_eq!(reg("cap_admin", "bot", Some("admin")).await.0, 201, "the admin token is exempt");
+    let (st, e) = reg("Sharingan-3", "bot", Some("admin")).await;
+    assert_eq!(st, 400, "reserved names stay reserved: {e}");
+}
+
+#[tokio::test]
 async fn request_rate_limit_is_per_token_with_retry_after() {
     let s = srv_cfg(None, |c| {
         c.rate_limit_rps = 0.5;

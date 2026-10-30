@@ -42,7 +42,7 @@ pub fn build_state(cfg: ServerConfig) -> Result<Arc<AppState>, String> {
         tracing::warn!("marked {n} stale running matches as aborted");
     }
     let admin_token = cfg.admin_token.clone().unwrap_or_else(|| format!("adm_{}", util::random_hex()));
-    let (rate_rps, rate_burst) = (cfg.rate_limit_rps, cfg.rate_limit_burst);
+    let (rate_rps, rate_burst, bots_per_day) = (cfg.rate_limit_rps, cfg.rate_limit_burst, cfg.bots_per_ip_per_day);
     Ok(Arc::new(AppState {
         cfg,
         writer: writer::HandWriter::spawn(store.clone()),
@@ -51,6 +51,7 @@ pub fn build_state(cfg: ServerConfig) -> Result<Arc<AppState>, String> {
         house: Arc::new(house),
         admin_token,
         limiter: limits::RateLimiter::new(rate_rps, rate_burst),
+        reg_limiter: limits::RateLimiter::new(bots_per_day / 86_400.0, bots_per_day),
         draining: std::sync::atomic::AtomicBool::new(false),
         shutdown: tokio::sync::watch::channel(false).0,
         tables: RwLock::new(HashMap::new()),
