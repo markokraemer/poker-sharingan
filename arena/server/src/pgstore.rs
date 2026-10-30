@@ -219,7 +219,7 @@ impl Store for PgStore {
         rows.into_iter().map(parse).collect()
     }
     fn abort_stale_matches(&self) -> Res<u64> {
-        let ids = self.run(|c| Ok(texts(c.query("SELECT match_id FROM matches WHERE status IN ('running','paused')", &[])?)))?;
+        let ids = self.run(|c| Ok(texts(c.query("SELECT match_id FROM matches WHERE status IN ('scheduled','running','paused')", &[])?)))?;
         for id in &ids {
             if let Some(mut m) = self.get_match(id)? {
                 m.status = "aborted".into();

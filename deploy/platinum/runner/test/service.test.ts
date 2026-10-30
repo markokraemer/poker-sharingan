@@ -175,8 +175,7 @@ describe("job lifecycle with credits", () => {
     assert.equal((await api("GET", "/v1/credits/user_a")).json.balance_usd, 9.4);
     // the same key with a different size is a conflict, not a second reservation
     const c = await api("POST", "/v1/jobs", submitBody({ hands: 6000 }));
-    assert.equal(c.status, 200);                                  // the existing job is returned (store dedup comes first)
-    assert.equal(c.json.id, a.json.id);
+    assert.deepEqual([c.status, c.json.error.code], [409, "idempotency_conflict"]);   // never silently the old 600-hand job
   });
 
   test("OUR failure (sandbox create) refunds in full", async () => {

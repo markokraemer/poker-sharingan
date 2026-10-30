@@ -136,6 +136,9 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
   };
 
   const send = (res: ServerResponse, code: number, body: unknown) => {
+    // one error envelope for every error, like the arena's: {error: {code, message, details}}
+    const b = body as { error?: { details?: unknown } };
+    if (b && typeof b === "object" && b.error && b.error.details === undefined) b.error.details = {};
     const text = JSON.stringify(body);
     res.writeHead(code, { ...CORS_HEADERS, "content-type": "application/json", "content-length": Buffer.byteLength(text) });
     res.end(text);
@@ -216,9 +219,10 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
       if (method === "POST" && (m = path.match(/^\/v1\/jobs\/([\w-]+)\/abort$/))) {
         if (player) { const j = await svc.getJob(m[1]!); if (!j || j.input.userId !== player) return send(res, 404, { error: { code: "not_found", message: "no such job" } }); }
         const aborted = await svc.abort(m[1]!);
+        if (!aborted) throw new ServiceError(409, "job_not_abortable", "the job is already over (finished, failed or aborted)");
         return send(res, 202, { ok: true, aborted });
       }
-      return send(res, 404, { error: { code: "not_found", message: `${method} ${path}` } });
+      return send(res, 404, { error: { code: "not_found", message: `no such route: ${method} ${path}` } });
     } catch (e) {
       if (e instanceof ServiceError) return send(res, e.status, { error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) } });
       if (e instanceof HttpError) return send(res, e.status, { error: { code: e.code, message: e.message } });

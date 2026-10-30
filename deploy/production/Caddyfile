@@ -17,9 +17,23 @@
 		}
 	}
 
-	# SHARINGAN-1 inference (sharingan-serve): needs a serve API key
+	# SHARINGAN-1 inference (sharingan-serve): needs a serve API key. CORS here, like the arena and runner routes,
+	# so a browser page can call /v1/act with an arena bot token.
+	@serve_preflight {
+		method OPTIONS
+		path /v1/act /v1/act/* /v1/info /v1/health
+	}
+	handle @serve_preflight {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+		header Access-Control-Allow-Headers "authorization, content-type"
+		header Access-Control-Max-Age "86400"
+		respond 204
+	}
 	@serve path /v1/act /v1/act/* /v1/info /v1/health
 	handle @serve {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Expose-Headers "x-request-id, retry-after"
 		reverse_proxy 127.0.0.1:8081 {
 			header_up X-Forwarded-For {http.request.header.X-Client-IP}
 			header_up -X-Edge-Secret

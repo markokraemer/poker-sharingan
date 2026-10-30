@@ -19,7 +19,8 @@ pub trait Store: Send + Sync {
     fn put_match(&self, m: &MatchRecord) -> Res<()>;
     fn get_match(&self, id: &str) -> Res<Option<MatchRecord>>;
     fn list_matches(&self, limit: u32) -> Res<Vec<MatchRecord>>;
-    /// Mark matches left `running`/`paused` by a previous process as `aborted`.
+    /// Mark matches left `scheduled`/`running`/`paused` by a previous process as `aborted` (their runtime lived in that
+    /// process: without this a never-started match stays `scheduled` and answers 404 to start and abort forever).
     fn abort_stale_matches(&self) -> Res<u64>;
 
     fn append_hand(&self, h: &HandHistory, events: &[Value]) -> Res<()>;
@@ -172,7 +173,7 @@ impl Store for SqliteStore {
     fn abort_stale_matches(&self) -> Res<u64> {
         let ids: Vec<String> = {
             let c = self.c();
-            let mut st = c.prepare("SELECT match_id FROM matches WHERE status IN ('running','paused')")?;
+            let mut st = c.prepare("SELECT match_id FROM matches WHERE status IN ('scheduled','running','paused')")?;
             let v = st.query_map([], |r| r.get(0))?.collect::<Result<Vec<String>, _>>()?;
             v
         };

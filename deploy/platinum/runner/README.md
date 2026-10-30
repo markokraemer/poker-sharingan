@@ -20,7 +20,10 @@ and `OPTIONS` is answered `204` without authentication.
 ### `POST /v1/jobs`
 
 `{botName, language, entry, artifactTgzBase64, requirementsFile?, track, hands?, lanes?, idempotencyKey, contact?}` -> `202 {id, status, hands, deduped}`
-(`200` with `deduped: true` for a repeated key).
+(`200` with `deduped: true` for a repeated key; the same key with a different track, size, name or entry is `409 idempotency_conflict`).
+snake_case field names (`bot_name`, `artifact_tgz_base64`, `idempotency_key`, ...) are accepted as well. Every error is
+`{error: {code, message, details}}`. Aborting a job that is already over is `409 job_not_abortable`. Free mode also caps running jobs
+per client address across all its bots (`FREE_MAX_CONCURRENT_JOBS_PER_IP`, `429 quota_concurrent_ip`).
 
 Checks run cheapest first and **before** the quota, so a malformed request is always a `400` and never a `429`/`402`:
 JSON body, field types, `hands` range, `contact` (optional email or X handle, max 200 characters), valid base64, the upload is a gzip tarball, `entry` (and `requirementsFile`) exist in it,

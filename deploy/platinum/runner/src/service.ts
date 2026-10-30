@@ -163,6 +163,7 @@ export class Service {
    */
   private async validate(req: SubmitRequest): Promise<{ input: JobInput; artifact: Buffer }> {
     const cfg = this.d.cfg;
+
     function bad(m: string): never { throw new ServiceError(400, "bad_request", m); }
     const str = (k: keyof SubmitRequest, max = 200): string => {
       const v = req[k];
@@ -251,13 +252,28 @@ export class Service {
    * idempotency key is namespaced, so one player can never read or dedupe into another's jobs.
    */
   async submit(req: SubmitRequest, asUser?: string, clientIp?: string): Promise<{ job: Job; deduped: boolean }> {
+    // snake_case is accepted too (the rest of the API is snake_case); camelCase stays canonical for existing clients.
+    // Done first, so a snake_case idempotency key is namespaced per player like a camelCase one.
+    const r = { ...(req as Record<string, unknown>) };
+    for (const [snake, camel] of [["user_id", "userId"], ["bot_name", "botName"], ["artifact_tgz_base64", "artifactTgzBase64"],
+      ["requirements_file", "requirementsFile"], ["idempotency_key", "idempotencyKey"]] as const) {
+      if (r[camel] === undefined && r[snake] !== undefined) r[camel] = r[snake];
+    }
+    req = r as SubmitRequest;
     // public players only get worker mode (no network at all); connect mode needs the sandbox on the arena's network
     if (asUser) req = { ...req, mode: "worker", userId: asUser, idempotencyKey: typeof req.idempotencyKey === "string" ? `${asUser}:${req.idempotencyKey}`.slice(0, 200) : req.idempotencyKey };
     const { input, artifact } = await this.validate(req);
     if (asUser) input.playerId = asUser;
     if (asUser && clientIp) input.clientIp = clientIp.slice(0, 64);
     const existing = await this.d.store.byKey(input.idempotencyKey);
-    if (existing) return { job: existing, deduped: true };
+    if (existing) {
+      const a = existing.input, same = a.track === input.track && a.hands === input.hands && a.botName === input.botName && a.entry === input.entry;
+      if (!same) {
+        this.d.log("idempotency_conflict", { key: input.idempotencyKey, was: [a.track, a.hands, a.botName, a.entry], now: [input.track, input.hands, input.botName, input.entry] });
+        throw new ServiceError(409, "idempotency_conflict", "this idempotencyKey was already used for a different job; use a new key");
+      }
+      return { job: existing, deduped: true };
+    }
 
     if (this.d.cfg.billing.mode === "free") {
       // serialise quota check + insert so two parallel submits cannot both pass the check

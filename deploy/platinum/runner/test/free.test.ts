@@ -207,4 +207,18 @@ describe("free billing mode", () => {
     assert.equal((await post("sk_user_bob", "198.51.100.9", "b2")).status, 202, "another address is unaffected");
     assert.ok(!("client_ip" in (await api("GET", "/v1/jobs", "sk_user_bob")).json.jobs[0]), "never in the public view");
   });
+  test("API polish: snake_case fields, idempotency conflict is 409, abort of a finished job is 409, every error has details", async () => {
+    await boot({ onProcess: good });
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", { bot_name: "b", language: "python", entry: "bot.py", track: "ladder-v1", hands: 600,
+      idempotency_key: "snake1", artifact_tgz_base64: tgzB64() });
+    assert.equal(r.status, 202, JSON.stringify(r.json));
+    const c = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "snake1", hands: 1200 }));
+    assert.deepEqual([c.status, c.json.error.code], [409, "idempotency_conflict"]);
+    await until(async () => (await store.get(r.json.id))?.settled === true);
+    const a = await api("POST", `/v1/jobs/${r.json.id}/abort`, "sk_user_alice");
+    assert.deepEqual([a.status, a.json.error.code], [409, "job_not_abortable"]);
+    for (const e of [c, a, await api("GET", "/v1/jobs/job_nope", "sk_user_alice"), await api("GET", "/v1/quota", "sk_bad"), await api("DELETE", "/v1/nope", AUTH)]) {
+      assert.deepEqual(Object.keys(e.json.error).sort(), ["code", "details", "message"], JSON.stringify(e.json));
+    }
+  });
 });
