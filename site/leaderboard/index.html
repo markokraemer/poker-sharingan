@@ -30,9 +30,9 @@
   <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">LEADERBOARD</span></a></h1><nav class="nav"><a href="../play/" data-int>Play</a><a href="./" data-int class="on">Leaderboard</a><a href="../docs/" data-int>Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><span class="p"><span class="red">$5,000 in prizes</span> for the top 3 submitted bots. The board closes at 23:59 UTC on November 15; a final 200,000-hand run of the top 10 decides. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
+  <div class="l"><span class="p"><span class="red">$5,000 in prizes</span> for the top 3 submitted bots. The board closes at 23:59 UTC on November 15, 2026; a final 200,000-hand run of the top 10 decides. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
   <div class="l"><span class="p">Score is mbb per game (1000 mbb = 1 big blind), luck-corrected, ± 95% interval. Higher is better.</span></div>
-  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. On the sharingan-1 track SHARINGAN-1 plays five copies of itself, so its true score is 0; the ± is the noise of 20,004 hands. ✓ = verified: our machines ran the bot.</span></div>
+  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. On the sharingan-1 track SHARINGAN-1 plays five copies of itself, so its true score is 0; the ± is the noise of 20,004 hands. ✓ = verified: our machines ran the bot. # counts submitted bots only, so it is the prize standing.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span id="status" class="p muted">LOADING...</span></div>
   <div class="l"></div>
@@ -58,12 +58,14 @@
     st.className = "p muted";
     st.innerHTML = "SORT BY " + tog("sharingan-1") + " " + tog("ladder-v1") + " &nbsp; " + subs + " submitted bot" + (subs === 1 ? "" : "s") + ", " + (list.length - subs) + " reference.";
     let h = row(["#", "Bot", "vs " + sortBy, "vs " + other, "Hands", "✓"], "h");
-    list.forEach((r, i) => {
+    let n = 0;
+    list.forEach((r) => {
+      const num = r.house ? '<span class="muted">REF</span>' : String(++n);   // # = place among submitted bots, i.e. the prize standing
       const name = String(r.name == null ? r.player_id : r.name).replace(/^house:/, "");
       const nm = window.esc(name) + (r.house ? ' <span class="muted">REFERENCE</span>' : "");
       const t = r.tracks && r.tracks[sortBy], ok = t && t.verified ? '<span class="red">✓</span>' : "";
       const hands = (r.hands || 0).toLocaleString("en-US");
-      h += row([String(i + 1), nm, cell(r[k]), cell(r[ko]), hands, ok], r.house ? "muted" : "",
+      h += row([num, nm, cell(r[k]), cell(r[ko]), hands, ok], r.house ? "muted" : "",
         cell(r[k]) + " vs " + sortBy + ", " + cell(r[ko]) + " vs " + other + ", " + hands + " hands");
     });
     if (!subs) h += '<div class="l"></div><div class="l"><span class="p">No submissions yet. <a href="../docs/" data-int>Be the first</a>.</span></div>';
