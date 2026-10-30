@@ -1,6 +1,6 @@
 """`sharingan` command line: eval / benchmark / connect / play / serve a bot file.
 
-    sharingan eval mybot.py [--hands 3000] [--server http://localhost:8080]   # ladder-v1 benchmark if the server has it
+    sharingan eval mybot.py [--hands 3000] [--server https://arena.sharingan.poker]   # ladder-v1 benchmark if the server has it
     sharingan benchmark mybot.py --track ladder-v1|sharingan-1 [--hands N] [--server URL] [--token T]
     sharingan connect mybot.py --server URL --token T [--player-id ID]        # answer your_turn until the server closes
     sharingan play mybot.py --vs sharingan-1 [--server URL]
@@ -20,6 +20,7 @@ import importlib.util
 import inspect
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -29,7 +30,7 @@ from .bot import Bot
 from .client import ApiException, ArenaClient, Runner
 from .models import Action
 
-DEFAULT_SERVER = "http://localhost:8080"
+DEFAULT_SERVER = "https://arena.sharingan.poker"   # the public arena; self-hosters pass --server or SHARINGAN_SERVER
 TRACKS = ("ladder-v1", "sharingan-1")
 DEFAULT_TRACK = "ladder-v1"
 START_CMD = "cargo run --release -p sharingan-arena -- --port 8080"
@@ -79,8 +80,9 @@ def _house(vs: str) -> List[str]:
 
 
 def _unreachable(server: str, err: Exception) -> int:
-    print(f"sharingan: arena server not reachable at {server} ({err}).\n"
-          f"Start one with:  {START_CMD}\n(or pass --server URL)", file=sys.stderr)
+    hint = f"Start one with:  {START_CMD}\n(or pass --server URL)" if re.match(r"https?://(localhost|127\.)", server) \
+        else "Check your connection, or pass --server URL for a self-hosted arena."
+    print(f"sharingan: arena server not reachable at {server} ({err}).\n{hint}", file=sys.stderr)
     return 2
 
 
