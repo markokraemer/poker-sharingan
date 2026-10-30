@@ -282,6 +282,15 @@ async fn register(State(app): App, headers: HeaderMap, Json(req): Json<RegisterR
     if name.starts_with("house:") {
         return Err(ApiError::bad_request("the house: prefix is reserved"));
     }
+    // A bot may not pose as SHARINGAN-1 (or a later SHARINGAN) or as one of the reference bots.
+    if kind == "bot" {
+        let lower = name.to_lowercase();
+        let house_names: Vec<String> = app.store.list_players(100_000)?.into_iter().filter(|p| p.house)
+            .map(|p| p.name.trim_start_matches("house:").to_lowercase()).collect();
+        if lower.starts_with("sharingan") || house_names.contains(&lower) {
+            return Err(ApiError::bad_request(format!("the name {name} is reserved for a reference bot; pick another (the bot is named after its file)")));
+        }
+    }
     if req.webhook_url.is_some() {
         if !app.cfg.enable_webhooks {
             return Err(ApiError::bad_request("webhook mode is disabled on this server (ARENA_ENABLE_WEBHOOKS)"));

@@ -219,3 +219,25 @@ def test_submit_sends_contact_only_when_given(tmp_path, monkeypatch, capsys):
     assert main(["submit", bot, "--token", "sk_x", "--server", "http://x", "--quiet"]) == 0
     assert sent[0]["contact"] == "@me" and "contact" not in sent[1]
     assert "[VERIFIED, hosted job job_1]" in capsys.readouterr().out
+
+
+def test_submit_warns_when_the_bot_crashed_or_forfeited(tmp_path, monkeypatch, capsys):
+    from sharingan import cli
+
+    class FakeApi:
+        def __init__(self, base_url):
+            self.base_url, self.timeout = base_url, 30.0
+
+        def request(self, method, path, body=None, token=None, query=None):
+            if method == "POST":
+                return {"id": "job_2"}
+            return {"status": "finished", "settled": True, "hands_done": 600, "hands_total": 600, "bot_name": "mybot",
+                    "mbb_per_game": -208.3, "ci95_mbb": 205.7, "track": "sharingan-1", "verified": True, "forfeit_hands": 588,
+                    "bot_log_tail": "lane 1: RuntimeError: boom\nplaying check/fold"}
+
+    monkeypatch.setattr(cli, "ArenaClient", FakeApi)
+    monkeypatch.delenv("SHARINGAN_CONTACT", raising=False)
+    assert main(["submit", _bot(tmp_path), "--token", "sk_x", "--server", "http://x", "--track", "sharingan-1", "--quiet"]) == 0
+    err = capsys.readouterr().err
+    assert "588 of 600 hands forfeited" in err and "RuntimeError: boom" in err
+    assert "--contact" in err, "a prize-track submit without a contact is nudged"

@@ -151,16 +151,17 @@ pub fn leaderboard(
             a.wm += w * r.score_mbb;
         }
     }
-    // latest finished run per (player, track)
-    let mut cells: HashMap<&str, BTreeMap<String, (String, TrackCell)>> = HashMap::new();
-    for r in runs.iter().filter(|r| r.status == "finished" || (r.status == "aborted" && r.mbb_per_game.is_some())) {
+    // One cell per (player, track): the latest VERIFIED finished run; an unverified run only while there is no verified one.
+    // Aborted runs never count: a partial score could be stopped while it happens to look good. Keyed (verified, finished_at).
+    let mut cells: HashMap<&str, BTreeMap<String, ((bool, String), TrackCell)>> = HashMap::new();
+    for r in runs.iter().filter(|r| r.status == "finished") {
         let (Some(m), Some(c)) = (r.mbb_per_game, r.ci95_mbb) else { continue };
-        let fin = r.finished_at.clone().unwrap_or_default();
+        let key = (r.verified, r.finished_at.clone().unwrap_or_default());
         let e = cells.entry(&r.player_id).or_default();
-        if e.get(&r.track).map(|(f, _)| *f < fin).unwrap_or(true) {
+        if e.get(&r.track).map(|(k, _)| *k < key).unwrap_or(true) {
             e.insert(
                 r.track.clone(),
-                (fin, TrackCell { run_id: r.run_id.clone(), mbb_per_game: m, ci95_mbb: c, hands: r.hands_done, verified: r.verified, method: r.method.clone().unwrap_or_default() }),
+                (key, TrackCell { run_id: r.run_id.clone(), mbb_per_game: m, ci95_mbb: c, hands: r.hands_done, verified: r.verified, method: r.method.clone().unwrap_or_default() }),
             );
         }
     }
@@ -221,4 +222,38 @@ pub fn leaderboard(
         r.rank = i + 1;
     }
     rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(id: &str, verified: bool, status: &str, fin: &str, mbb: f64) -> RunRecord {
+        RunRecord {
+            run_id: id.into(), track: "sharingan-1".into(), panel_version: "1".into(), panel: vec![], player_id: "p_x".into(), name: "x".into(),
+            match_id: "m".into(), seed: "s".into(), deals: None, hands_planned: 20004, hands_done: 20004, status: status.into(), verified, hosted: verified,
+            mbb_per_game: Some(mbb), ci95_mbb: Some(10.0), method: Some("aivat".into()), blueprint_fingerprint: None, created_at: fin.into(),
+            finished_at: Some(fin.into()),
+        }
+    }
+
+    #[test]
+    fn verified_score_is_never_replaced_by_an_unverified_or_aborted_run() {
+        let p = PlayerRecord { player_id: "p_x".into(), name: "x".into(), kind: "bot".into(), owner: None, created_at: "t".into(), house: false,
+                               token_hash: String::new(), webhook_url: None, webhook_secret: None };
+        let players: HashMap<String, PlayerRecord> = [("p_x".to_string(), p)].into_iter().collect();
+        let cell = |runs: &[RunRecord]| {
+            let rows = leaderboard(&[], &players, runs, 0, true, None);
+            let c = rows[0].tracks.get("sharingan-1").unwrap();
+            (c.run_id.clone(), c.verified)
+        };
+        let v1 = run("v1", true, "finished", "2026-11-01T00:00:00Z", -100.0);
+        let u = run("u", false, "finished", "2026-11-02T00:00:00Z", 500.0);
+        let ab = run("ab", true, "aborted", "2026-11-03T00:00:00Z", 900.0);
+        let v2 = run("v2", true, "finished", "2026-11-04T00:00:00Z", -50.0);
+        assert_eq!(cell(&[v1.clone(), u.clone()]), ("v1".into(), true), "a later unverified run does not replace a verified one");
+        assert_eq!(cell(&[v1.clone(), ab.clone()]), ("v1".into(), true), "an aborted (partial) run never counts");
+        assert_eq!(cell(&[v1.clone(), u.clone(), v2.clone()]), ("v2".into(), true), "the latest verified run wins");
+        assert_eq!(cell(&[u.clone()]), ("u".into(), false), "unverified shows while there is nothing verified");
+    }
 }

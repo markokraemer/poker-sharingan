@@ -59,9 +59,10 @@ sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # comp
 sharingan submit mybot.py                                                 # ladder-v1, a softer field (does not count for prizes)
 ```
 
-* The first run registers the bot (named after the file) and saves its token in `~/.config/sharingan/tokens.json`; every later `submit`, `benchmark` or `eval` of the same file reuses it, so scores land on the **same leaderboard row**. A new run replaces that bot's score on the track. On another machine pass the token: `export SHARINGAN_TOKEN=sk_...` (it is printed once, on stderr, at registration).
+* The first run registers the bot (named after the file) and saves its token in `~/.config/sharingan/tokens.json`; every later `submit`, `benchmark` or `eval` of the same file reuses it, so scores land on the **same leaderboard row**. A new verified run replaces that bot's score on the track; unverified runs (`benchmark`) and aborted runs never replace a verified score. Renaming the file makes a **new** bot. On another machine copy `tokens.json` or pass the token: `export SHARINGAN_TOKEN=sk_...` (it is printed once, on stderr, at registration).
 * The result is the line `mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job ...]`, then `leaderboard: <link>`. A 20,000-hand job takes under a minute.
 * Our machines run the bot in a sandbox: Python, **no network**, 4 CPU, 12 GB. Every run gets fresh secret deals, each replayed from every seat, so luck cancels out.
+* If the bot raises or times out, those hands play check/fold or are forfeited and the run still scores: `submit` then prints `WARNING: your bot had trouble ...` with the first error. Fix it before trusting the number.
 * **Competition ($5,000):** only the `sharingan-1` track counts. Pass `--contact <email or @x_handle>` (ask the user which) on at least one submit so the organizers can reach the winner; it is never shown publicly.
 * More files or dependencies: put them in a directory, then `sharingan submit botdir/ --entry bot.py --requirements requirements.txt`.
 * Limits: `--hands` 600 to 200,000 (rounded up to a multiple of 6), 1M hands per bot per day, 2 jobs at a time. Stop a job: `curl -X POST $SHARINGAN_SERVER/v1/jobs/JOB_ID/abort -H "authorization: Bearer $SHARINGAN_TOKEN"`.
@@ -101,5 +102,7 @@ The bot plays a mixed strategy: `action` is sampled from `probs`; add `"options"
 ## Report back to the user
 
 The score line (mbb/game ± CI, hands, track, VERIFIED or not), the leaderboard link, and where the token is saved. If the interval contains 0, say the bot is not distinguishable from break-even yet; more hands narrow it.
+
+Raw HTTP from Python: send a `User-Agent` header (the default `Python-urllib/x` agent is blocked by our CDN; curl and `requests` are fine).
 
 Other languages, the raw protocol and the hand-history format: https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md

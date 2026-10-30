@@ -79,6 +79,24 @@ def _house(vs: str) -> List[str]:
     return [f"house:{n}" for n in names]
 
 
+def _warn_bot_trouble(job: dict) -> None:
+    """A score can be VERIFIED and still come from a bot that crashed or timed out (those hands play check/fold or are
+    forfeited). Say so, with the first error line, instead of a clean-looking score."""
+    forfeits = job.get("forfeit_hands") or 0
+    tail = job.get("bot_log_tail") or ""
+    errs = [ln.strip() for ln in tail.splitlines() if re.search(r"(Error|Exception|Traceback|FORFEIT|timed? ?out)", ln)]
+    if not forfeits and not errs:
+        return
+    total = job.get("hands_done") or job.get("hands_total") or 0
+    msg = f"sharingan: WARNING: your bot had trouble in this run"
+    if forfeits:
+        msg += f": {forfeits} of {total} hands forfeited (crash or over the time limit)"
+    print(msg, file=sys.stderr)
+    if errs:
+        print(f"sharingan: first error: {errs[0][:300]}", file=sys.stderr)
+    print("sharingan: fix it and resubmit; try it locally with `sharingan play <bot> --hands 12`", file=sys.stderr)
+
+
 def _unreachable(server: str, err: Exception) -> int:
     hint = f"Start one with:  {START_CMD}\n(or pass --server URL)" if re.match(r"https?://(localhost|127\.)", server) \
         else "Check your connection, or pass --server URL for a self-hosted arena."
@@ -562,6 +580,10 @@ def _submit(args: argparse.Namespace) -> int:
         return 1
     print(f"{j['bot_name']}: {j['mbb_per_game']:+.1f} +- {j['ci95_mbb']:.1f} mbb/game over {j['hands_done']} hands on {j['track']} "
           f"[{'VERIFIED' if j['verified'] else 'unverified'}, hosted job {jid}]")
+    _warn_bot_trouble(j)
+    if j["track"] == "sharingan-1" and not args.contact:
+        print("sharingan: competition entry? add --contact <email or @x_handle> (once per bot) so we can reach you if you win",
+              file=sys.stderr)
     print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
     return 0
 

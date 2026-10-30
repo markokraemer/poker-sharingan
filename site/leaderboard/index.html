@@ -62,8 +62,8 @@
     list.forEach((r) => {
       const num = r.house ? '<span class="muted">REF</span>' : String(++n);   // # = place among submitted bots, i.e. the prize standing
       const name = String(r.name == null ? r.player_id : r.name).replace(/^house:/, "");
-      const nm = window.esc(name) + (r.house ? ' <span class="muted">REFERENCE</span>' : "");
       const t = r.tracks && r.tracks[sortBy], ok = t && t.verified ? '<span class="red">✓</span>' : "";
+      const nm = window.esc(name) + (r.house ? ' <span class="muted">REFERENCE</span>' : (t && !t.verified ? ' <span class="muted">UNVERIFIED</span>' : ""));
       const hands = (r.hands || 0).toLocaleString("en-US");
       h += row([num, nm, cell(r[k]), cell(r[ko]), hands, ok], r.house ? "muted" : "",
         cell(r[k]) + " vs " + sortBy + ", " + cell(r[ko]) + " vs " + other + ", " + hands + " hands");
