@@ -55,7 +55,7 @@ sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: you
 ## 4. Submit: verified score on the leaderboard
 
 ```bash
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # competition entry: vs 5 copies of SHARINGAN-1
+sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # competition entry: vs 5 copies of SHARINGAN-1 (blueprint, no search)
 sharingan submit mybot.py                                                 # ladder-v1, a softer field (does not count for prizes)
 ```
 
