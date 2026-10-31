@@ -223,7 +223,9 @@ def test_submit_requires_contact_and_profile_and_remembers_them(tmp_path, monkey
     assert main(base) == 0, "remembered after the first accepted submit"
     assert [(b["contact"], b["profile"]) for b in sent] == [("me@example.com", "https://x.com/me")] * 2
     assert oct(os.stat(cli.OWNER_FILE).st_mode & 0o777) == "0o600"
-    assert "[VERIFIED, hosted job job_1]" in capsys.readouterr().out
+    out = capsys.readouterr()
+    assert "[VERIFIED, hosted job job_1]" in out.out
+    assert "not ranked" in out.err, "a verified run shorter than a ranked run says it does not count"
 
 
 def test_submit_warns_when_the_bot_crashed_or_forfeited(tmp_path, monkeypatch, capsys):

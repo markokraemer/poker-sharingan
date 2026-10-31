@@ -38,11 +38,13 @@ Full spec: [docs/TABLE_API.md](docs/TABLE_API.md). The SDK hides all of this beh
 ## SHARINGAN-1
 
 A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat poker pros at six-player no-limit.
-SHARINGAN-1 is blueprint C@2e10 with turn and river search, the exact bot the arena runs:
+SHARINGAN-1 is blueprint C@2e10 with turn and river search, the bot behind these results:
 
 - won +77.6 bb/100 over 2,329 live hands on a public bot arena
 - a best response trained to exploit it, with the same bet sizes, still loses to it
 - a longer-trained checkpoint (C@4.77e10, also released) beats SvanBot, the #1 bot on that arena, in both seatings
+
+The leaderboard's sharingan-1 track and the inference API play its released blueprint, without real-time search.
 
 Weights: [huggingface.co/markokraemer/sharingan-1](https://huggingface.co/markokraemer/sharingan-1) ([model card](MODEL_CARD.md)) · Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
 

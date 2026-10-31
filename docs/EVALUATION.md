@@ -51,7 +51,7 @@ Run `openpoker analyze --trace <file>`.
 1. Implement the policy API in `arena/bench/src/policy.rs`, or write a JSON-lines bridge (`ext:` protocol) in any language.
 2. Seat it as hero against five copies of a field bot with `bench table --hero <yours> --field <field> --deals N --seed S` and read the AIVAT line (use `--aivat off` if your bot does not expose probabilities and compare raw duplicate results).
 3. Use the same `--seed` for every arm you want to compare, and report the CI.
-4. For an open, hosted version of this (public play-against API and benchmark) see "Coming soon" in the README.
+4. The open, hosted version of this (public play-against API and benchmark) is live: https://sharingan.poker.
 
 ## Pitfalls we hit
 

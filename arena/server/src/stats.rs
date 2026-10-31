@@ -120,13 +120,14 @@ impl Builder {
 
 /// Combine per-match results into one score per player: inverse-variance weighted mean.
 /// Rows without a usable standard error (fewer than two samples) carry no weight.
-/// Benchmark-track cells are the latest finished run per (player, track); `track` filters and
-/// sorts by that column.
+/// Benchmark-track cells are the latest finished run per (player, track); a verified run counts only with at least
+/// `ranked_min_hands` hands. `track` filters and sorts by that column.
 pub fn leaderboard(
     results: &[StoredResult],
     players: &HashMap<String, PlayerRecord>,
     runs: &[RunRecord],
     min_hands: u64,
+    ranked_min_hands: u64,
     include_house: bool,
     track: Option<&str>,
 ) -> Vec<LeaderboardRow> {
@@ -153,8 +154,9 @@ pub fn leaderboard(
     }
     // One cell per (player, track): the latest VERIFIED finished run; an unverified run only while there is no verified one.
     // Aborted runs never count: a partial score could be stopped while it happens to look good. Keyed (verified, finished_at).
+    // Short verified runs never count either: many cheap runs with wide intervals could fish for a lucky one.
     let mut cells: HashMap<&str, BTreeMap<String, ((bool, String), TrackCell)>> = HashMap::new();
-    for r in runs.iter().filter(|r| r.status == "finished") {
+    for r in runs.iter().filter(|r| r.status == "finished" && !(r.verified && u64::from(r.hands_done) < ranked_min_hands)) {
         let (Some(m), Some(c)) = (r.mbb_per_game, r.ci95_mbb) else { continue };
         let key = (r.verified, r.finished_at.clone().unwrap_or_default());
         let e = cells.entry(&r.player_id).or_default();
@@ -243,7 +245,7 @@ mod tests {
                                token_hash: String::new(), webhook_url: None, webhook_secret: None };
         let players: HashMap<String, PlayerRecord> = [("p_x".to_string(), p)].into_iter().collect();
         let cell = |runs: &[RunRecord]| {
-            let rows = leaderboard(&[], &players, runs, 0, true, None);
+            let rows = leaderboard(&[], &players, runs, 0, 0, true, None);
             let c = rows[0].tracks.get("sharingan-1").unwrap();
             (c.run_id.clone(), c.verified)
         };
@@ -255,5 +257,19 @@ mod tests {
         assert_eq!(cell(&[v1.clone(), ab.clone()]), ("v1".into(), true), "an aborted (partial) run never counts");
         assert_eq!(cell(&[v1.clone(), u.clone(), v2.clone()]), ("v2".into(), true), "the latest verified run wins");
         assert_eq!(cell(&[u.clone()]), ("u".into(), false), "unverified shows while there is nothing verified");
+    }
+
+    #[test]
+    fn short_verified_runs_never_set_the_score() {
+        let p = PlayerRecord { player_id: "p_x".into(), name: "x".into(), kind: "bot".into(), owner: None, created_at: "t".into(), house: false,
+                               token_hash: String::new(), webhook_url: None, webhook_secret: None };
+        let players: HashMap<String, PlayerRecord> = [("p_x".to_string(), p)].into_iter().collect();
+        let full = run("full", true, "finished", "2026-11-01T00:00:00Z", -100.0);
+        let mut short = run("short", true, "finished", "2026-11-02T00:00:00Z", 1500.0);
+        short.hands_done = 600;
+        let cell = |runs: &[RunRecord]| leaderboard(&[], &players, runs, 0, 20004, true, None).first().and_then(|r| r.tracks.get("sharingan-1").map(|c| c.run_id.clone()));
+        assert_eq!(cell(&[full.clone(), short.clone()]), Some("full".into()), "a later short run does not replace a full one");
+        assert_eq!(cell(&[short.clone()]), None, "a bot with only short runs is not on the board");
+        assert_eq!(leaderboard(&[], &players, &[full, short], 0, 0, true, None)[0].tracks["sharingan-1"].run_id, "short", "0 = any length");
     }
 }

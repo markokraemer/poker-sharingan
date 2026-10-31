@@ -26,6 +26,9 @@ pub struct ServerConfig {
     pub reconnect_grace_ms: u64,
     /// `ARENA_LEADERBOARD_MIN_HANDS` (default 1000).
     pub min_leaderboard_hands: u64,
+    /// `ARENA_RANKED_MIN_HANDS` (default 0 = any length): a verified run sets a bot's track score only with at least this many
+    /// hands, so a pile of short, wide-interval runs can't fish for a lucky score. Shorter runs still score for their owner.
+    pub ranked_min_hands: u64,
     /// `ARENA_SAVE_FREE_HANDS` (default true): store hand histories of free tables too.
     pub save_free_hands: bool,
     /// `ARENA_DATABASE_URL` (`postgres://...`): use Postgres instead of SQLite.
@@ -80,6 +83,7 @@ impl Default for ServerConfig {
             hand_delay_ms: 300,
             reconnect_grace_ms: 2000,
             min_leaderboard_hands: 1000,
+            ranked_min_hands: 0,
             save_free_hands: true,
             database_url: None,
             database_schema: None,
@@ -129,6 +133,7 @@ impl ServerConfig {
             hand_delay_ms: num("ARENA_HAND_DELAY_MS", d.hand_delay_ms),
             reconnect_grace_ms: num("ARENA_RECONNECT_GRACE_MS", d.reconnect_grace_ms),
             min_leaderboard_hands: num("ARENA_LEADERBOARD_MIN_HANDS", d.min_leaderboard_hands),
+            ranked_min_hands: num("ARENA_RANKED_MIN_HANDS", d.ranked_min_hands),
             save_free_hands: flag("ARENA_SAVE_FREE_HANDS", d.save_free_hands),
             database_url: env("ARENA_DATABASE_URL"),
             database_schema: env("ARENA_DATABASE_SCHEMA"),

@@ -49,9 +49,11 @@ Every accepted job keeps its upload in Postgres (`job_artifacts`). `GET /v1/jobs
 returns the exact `.tar.gz` that was submitted. This is what the [competition](../../../COMPETITION.md) final table plays:
 
 1. At the deadline, save the non-house rows of `GET https://arena.sharingan.poker/v1/leaderboard` in its default order (score vs
-   SHARINGAN-1) and take the top 6, one bot per person.
+   SHARINGAN-1). Qualified: verified, score above 0. Take the top 6, one bot per person (by `profile`); copies of SHARINGAN-1 fill
+   empty seats. Optionally re-run the leading bots' artifacts (step 3) on fresh deals with more hands to confirm the standings.
 2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token and pick the latest job created before the
-   deadline that is `finished`, `verified` and on `track: sharingan-1`. Its `contact` reaches the owner; `profile` says who they are.
+   deadline that is `finished`, `verified`, on `track: sharingan-1` and has `hands_done` >= 20004 (the board ignores shorter runs).
+   Its `contact` reaches the owner; `profile` says who they are.
 3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz`.
 4. Play the six bots against each other at one table, every deal from every seat, in a sandbox without network.
 

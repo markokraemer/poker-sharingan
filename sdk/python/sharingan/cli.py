@@ -159,6 +159,7 @@ def _load_tokens() -> dict:
 
 
 OWNER_FILE = os.path.join(os.path.dirname(TOKENS_FILE), "owner.json")
+RANKED_HANDS = 20004    # the public arena ranks verified runs of at least this many hands (ARENA_RANKED_MIN_HANDS)
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
@@ -623,6 +624,9 @@ def _submit(args: argparse.Namespace) -> int:
     print(f"{j['bot_name']}: {j['mbb_per_game']:+.1f} +- {j['ci95_mbb']:.1f} mbb/game over {j['hands_done']} hands on {j['track']} "
           f"[{'VERIFIED' if j['verified'] else 'unverified'}, hosted job {jid}]")
     _warn_bot_trouble(j)
+    if j["verified"] and j["hands_done"] < RANKED_HANDS:
+        print(f"sharingan: not ranked: the leaderboard counts verified runs of {RANKED_HANDS:,}+ hands, this one had {j['hands_done']:,}; "
+              "submit without --hands for a ranked run", file=sys.stderr)
     print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
     return 0
 

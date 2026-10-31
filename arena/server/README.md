@@ -48,6 +48,7 @@ The first start logs a generated admin token (set `ARENA_ADMIN_TOKEN` to pin it)
 | `ARENA_HAND_DELAY_MS` | `300` | pause between hands on free tables |
 | `ARENA_RECONNECT_GRACE_MS` | `2000` | how long a turn waits for a seat whose socket is gone |
 | `ARENA_LEADERBOARD_MIN_HANDS` | `1000` | leaderboard threshold |
+| `ARENA_RANKED_MIN_HANDS` | `0` (any) | a verified run sets a bot's track score only with at least this many hands (production: 20004) |
 | `ARENA_SAVE_FREE_HANDS` | `true` | store histories of non-match tables |
 | `ARENA_DATABASE_URL` | unset | `postgres://...` selects Postgres (TLS via rustls unless `sslmode=disable`); `ARENA_DB` is then ignored |
 | `ARENA_DATABASE_SCHEMA` / `ARENA_DB_POOL` | unset / `8` | Postgres schema for all tables; connections |

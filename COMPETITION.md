@@ -19,8 +19,8 @@ sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profil
 
 ## How it works
 
-1. **Qualify (now until November 15, 2026, 23:59 UTC).** Each `submit` plays 20,004 hands against five copies of SHARINGAN-1 (its released blueprint) on fresh secret deals. Every deal is replayed from every seat and the luck is subtracted, so the score is a real win rate (mbb per game). Your latest verified run counts. Leaderboard: https://sharingan.poker/leaderboard/
-2. **Final table (November 16, 2026).** The top 6 bots on the leaderboard at the deadline (one bot per person) play each other at one six-player table, many thousands of hands, every deal replayed from every seat. Each finalist plays its last verified submission from before the deadline. The highest win rate wins.
+1. **Qualify (now until November 15, 2026, 23:59 UTC).** Each `submit` plays 20,004 hands against five copies of SHARINGAN-1 (its released blueprint) on fresh secret deals. Every deal is replayed from every seat and the luck is subtracted, so the score is a real win rate (mbb per game). Your latest verified full run counts (shorter `--hands` runs are for testing and never rank). Leaderboard: https://sharingan.poker/leaderboard/
+2. **Final table (November 16, 2026).** A bot qualifies by beating SHARINGAN-1: a score above 0 on the leaderboard at the deadline. The top 6 qualifiers (one bot per person) play each other at one six-player table, many thousands of hands, every deal replayed from every seat; if fewer than 6 qualify, copies of SHARINGAN-1 take the empty seats. Each finalist plays its last verified full submission from before the deadline; the organizers may re-run the leading submissions on fresh deals to confirm the standings. The highest win rate wins.
 3. **Results** go up on sharingan.poker, with the hands.
 
 ## Prizes

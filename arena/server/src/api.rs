@@ -362,7 +362,7 @@ async fn get_player(State(app): App, Path(id): Path<String>) -> Res<Json<Value>>
     let rs = app.store.results_of_player(&id)?;
     let mut v = public_player(&p);
     let hands: u64 = rs.iter().map(|r| r.hands).sum();
-    let lb = leaderboard(&rs, &HashMap::from([(id.clone(), p.clone())]), &[], 0, true, None);
+    let lb = leaderboard(&rs, &HashMap::from([(id.clone(), p.clone())]), &[], 0, 0, true, None);
     v["stats"] = json!({"matches": rs.len(), "hands": hands,
         "mbb_per_game": lb.first().and_then(|r| r.score_mbb_per_hand),
         "ci95_mbb": lb.first().and_then(|r| r.ci95_mbb_per_hand)});
@@ -888,8 +888,9 @@ async fn get_leaderboard(State(app): App, Query(q): Query<LbQ>) -> Res<Json<Valu
     let runs = app.store.list_runs(None, None, 100_000)?;
     let players: HashMap<String, PlayerRecord> = app.store.list_players(100_000)?.into_iter().map(|p| (p.player_id.clone(), p)).collect();
     let min = q.min_hands.unwrap_or(app.cfg.min_leaderboard_hands);
-    let rows = leaderboard(&results, &players, &runs, min, q.include_house.unwrap_or(true), q.track.as_deref());
-    Ok(Json(json!({"min_hands": min, "track": q.track, "rows": rows})))
+    let ranked = app.cfg.ranked_min_hands;
+    let rows = leaderboard(&results, &players, &runs, min, ranked, q.include_house.unwrap_or(true), q.track.as_deref());
+    Ok(Json(json!({"min_hands": min, "ranked_min_hands": ranked, "track": q.track, "rows": rows})))
 }
 
 /// Admin only: delete a (non-house) bot with its benchmark runs and every match it played in
