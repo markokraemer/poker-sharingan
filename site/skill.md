@@ -8,7 +8,7 @@ description: Build a six-player no-limit hold'em poker bot, score it with luck-c
 Arena: `https://arena.sharingan.poker` · Leaderboard: https://sharingan.poker/leaderboard · Free, no account.
 Six-max no-limit hold'em, blinds 50/100, 100 bb stacks. Scores are **mbb/game** (1000 mbb = 1 big blind) with a 95% confidence interval.
 
-**$5,000 in prizes:** beat SHARINGAN-1 to qualify. The leaderboard (verified score vs SHARINGAN-1) closes at 23:59 UTC on November 15, 2026; the top 6 meet at the final table on November 16 and play each other. To enter, submit with `--track sharingan-1 --contact <email or @x_handle>` (section 4) and keep the token. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+**$5,000 in prizes:** beat SHARINGAN-1 to qualify. The leaderboard (verified score vs SHARINGAN-1) closes at 23:59 UTC on November 15, 2026; the top 6 meet at the final table on November 16 and play each other. To enter, submit with `--track sharingan-1 --contact <email> --profile <X/LinkedIn/GitHub link>` (section 4) and keep the token. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 ## 1. Install (Python 3.9+)
 
@@ -55,7 +55,7 @@ sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: you
 ## 4. Submit: verified score on the leaderboard
 
 ```bash
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # competition entry: vs 5 copies of SHARINGAN-1 (blueprint, no search)
+sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # competition entry: vs 5 copies of SHARINGAN-1 (blueprint, no search)
 sharingan submit mybot.py                                                 # ladder-v1, a softer field (does not count for prizes)
 ```
 
@@ -63,7 +63,8 @@ sharingan submit mybot.py                                                 # ladd
 * The result is the line `mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job ...]`, then `leaderboard: <link>`. A 20,000-hand job takes under a minute.
 * Our machines run the bot in a sandbox: Python, **no network**, 4 CPU, 12 GB. Every run gets fresh secret deals, each replayed from every seat, so luck cancels out.
 * If the bot raises or times out, those hands play check/fold or are forfeited and the run still scores: `submit` then prints `WARNING: your bot had trouble ...` with the first error. Fix it before trusting the number.
-* **Competition ($5,000):** only the `sharingan-1` track counts. Pass `--contact <email or @x_handle>` (ask the user which) on at least one submit so the organizers can reach the winner; it is never shown publicly.
+* **Who is behind the bot (required):** every `submit` needs `--contact <email>` and `--profile <link>` to the user's X, LinkedIn, GitHub or personal page. Ask the user for both; never invent them. They are never shown publicly and are saved in `~/.config/sharingan/owner.json` after the first accepted submit (or set `SHARINGAN_CONTACT` / `SHARINGAN_PROFILE`). Without them `submit` uploads nothing and exits 2.
+* **Competition ($5,000):** only the `sharingan-1` track counts. The email is how the organizers reach the winner.
 * More files or dependencies: put them in a directory, then `sharingan submit botdir/ --entry bot.py --requirements requirements.txt`.
 * Limits: `--hands` 600 to 200,000 (rounded up to a multiple of 6), 1M hands per bot per day, 2 jobs at a time. Stop a job: `curl -X POST $SHARINGAN_SERVER/v1/jobs/JOB_ID/abort -H "authorization: Bearer $SHARINGAN_TOKEN"`.
 

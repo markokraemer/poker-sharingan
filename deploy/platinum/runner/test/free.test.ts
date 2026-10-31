@@ -32,7 +32,8 @@ const api = async (method: string, path: string, token: string | undefined, body
   const t = await res.text();
   return { status: res.status, json: t ? JSON.parse(t) : undefined };
 };
-const sub = (over: Record<string, unknown> = {}) => ({ botName: "b", language: "python", entry: "bot.py", track: "ladder-v1", hands: 600, idempotencyKey: "k1", artifactTgzBase64: tgzB64(), ...over });
+const sub = (over: Record<string, unknown> = {}) => ({ botName: "b", language: "python", entry: "bot.py", track: "ladder-v1", hands: 600, idempotencyKey: "k1", artifactTgzBase64: tgzB64(),
+  contact: "alice@example.com", profile: "https://x.com/alice", ...over });
 
 describe("free billing mode", () => {
   test("arena bot token authenticates; job is free, scoped to the player, ledger untouched", async () => {
@@ -177,17 +178,34 @@ describe("free billing mode", () => {
     assert.deepEqual([r.json.hands, j.hands, j.hands_total], [606, 606, 606]);
     assert.equal((await api("GET", "/v1/quota", "sk_user_eve")).json.hands_used_24h, 606);
   });
-  test("contact is private, the uploaded bot is kept, and only the service token can fetch it back", async () => {
+  test("a public submit needs an email + a profile link; both are private, the uploaded bot is kept, only the service token can fetch it", async () => {
     await boot({ onProcess: good });
-    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: 5 }))).status, 400);
-    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: "x".repeat(201) }))).status, 400);
+    const status = async (over: Record<string, unknown>) => (await api("POST", "/v1/jobs", "sk_user_alice", sub(over))).status;
+    const missing = await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: undefined, profile: undefined }));
+    assert.equal(missing.status, 400);
+    assert.match(missing.json.error.message, /contact and profile required/);
+    assert.equal(await status({ profile: undefined }), 400, "an email alone is not enough");
+    assert.equal(await status({ contact: "" }), 400, "a profile alone is not enough");
+    assert.equal(await status({ contact: 5 }), 400);
+    assert.equal(await status({ contact: "@alice" }), 400, "contact is an email");
+    assert.equal(await status({ contact: "x".repeat(195) + "@a.com" }), 400, "max 200 characters");
+    for (const p of ["alice", "ftp://x.com/a", "https://127.0.0.1/a", "https://localhost/a", "https://u:p@x.com/a", "javascript:alert(1)"]) {
+      assert.equal(await status({ profile: p }), 400, p);
+    }
     const art = tgzB64();
-    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: "  @alice  ", artifactTgzBase64: art }));
-    assert.equal(r.status, 202);
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ contact: "  alice@example.com  ", profile: "linkedin.com/in/alice", artifactTgzBase64: art }));
+    assert.equal(r.status, 202, JSON.stringify(r.json));
     const id = r.json.id;
     await until(async () => (await store.get(id))?.settled === true);
-    assert.equal((await api("GET", `/v1/jobs/${id}`, AUTH)).json.contact, "@alice", "trimmed, visible to the organizers");
-    assert.ok(!("contact" in (await api("GET", `/v1/jobs/${id}`, "sk_user_alice")).json), "not in the public view");
+    const full = (await api("GET", `/v1/jobs/${id}`, AUTH)).json;
+    assert.deepEqual([full.contact, full.profile], ["alice@example.com", "https://linkedin.com/in/alice"], "trimmed + normalized, visible to the organizers");
+    const own = (await api("GET", `/v1/jobs/${id}`, "sk_user_alice")).json;
+    assert.ok(!("contact" in own) && !("profile" in own), "not in the public view");
+    const x = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "k2", profile: "@alice" }));
+    assert.equal(x.status, 202);
+    assert.equal((await api("GET", `/v1/jobs/${x.json.id}`, AUTH)).json.profile, "https://x.com/alice", "@handle means X");
+    const svc = await api("POST", "/v1/jobs", AUTH, sub({ userId: "house", idempotencyKey: "k3", contact: undefined, profile: undefined }));
+    assert.ok([200, 202].includes(svc.status), "our own service-token submits need no owner");
     assert.equal((await api("GET", `/v1/jobs/${id}/artifact`, "sk_user_alice")).status, 403);
     const res = await fetch(`${base}/v1/jobs/${id}/artifact`, { headers: { authorization: `Bearer ${AUTH}` } });
     assert.equal(res.status, 200);
@@ -210,7 +228,7 @@ describe("free billing mode", () => {
   test("API polish: snake_case fields, idempotency conflict is 409, abort of a finished job is 409, every error has details", async () => {
     await boot({ onProcess: good });
     const r = await api("POST", "/v1/jobs", "sk_user_alice", { bot_name: "b", language: "python", entry: "bot.py", track: "ladder-v1", hands: 600,
-      idempotency_key: "snake1", artifact_tgz_base64: tgzB64() });
+      idempotency_key: "snake1", artifact_tgz_base64: tgzB64(), contact: "a@example.com", profile: "x.com/a" });
     assert.equal(r.status, 202, JSON.stringify(r.json));
     const c = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "snake1", hands: 1200 }));
     assert.deepEqual([c.status, c.json.error.code], [409, "idempotency_conflict"]);

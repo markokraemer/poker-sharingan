@@ -12,6 +12,9 @@ def _isolated_tokens(tmp_path, monkeypatch):
     # The CLI saves bot tokens in ~/.config/sharingan; keep tests out of the real home.
     import sharingan.cli
     monkeypatch.setattr(sharingan.cli, "TOKENS_FILE", str(tmp_path / "tokens.json"))
+    monkeypatch.setattr(sharingan.cli, "OWNER_FILE", str(tmp_path / "owner.json"))
+    monkeypatch.delenv("SHARINGAN_CONTACT", raising=False)
+    monkeypatch.delenv("SHARINGAN_PROFILE", raising=False)
 
 from sharingan.models import YourTurn
 

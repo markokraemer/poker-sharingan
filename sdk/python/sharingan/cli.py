@@ -5,7 +5,7 @@
     sharingan connect mybot.py --server URL --token T [--player-id ID]        # answer your_turn until the server closes
     sharingan play mybot.py --vs sharingan-1 [--server URL]
     sharingan serve mybot.py --port 9000 [--secret S]
-    sharingan submit mybot.py --server URL [--token T] [--hands N]            # hosted job on the server's runner: verified score
+    sharingan submit mybot.py --contact EMAIL --profile URL [--token T] [--hands N]   # hosted job on the server's runner: verified score
     sharingan pipe mybot.py                                                   # stdin/stdout, for `sharingan-arena run --bot "sharingan pipe mybot.py"`
     sharingan eval mybot.py --local [--track T] [--hands N] [--lanes L]       # run the local worker binary, no server
 
@@ -156,6 +156,45 @@ def _load_tokens() -> dict:
         return d if isinstance(d, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+OWNER_FILE = os.path.join(os.path.dirname(TOKENS_FILE), "owner.json")
+_EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def _owner(args: argparse.Namespace) -> Optional[dict]:
+    """Who is behind the bot: --contact (email) and --profile (X / LinkedIn / GitHub / personal page link), else the
+    environment, else what the last accepted submit saved. None (after explaining) when either is missing or malformed."""
+    try:
+        with open(OWNER_FILE) as f:
+            saved = json.load(f)
+        saved = saved if isinstance(saved, dict) else {}
+    except (OSError, ValueError):
+        saved = {}
+    contact = (args.contact or saved.get("contact") or "").strip()
+    profile = (args.profile or saved.get("profile") or "").strip()
+    if not contact or not profile:
+        print("sharingan: every submit needs who is behind the bot (never shown publicly):\n"
+              "  --contact you@example.com           an email to reach you (competition prizes)\n"
+              "  --profile https://x.com/you         your X, LinkedIn, GitHub or personal page\n"
+              f"Pass them once; they are saved in {OWNER_FILE} (or set SHARINGAN_CONTACT / SHARINGAN_PROFILE).",
+              file=sys.stderr)
+        return None
+    if not _EMAIL.match(contact):
+        print(f"sharingan: --contact must be an email address, got {contact!r}", file=sys.stderr)
+        return None
+    return {"contact": contact, "profile": profile}
+
+
+def _save_owner(owner: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(OWNER_FILE), exist_ok=True)
+        fd = os.open(OWNER_FILE + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(owner, f, indent=1)
+        os.replace(OWNER_FILE + ".tmp", OWNER_FILE)
+    except OSError:
+        pass
 
 
 def bot_token(api: ArenaClient, name: str) -> str:
@@ -517,6 +556,9 @@ def _submit(args: argparse.Namespace) -> int:
     if not os.path.exists(path):
         print(f"sharingan: no such file: {args.bot}", file=sys.stderr)
         return 2
+    owner = _owner(args)
+    if owner is None:
+        return 2
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         if os.path.isdir(path):
@@ -543,8 +585,7 @@ def _submit(args: argparse.Namespace) -> int:
         body["lanes"] = args.lanes
     if args.requirements:
         body["requirementsFile"] = args.requirements
-    if args.contact:
-        body["contact"] = args.contact
+    body.update(owner)
     api.timeout = 120.0
     try:
         job = api.request("POST", "/v1/jobs", body, token=token)
@@ -553,6 +594,7 @@ def _submit(args: argparse.Namespace) -> int:
         return 1
     except OSError as e:
         return _unreachable(args.server, e)
+    _save_owner(owner)
     jid = job["id"]
     print(f"sharingan: job {jid} accepted ({args.hands} hands on {args.track})", file=sys.stderr, flush=True)
     t0, last = time.time(), None
@@ -581,9 +623,6 @@ def _submit(args: argparse.Namespace) -> int:
     print(f"{j['bot_name']}: {j['mbb_per_game']:+.1f} +- {j['ci95_mbb']:.1f} mbb/game over {j['hands_done']} hands on {j['track']} "
           f"[{'VERIFIED' if j['verified'] else 'unverified'}, hosted job {jid}]")
     _warn_bot_trouble(j)
-    if j["track"] == "sharingan-1" and not args.contact:
-        print("sharingan: competition entry? add --contact <email or @x_handle> (once per bot) so we can reach you if you win",
-              file=sys.stderr)
     print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
     return 0
 
@@ -630,7 +669,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--lanes", type=int, default=0)
     sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
     sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")
-    sm.add_argument("--contact", default=os.environ.get("SHARINGAN_CONTACT"), help="email or X handle so the organizers can reach you (competition prizes); never shown publicly")
+    sm.add_argument("--contact", default=os.environ.get("SHARINGAN_CONTACT"), help="required: your email, so the organizers can reach you (competition prizes); never shown publicly; saved after the first submit")
+    sm.add_argument("--profile", default=os.environ.get("SHARINGAN_PROFILE"), help="required: link to your X, LinkedIn, GitHub or personal page (https://x.com/you); never shown publicly; saved after the first submit")
     sm.add_argument("--key", default=None, help="idempotency key (resubmitting the same key returns the same job)")
     sm.add_argument("--timeout", type=float, default=0)
     sm.add_argument("--quiet", action="store_true")

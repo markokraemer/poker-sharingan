@@ -197,7 +197,7 @@ def test_launch_bot_wrapper_maps_env(tmp_path, monkeypatch):
     assert lb.argv_from_env() == ["connect", "/x/bot.py", "--server", "https://a", "--token", "T", "--max-hands", "7"]
 
 
-def test_submit_sends_contact_only_when_given(tmp_path, monkeypatch, capsys):
+def test_submit_requires_contact_and_profile_and_remembers_them(tmp_path, monkeypatch, capsys):
     from sharingan import cli
     sent = []
 
@@ -213,11 +213,16 @@ def test_submit_sends_contact_only_when_given(tmp_path, monkeypatch, capsys):
                     "mbb_per_game": 1.0, "ci95_mbb": 2.0, "track": "ladder-v1", "verified": True}
 
     monkeypatch.setattr(cli, "ArenaClient", FakeApi)
-    monkeypatch.delenv("SHARINGAN_CONTACT", raising=False)
     bot = _bot(tmp_path)
-    assert main(["submit", bot, "--token", "sk_x", "--server", "http://x", "--contact", "@me", "--quiet"]) == 0
-    assert main(["submit", bot, "--token", "sk_x", "--server", "http://x", "--quiet"]) == 0
-    assert sent[0]["contact"] == "@me" and "contact" not in sent[1]
+    base = ["submit", bot, "--token", "sk_x", "--server", "http://x", "--quiet"]
+    assert main(base) == 2 and not sent, "nothing is uploaded without an owner"
+    assert "--contact" in capsys.readouterr().err
+    assert main(base + ["--contact", "me@example.com"]) == 2 and not sent, "an email alone is not enough"
+    assert main(base + ["--contact", "@me", "--profile", "https://x.com/me"]) == 2 and not sent, "contact is an email"
+    assert main(base + ["--contact", "me@example.com", "--profile", "https://x.com/me"]) == 0
+    assert main(base) == 0, "remembered after the first accepted submit"
+    assert [(b["contact"], b["profile"]) for b in sent] == [("me@example.com", "https://x.com/me")] * 2
+    assert oct(os.stat(cli.OWNER_FILE).st_mode & 0o777) == "0o600"
     assert "[VERIFIED, hosted job job_1]" in capsys.readouterr().out
 
 
@@ -236,8 +241,8 @@ def test_submit_warns_when_the_bot_crashed_or_forfeited(tmp_path, monkeypatch, c
                     "bot_log_tail": "lane 1: RuntimeError: boom\nplaying check/fold"}
 
     monkeypatch.setattr(cli, "ArenaClient", FakeApi)
-    monkeypatch.delenv("SHARINGAN_CONTACT", raising=False)
+    monkeypatch.setenv("SHARINGAN_CONTACT", "me@example.com")
+    monkeypatch.setenv("SHARINGAN_PROFILE", "https://linkedin.com/in/me")
     assert main(["submit", _bot(tmp_path), "--token", "sk_x", "--server", "http://x", "--track", "sharingan-1", "--quiet"]) == 0
     err = capsys.readouterr().err
     assert "588 of 600 hands forfeited" in err and "RuntimeError: boom" in err
-    assert "--contact" in err, "a prize-track submit without a contact is nudged"

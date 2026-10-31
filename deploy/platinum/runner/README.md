@@ -19,14 +19,14 @@ and `OPTIONS` is answered `204` without authentication.
 
 ### `POST /v1/jobs`
 
-`{botName, language, entry, artifactTgzBase64, requirementsFile?, track, hands?, lanes?, idempotencyKey, contact?}` -> `202 {id, status, hands, deduped}`
+`{botName, language, entry, artifactTgzBase64, requirementsFile?, track, hands?, lanes?, idempotencyKey, contact, profile}` -> `202 {id, status, hands, deduped}`
 (`200` with `deduped: true` for a repeated key; the same key with a different track, size, name or entry is `409 idempotency_conflict`).
 snake_case field names (`bot_name`, `artifact_tgz_base64`, `idempotency_key`, ...) are accepted as well. Every error is
 `{error: {code, message, details}}`. Aborting a job that is already over is `409 job_not_abortable`. Free mode also caps running jobs
 per client address across all its bots (`FREE_MAX_CONCURRENT_JOBS_PER_IP`, `429 quota_concurrent_ip`).
 
 Checks run cheapest first and **before** the quota, so a malformed request is always a `400` and never a `429`/`402`:
-JSON body, field types, `hands` range, `contact` (optional email or X handle, max 200 characters), valid base64, the upload is a gzip tarball, `entry` (and `requirementsFile`) exist in it,
+JSON body, field types, `hands` range, `contact` (an email) and `profile` (an http(s) link to a public profile: X, LinkedIn, GitHub, a personal page; scheme optional, `@handle` means X; stored as https), both max 200 characters and **required on every player submit** (the service token may omit them), valid base64, the upload is a gzip tarball, `entry` (and `requirementsFile`) exist in it,
 and only then the per-player quota (`429`) or credit reservation (`402`).
 
 **Hands**: the request must be in `MIN_HANDS`..`MAX_HANDS` (default 600..200,000); the number actually played is **rounded up to a multiple
@@ -37,7 +37,7 @@ quotas and prices use it too). So: rounded up to a multiple of 6, min 600, max 2
 
 A public player (arena bot token) sees only: `id, status, bot_name, track, hands, hands_total, hands_done, mbb_per_game, ci95_mbb, verified,
 forfeit_hands, error, bot_log_tail, run_id, arena_player_id, deals_seed, created_at, finished_at`. Failures on our side show a generic
-`error`. The service token (`RUNNER_AUTH_TOKEN`) still gets the full view (sandbox, cost and ledger fields, and `contact`). `contact` is never in the public view.
+`error`. The service token (`RUNNER_AUTH_TOKEN`) still gets the full view (sandbox, cost and ledger fields, `contact` and `profile`). `contact` and `profile` are never in the public view.
 
 `error` for a failing bot is one clear first line (for example `the bot never answered a decision (600/600 hands forfeited); nothing was
 submitted.`) followed by one de-duplicated traceback / log excerpt. Progress lines are removed, and a forfeited or rejected run never
@@ -51,7 +51,7 @@ returns the exact `.tar.gz` that was submitted. This is what the [competition](.
 1. At the deadline, save the non-house rows of `GET https://arena.sharingan.poker/v1/leaderboard` in its default order (score vs
    SHARINGAN-1) and take the top 6, one bot per person.
 2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token and pick the latest job created before the
-   deadline that is `finished`, `verified` and on `track: sharingan-1`. Its `contact` (or an earlier job's) reaches the owner.
+   deadline that is `finished`, `verified` and on `track: sharingan-1`. Its `contact` reaches the owner; `profile` says who they are.
 3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz`.
 4. Play the six bots against each other at one table, every deal from every seat, in a sandbox without network.
 

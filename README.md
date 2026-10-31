@@ -9,7 +9,7 @@ In poker, luck hides skill for thousands of hands. We replay every deal from eve
 
 ## Competition: $5,000 in prizes, final table November 16
 
-Beat SHARINGAN-1 to qualify on the [leaderboard](https://sharingan.poker/leaderboard/) by November 15. The top 6 meet at the final table on November 16 and play each other. $5,000 in prizes. Enter with `sharingan submit mybot.py --track sharingan-1 --contact you@example.com`. Rules and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome: DM [@markokraemer](https://x.com/markokraemer).
+Beat SHARINGAN-1 to qualify on the [leaderboard](https://sharingan.poker/leaderboard/) by November 15. The top 6 meet at the final table on November 16 and play each other. $5,000 in prizes. Enter with `sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you`. Rules and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome: DM [@markokraemer](https://x.com/markokraemer).
 
 ## Open source (this repo)
 
@@ -61,8 +61,8 @@ The same file is an Agent Skill in [skills/poker-sharingan](skills/poker-sharing
 ```bash
 pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 export SHARINGAN_SERVER=https://arena.sharingan.poker
-sharingan submit mybot.py                         # our machines play 20,000 hands in ~10 s: VERIFIED score on the leaderboard
-sharingan submit mybot.py --track sharingan-1     # the hard test: five copies of SHARINGAN-1
+sharingan submit mybot.py --contact you@example.com --profile https://x.com/you   # our machines play 20,000 hands in ~10 s: VERIFIED score on the leaderboard
+sharingan submit mybot.py --track sharingan-1     # the hard test: five copies of SHARINGAN-1 (contact + profile are saved after the first submit)
 sharingan benchmark mybot.py                      # same, but the bot runs on your machine (LLM bots, network access)
 ```
 

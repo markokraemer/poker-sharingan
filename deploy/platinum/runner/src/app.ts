@@ -40,6 +40,7 @@ export function jobView(j: Job) {
     user_id: j.input.userId,
     bot_name: j.input.botName,
     contact: j.input.contact ?? null,
+    profile: j.input.profile ?? null,
     track: j.input.track,
     hands: j.input.hands,
     hands_done: j.handsDone ?? 0,

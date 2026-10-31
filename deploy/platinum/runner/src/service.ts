@@ -46,12 +46,34 @@ export interface ServiceDeps {
 export interface SubmitRequest {
   userId?: unknown; botName?: unknown; language?: unknown; artifactTgzBase64?: unknown; entry?: unknown;
   requirementsFile?: unknown; track?: unknown; hands?: unknown; lanes?: unknown; idempotencyKey?: unknown; mode?: unknown;
-  contact?: unknown;
+  contact?: unknown; profile?: unknown;
 }
 
 const TRACKS = new Set(["ladder-v1", "sharingan-1"]);
 const SAFE_PATH = /^[\w./-]{1,200}$/;
 const SAFE_ID = /^[\w.:@+-]{1,128}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Optional free-text field: trimmed, max 200 characters, no control characters; absent / null / "" is undefined. */
+function optText(v: unknown, name: string): string | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  const t = typeof v === "string" ? v.trim() : undefined;
+  if (!t || t.length > 200 || /[\u0000-\u001f\u007f]/.test(t)) throw new ServiceError(400, "bad_request", `${name}: a string, max 200 characters`);
+  return t;
+}
+
+/** A public https profile link (scheme optional: "x.com/you" works; "@you" means X), normalized; undefined when it is not one. */
+export function profileUrl(s: string): string | undefined {
+  if (/^@\w{1,15}$/.test(s)) return `https://x.com/${s.slice(1)}`;
+  let u: URL;
+  try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`); } catch { return undefined; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+  if (u.username || u.password || u.port) return undefined;
+  const host = u.hostname.toLowerCase();
+  if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(host) || host.endsWith(".local")) return undefined;   // a public name, not an IP
+  u.protocol = "https:";
+  return u.toString();
+}
 
 class Semaphore {
   private n: number;
@@ -161,7 +183,7 @@ export class Service {
    * Everything that can be decided from the request alone, cheapest first. Runs BEFORE the quota / credit checks, so garbage
    * is a 400 and never a 429 / 402 (and never costs a reservation).
    */
-  private async validate(req: SubmitRequest): Promise<{ input: JobInput; artifact: Buffer }> {
+  private async validate(req: SubmitRequest, requireOwner: boolean): Promise<{ input: JobInput; artifact: Buffer }> {
     const cfg = this.d.cfg;
 
     function bad(m: string): never { throw new ServiceError(400, "bad_request", m); }
@@ -196,11 +218,16 @@ export class Service {
     if (mode !== "worker" && mode !== "connect") bad("mode must be worker|connect");
     if (mode === "worker" && language === "typescript" && !cfg.worker.pipeCmd.typescript) bad("worker mode does not support typescript bots yet; use mode:\"connect\"");
 
-    let contact: string | undefined;
-    if (req.contact !== undefined && req.contact !== null && req.contact !== "") {
-      contact = typeof req.contact === "string" ? req.contact.trim() : bad("contact must be a string");
-      if (!contact || contact.length > 200 || /[\u0000-\u001f\u007f]/.test(contact)) bad("contact: an email or X handle, max 200 characters");
+    // who is behind the bot: an email to reach them + a public profile link (X, LinkedIn, GitHub, a personal site...) that
+    // ties the bot to a real person. Required on every public submit; optional for our own service-token submits.
+    const contact = optText(req.contact, "contact");
+    const profile = optText(req.profile, "profile");
+    if (requireOwner && (!contact || !profile)) {
+      bad("contact and profile required: an email (--contact you@example.com) and a link to your X, LinkedIn, GitHub or personal page "
+        + "(--profile https://x.com/you); never shown publicly. Old CLI? pip install -U \"git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python\"");
     }
+    if (contact !== undefined && !EMAIL.test(contact)) bad("contact must be an email address");
+    if (profile !== undefined && !profileUrl(profile)) bad("profile must be a link to your X, LinkedIn, GitHub or personal page, like https://x.com/you");
 
     const b64 = str("artifactTgzBase64", Math.ceil(cfg.limits.maxArtifactBytes * 1.4) + 1024);
     const compact = b64.replace(/\s+/g, "");
@@ -218,7 +245,7 @@ export class Service {
       throw e;
     }
     // hands are echoed back rounded up to whole deals (6 hands), so the job says what is actually played
-    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode, ...(contact ? { contact } : {}) }, artifact };
+    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode, ...(contact ? { contact } : {}), ...(profile ? { profile: profileUrl(profile)! } : {}) }, artifact };
   }
 
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
@@ -262,7 +289,7 @@ export class Service {
     req = r as SubmitRequest;
     // public players only get worker mode (no network at all); connect mode needs the sandbox on the arena's network
     if (asUser) req = { ...req, mode: "worker", userId: asUser, idempotencyKey: typeof req.idempotencyKey === "string" ? `${asUser}:${req.idempotencyKey}`.slice(0, 200) : req.idempotencyKey };
-    const { input, artifact } = await this.validate(req);
+    const { input, artifact } = await this.validate(req, !!asUser);
     if (asUser) input.playerId = asUser;
     if (asUser && clientIp) input.clientIp = clientIp.slice(0, 64);
     const existing = await this.d.store.byKey(input.idempotencyKey);

@@ -23,8 +23,10 @@ export interface JobInput {
   mode: JobMode;
   /** Set when a public player submits with their own arena token: the run is credited to that player (worker mode). */
   playerId?: string;
-  /** Optional email or X handle, so the organizers can reach the bot's owner (competition prizes). Never shown publicly. */
+  /** Email of the bot's owner, so the organizers can reach them (competition prizes). Required on public submits. Never shown publicly. */
   contact?: string;
+  /** Link to the owner's public profile (X, LinkedIn, GitHub, a personal page), normalized to https. Required on public submits. Never shown publicly. */
+  profile?: string;
   /** Public submits: the client address (from our proxy), for the per-address concurrency cap. Never shown publicly. */
   clientIp?: string;
 }

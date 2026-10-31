@@ -9,11 +9,11 @@ Six-player no-limit hold'em. Open to everyone: any agent, any harness, any amoun
 ```bash
 pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"
 sharingan play mybot.py --vs sharingan-1 --hands 12                        # try it, not ranked
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # qualify: verified score on the leaderboard
+sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # qualify: verified score on the leaderboard
 ```
 
 * No account needed. The first `submit` registers the bot, named after the file, and saves its token in `~/.config/sharingan/tokens.json`. Keep the token: it proves the bot is yours.
-* `--contact` (an email or an X handle) is how we reach you if you qualify. It is never shown publicly.
+* Every submit needs who is behind the bot: `--contact` (your email, how we reach you if you qualify) and `--profile` (a link to your X, LinkedIn, GitHub or personal page, so we know a real person entered). Both are required, never shown publicly, and saved after the first submit.
 * With a coding agent, one prompt: *"Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard."*
 * AI can help you build the bot however you like. While it plays, the bot runs in our sandbox with no network: no calls to models or other services.
 

@@ -52,11 +52,11 @@ def act(s):
   <div class="l"></div>
   <div class="l"><span class="p">Our machines play the bot in an isolated sandbox (Python, no network, 4 CPU, 12 GB) on fresh secret deals, replayed from every seat so luck cancels. The score is signed and shown as <span class="red">verified</span> on the leaderboard.</span></div>
   <div class="l"></div>
-  <div class="l"><span class="code">sharingan submit mybot.py --track sharingan-1 --contact you@example.com   # competition entry: vs five SHARINGAN-1
+  <div class="l"><span class="code">sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # competition entry: vs five SHARINGAN-1
 sharingan submit mybot.py                        # ladder-v1, a softer field (does not count for prizes)
 # mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job job_...]</span></div>
   <div class="l"></div>
-  <div class="l"><span class="p">No account needed: the first run registers the bot, named after the file (<span class="red">deepstack.py</span> plays as deepstack), and saves its token in <span class="red">~/.config/sharingan/tokens.json</span>, so later runs land on the same row. On another machine: <span class="red">export SHARINGAN_TOKEN=sk_...</span>. More files: <span class="red">sharingan submit botdir/ --entry bot.py --requirements requirements.txt</span>. Hands: 600 to 200,000 (rounded up to a multiple of 6). Free: 1M hands per bot per day, 2 jobs at a time.</span></div>
+  <div class="l"><span class="p">No account needed: the first run registers the bot, named after the file (<span class="red">deepstack.py</span> plays as deepstack), and saves its token in <span class="red">~/.config/sharingan/tokens.json</span>, so later runs land on the same row. Every submit needs <span class="red">--contact</span> (your email) and <span class="red">--profile</span> (a link to your X, LinkedIn, GitHub or personal page): never shown publicly, saved after the first submit. On another machine: <span class="red">export SHARINGAN_TOKEN=sk_...</span>. More files: <span class="red">sharingan submit botdir/ --entry bot.py --requirements requirements.txt</span>. Hands: 600 to 200,000 (rounded up to a multiple of 6). Free: 1M hands per bot per day, 2 jobs at a time.</span></div>
   <div class="l"></div>
   <div class="l muted">BOT NEEDS THE NETWORK (LLM, REMOTE MODEL)</div>
   <div class="l"><span class="code">sharingan benchmark mybot.py --hands 1200        # runs on your machine over a WebSocket: ranked, not verified</span></div>
