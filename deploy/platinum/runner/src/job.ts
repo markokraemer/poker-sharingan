@@ -172,8 +172,9 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
       ));
       if (pip.exitCode !== 0) throw new JobFailure("bot", `pip install failed: ${(pip.stderr || pip.stdout).trim().slice(-400)}`);
       await infra(() => sbx!.setEgress(baseAllow));
-      // nothing the install started or wrote outside DEPS_DIR survives into the run
-      const lock = await infra(() => sbx!.sh(`chown -R root:root ${DEPS_DIR} && chmod -R a+rX,go-w ${DEPS_DIR} && sharingan-scrub ${BOT_UID}`, { timeoutMs: 60_000 }));
+      // First end everything the install started (nothing of BOT_UID may still run while root walks DEPS_DIR), then seal
+      // DEPS_DIR root-owned and read-only. Nothing the install wrote outside DEPS_DIR survives into the run.
+      const lock = await infra(() => sbx!.sh(`sharingan-scrub ${BOT_UID} --keep ${DEPS_DIR} && chown -R root:root ${DEPS_DIR} && chmod -R a+rX,go-w ${DEPS_DIR}`, { timeoutMs: 60_000 }));
       if (lock.exitCode !== 0) throw new JobFailure("infra", `could not seal the install: ${(lock.stderr || lock.stdout).trim().slice(-300)}`);
     }
 

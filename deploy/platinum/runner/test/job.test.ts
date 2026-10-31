@@ -292,7 +292,7 @@ describe("provisioning failures", () => {
     assert.match(pip, /cp -r \/opt\/sharingan\/bot \/tmp\/pip-src .* && cd \/tmp\/pip-src && setpriv --reuid=10002 --regid=10002 --clear-groups env -i .* pip install .* --target \/opt\/sharingan\/deps -r '\/tmp\/pip-src\/requirements\.txt'/, "the install runs unprivileged, in a private copy");
     const seal = sbx.shCalls.findIndex((s) => s.includes("sharingan-scrub 10002"));
     assert.ok(seal > sbx.shCalls.indexOf(pip), "after the install: deps sealed read-only and the install user wiped");
-    assert.match(sbx.shCalls[seal]!, /chown -R root:root \/opt\/sharingan\/deps && chmod -R a\+rX,go-w/);
+    assert.match(sbx.shCalls[seal]!, /^sharingan-scrub 10002 --keep \/opt\/sharingan\/deps && chown -R root:root \/opt\/sharingan\/deps && chmod -R a\+rX,go-w/, "wipe the install user first, then seal");
   });
 
   test("a failing pip install is the bot's error and the sandbox is still deleted", async () => {
