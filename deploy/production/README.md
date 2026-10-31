@@ -73,6 +73,10 @@ sudo systemctl restart sharingan-runner    # recover() fails jobs that were mid-
 ```
 Site: `CLOUDFLARE_ACCOUNT_ID=502fc16a6392df03de7c478c5242f047 npx -y wrangler@latest deploy` at the repo root. Edge Worker: same command in `deploy/platinum/edge`.
 Caddy: `sudo cp deploy/production/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy`.
+Sandbox AppArmor profile (once per host, and when it changes; the runner's `LOCAL_SANDBOX_APPARMOR=sharingan-sandbox` needs it loaded):
+`sudo cp deploy/production/apparmor/sharingan-sandbox /etc/apparmor.d/ && sudo apparmor_parser -r /etc/apparmor.d/sharingan-sandbox`.
+Isolation check of a new bot image (a bot that tries to keep notes between rotations of duplicate deals must find none):
+`sudo sh deploy/platinum/bot/test_isolation.sh localhost/sharingan-bot:prod /srv/sharingan/models`.
 Sandboxes pick up a new `sharingan-bot:prod` for the next job automatically (the image is referenced by tag).
 
 ## Upgrade the model (final SHARINGAN-1 replaces sharingan-1.plcp)

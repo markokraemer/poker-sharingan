@@ -1,0 +1,41 @@
+# AppArmor profile for the bot sandboxes (LOCAL_SANDBOX_APPARMOR=sharingan-sandbox). podman's containers-default profile,
+# rule for rule, except that processes inside one sandbox may signal (and ptrace) each other. Under crun the container
+# label is stacked ("crun//&<profile>"), and the default profile's `peer=<profile>` never matches it: every signal inside
+# the container is denied (even podman's own init forwarding a stop), so the worker could not end a hung bot, and the isolation between rotations of duplicate
+# deals (sharingan-scrub) could not end the processes a rotation left behind.
+# Install: sudo cp deploy/production/apparmor/sharingan-sandbox /etc/apparmor.d/ && sudo apparmor_parser -r /etc/apparmor.d/sharingan-sandbox
+#include <tunables/global>
+
+profile sharingan-sandbox flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  network,
+  capability,
+  file,
+  umount,
+
+  # Signals without a peer rule: a sandbox only sees its own pid namespace, and the kernel's uid checks still apply.
+  signal,
+
+  deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+  # deny write to files not in /proc/<number>/** or /proc/sys/**
+  deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  deny mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  # 'ps' and friends inside the sandbox (tracing still needs the same uid; the sandbox has no CAP_SYS_PTRACE)
+  ptrace (read,readby),
+}

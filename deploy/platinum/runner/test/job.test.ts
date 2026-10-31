@@ -60,7 +60,9 @@ describe("worker mode", () => {
     assert.equal(sbx.fileModes.get("/opt/sharingan/worker.key"), 0o400);
     assert.equal(new TextDecoder().decode(sbx.files.get("/opt/sharingan/worker.key")), "key1=test-signing-key", "id=secret, as --sign-key-file expects");
     const cmd = sbx.procs[0]!.opts.cmd.join(" ");
-    assert.match(cmd, /sharingan-arena run --bot 'env -i HOME=\/home\/bot .* setpriv --reuid=10002 --regid=10002 --clear-groups sharingan pipe '\\''\/opt\/sharingan\/bot\/bot\.py'\\'''/);
+    assert.match(cmd, /sharingan-arena run --bot 'env -i HOME=\/tmp .*PYTHONPATH=\/opt\/sharingan\/deps .* sharingan pipe '\\''\/opt\/sharingan\/bot\/bot\.py'\\'''/);
+    assert.match(cmd, / --rotation-uids 10010,10011,10012,10013,10014,10015$/, "every signed run is played with each rotation as its own user");
+    assert.ok(sbx.shCalls.some((s) => s.includes("chown -R root:root /opt/sharingan/bot") && s.includes("go-w")), "the bot can't write its own directory");
     assert.match(cmd, /--track 'ladder-v1' --hands '600' --lanes '1' --out '\/work\/result\.json' --sign-key-file '\/opt\/sharingan\/worker\.key' --player-id 'p_test'/);
     assert.equal(sbx.procs[0]!.opts.env!.SHARINGAN_JOB_ID, "job_t1");
     assert.ok(!JSON.stringify(sbx.procs[0]!.opts).includes("runner-secret"), "no arena token reaches the sandbox");
@@ -115,7 +117,7 @@ describe("worker mode", () => {
       WORKER_CMD_TEMPLATE: "sharingan-arena run --bot {bot} --track {track} --hands {hands} --out {out} --sign-key-file {keyfile} --player-id {player_id}",
     });
     await run();
-    assert.match(platinum.last.procs[0]!.opts.cmd.join(" "), /--player-id 'p_test' --seed-file '\/opt\/sharingan\/run\.seed'$/);
+    assert.match(platinum.last.procs[0]!.opts.cmd.join(" "), /--player-id 'p_test' --seed-file '\/opt\/sharingan\/run\.seed' --rotation-uids 10010,10011,10012,10013,10014,10015$/);
   });
 
   test("a failing bot: one clear line, ONE de-duplicated traceback, no progress, no score line (error and bot_log_tail)", async () => {
@@ -286,11 +288,15 @@ describe("provisioning failures", () => {
     const sbx = platinum.last;
     assert.deepEqual(sbx.spec.allowOut, ["pypi.org", "files.pythonhosted.org"]);
     assert.deepEqual(sbx.egress, [[]]);
-    assert.ok(sbx.shCalls.some((s) => s.includes("pip install --no-cache-dir -r '/opt/sharingan/bot/requirements.txt'")));
+    const pip = sbx.shCalls.find((s) => s.includes("pip install"))!;
+    assert.match(pip, /setpriv --reuid=10002 --regid=10002 --clear-groups env -i .* pip install .* --target \/opt\/sharingan\/deps -r '\/opt\/sharingan\/bot\/requirements\.txt'/, "the install runs unprivileged");
+    const seal = sbx.shCalls.findIndex((s) => s.includes("sharingan-scrub 10002"));
+    assert.ok(seal > sbx.shCalls.indexOf(pip), "after the install: deps sealed read-only and the install user wiped");
+    assert.match(sbx.shCalls[seal]!, /chown -R root:root \/opt\/sharingan\/deps && chmod -R a\+rX,go-w/);
   });
 
   test("a failing pip install is the bot's error and the sandbox is still deleted", async () => {
-    const { platinum, store, run } = await setup({ sh: (s) => (s.startsWith("pip install") ? { exitCode: 1, stdout: "", stderr: "No matching distribution for foo" } : undefined) }, { requirementsFile: "requirements.txt" });
+    const { platinum, store, run } = await setup({ sh: (s) => (s.includes("pip install") ? { exitCode: 1, stdout: "", stderr: "No matching distribution for foo" } : undefined) }, { requirementsFile: "requirements.txt" });
     await run();
     const j = (await store.get("job_t1"))!;
     assert.deepEqual([j.status, j.errorClass], ["failed", "bot"]);
@@ -390,9 +396,10 @@ describe("helpers", () => {
     assert.equal(renderCommand("x --a {a} --b {b}", { a: "one two", b: 3 }), "x --a 'one two' --b '3'");
     assert.throws(() => renderCommand("x {nope}", {}), /\{nope\}/);
   });
-  test("botCommand: clean env, uid drop, entry quoted", () => {
+  test("botCommand: clean env, entry quoted, no uid of its own (the worker sets one per rotation)", () => {
     const c = botCommand(cfg, input({ entry: "my bot.py" }));
-    assert.match(c, /^env -i HOME=\/home\/bot .* setpriv --reuid=10002 .* sharingan pipe '\/opt\/sharingan\/bot\/my bot\.py'$/);
+    assert.match(c, /^env -i HOME=\/tmp .* sharingan pipe '\/opt\/sharingan\/bot\/my bot\.py'$/);
+    assert.doesNotMatch(c, /setpriv/);
   });
   test("parseProgress: JSON lines and 'N/M hands'", () => {
     assert.deepEqual(parseProgress('noise\n{"hands_done":120,"hands_total":600}\n'), { done: 120, total: 600 });

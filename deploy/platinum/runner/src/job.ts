@@ -50,11 +50,15 @@ class AbortedError extends Error {}
 
 const PYPI_HOSTS = ["pypi.org", "files.pythonhosted.org"];
 const BOT_DIR = "/opt/sharingan/bot";
+/** pip --target for the bot's requirements; on PYTHONPATH. Installed as BOT_UID, then root-owned and read-only. */
+const DEPS_DIR = "/opt/sharingan/deps";
 const BOT_UID = 10002;
+/** The worker runs rotation r of the duplicate deals as uid ROTATION_UIDS[r] and wipes it before the next (sharingan-scrub). */
+export const ROTATION_UIDS = [10010, 10011, 10012, 10013, 10014, 10015];
 const KEY_PATH = "/opt/sharingan/worker.key";
 /** Per-job secret deal seed, same protection as the key: root-only, never in the bot's env or args. */
 export const SEED_PATH = "/opt/sharingan/run.seed";
-const BOT_ENV = "HOME=/home/bot PATH=/usr/local/bin:/usr/bin:/bin PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1";
+const BOT_ENV = `HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin PYTHONPATH=${DEPS_DIR} PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1`;
 
 export const shq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
 
@@ -71,7 +75,8 @@ export function botCommand(cfg: Config, input: Job["input"]): string {
   const pipe = input.language === "python" ? cfg.worker.pipeCmd.python : cfg.worker.pipeCmd.typescript;
   if (!pipe) throw new JobFailure("infra", `worker mode has no pipe command for ${input.language} (set PIPE_CMD_${input.language.toUpperCase()})`);
   const entry = `${BOT_DIR}/${input.entry}`;
-  return `env -i ${BOT_ENV} setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups ${pipe} ${shq(entry)}`;
+  // no setpriv here: the worker runs each rotation as its own uid (--rotation-uids)
+  return `env -i ${BOT_ENV} ${pipe} ${shq(entry)}`;
 }
 
 /** Best-effort progress from worker output: a JSON line carrying hands_done/hands_total, or "N/M hands". */
@@ -144,7 +149,8 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     if (artifact.length > cfg.limits.maxArtifactBytes) throw new JobFailure("bot", `artifact too large (${artifact.length} > ${cfg.limits.maxArtifactBytes})`);
     await infra(() => sbx!.writeFile("/tmp/bot.tgz", artifact));
     const unpack = await infra(() => sbx!.sh(
-      `mkdir -p ${BOT_DIR} && tar xzf /tmp/bot.tgz -C ${BOT_DIR} --no-same-owner && chmod -R a+rX ${BOT_DIR}`, { timeoutMs: 30_000 },
+      `mkdir -p ${BOT_DIR} && tar xzf /tmp/bot.tgz -C ${BOT_DIR} --no-same-owner && rm -f /tmp/bot.tgz `
+      + `&& chown -R root:root ${BOT_DIR} && chmod -R a+rX,go-w ${BOT_DIR} && chmod 0755 ${BOT_DIR}`, { timeoutMs: 30_000 },
     ));
     if (unpack.exitCode !== 0) throw new JobFailure("bot", `could not unpack the artifact: ${unpack.stderr.trim().slice(0, 300)}`);
     const has = await infra(() => sbx!.sh(`test -f ${shq(`${BOT_DIR}/${input.entry}`)}`));
@@ -152,9 +158,17 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
 
     // 4 ---- deps, then drop PyPI again
     if (needsPip) {
-      const pip = await infra(() => sbx!.sh(`pip install --no-cache-dir -r ${shq(`${BOT_DIR}/${input.requirementsFile!}`)}`, { timeoutMs: 300_000 }));
+      // Unprivileged (BOT_UID) into DEPS_DIR: a package's setup code must not reach the worker, the key or the seed.
+      const pip = await infra(() => sbx!.sh(
+        `mkdir -p ${DEPS_DIR} && chown ${BOT_UID}:${BOT_UID} ${DEPS_DIR} && setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups `
+        + `env -i HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin pip install --no-cache-dir --disable-pip-version-check --no-warn-script-location `
+        + `--target ${DEPS_DIR} -r ${shq(`${BOT_DIR}/${input.requirementsFile!}`)}`, { timeoutMs: 300_000 },
+      ));
       if (pip.exitCode !== 0) throw new JobFailure("bot", `pip install failed: ${(pip.stderr || pip.stdout).trim().slice(-400)}`);
       await infra(() => sbx!.setEgress(baseAllow));
+      // nothing the install started or wrote outside DEPS_DIR survives into the run
+      const lock = await infra(() => sbx!.sh(`chown -R root:root ${DEPS_DIR} && chmod -R a+rX,go-w ${DEPS_DIR} && sharingan-scrub ${BOT_UID}`, { timeoutMs: 60_000 }));
+      if (lock.exitCode !== 0) throw new JobFailure("infra", `could not seal the install: ${(lock.stderr || lock.stdout).trim().slice(-300)}`);
     }
 
     // 5 ---- play
@@ -236,6 +250,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
       key_id: w.keyId,
     });
     if (!w.cmdTemplate.includes("{seedfile}")) cmd += ` --seed-file ${shq(SEED_PATH)}`;   // a custom template must not drop the seed
+    if (!w.cmdTemplate.includes("--rotation-uids")) cmd += ` --rotation-uids ${ROTATION_UIDS.join(",")}`;   // nor the isolation
     const wp = await infra(() => sbx!.startProcess({
       cmd: ["sh", "-c", `mkdir -p ${shq(dir)} && cd ${shq(dir)} && exec ${cmd}`],
       env: { ...w.env, SHARINGAN_JOB_ID: jobId, SHARINGAN_OWNER: input.userId, SHARINGAN_BOT_NAME: input.botName, SHARINGAN_TRACK: input.track },

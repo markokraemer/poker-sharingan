@@ -260,6 +260,23 @@ pub fn lane_hand_no(duplicate: bool, planned: u32, block_deals: u32, lanes: usiz
     None
 }
 
+/// The `c`-th (0-based) hand of rotation `rot` for a lane (the headless worker plays rotation-major): lane `L` of `N`
+/// plays rotation `rot` of the deals in blocks `L, L+N, ...`. Over one rotation every deal appears exactly once.
+pub fn lane_rotation_hand_no(planned: u32, block_deals: u32, lanes: usize, lane: usize, rot: u32, c: u32) -> Option<u32> {
+    let deals = planned / 6;
+    let nblocks = (deals + block_deals - 1) / block_deals;
+    let (mut rem, mut b) = (c, lane as u32);
+    while b < nblocks {
+        let sz = block_deals.min(deals - b * block_deals);
+        if rem < sz {
+            return Some(b * 6 * block_deals + rot * sz + rem + 1);
+        }
+        rem -= sz;
+        b += lanes as u32;
+    }
+    None
+}
+
 /// Standings from per-hand nets (and AIVAT-corrected payoffs when available). `keys` are the stats
 /// keys per participant slot (see `MatchRuntime::slot_keys`).
 #[allow(clippy::too_many_arguments)]
@@ -569,4 +586,31 @@ pub fn aivat_hand(house: &crate::house::HouseRegistry, h: &HandHistory, est: &dy
     }
     let _ = Action::Fold;
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotation_major_lanes_cover_every_hand_once_and_never_repeat_a_deal_within_a_rotation() {
+        for (planned, lanes) in [(20_004u32, 4usize), (20_004, 8), (600, 3), (144, 2), (6, 1), (78, 5)] {
+            let mut seen = vec![false; planned as usize + 1];
+            for rot in 0..6u32 {
+                let mut deals_this_rot = std::collections::HashSet::new();
+                for lane in 0..lanes {
+                    let mut c = 0;
+                    while let Some(h) = lane_rotation_hand_no(planned, 12, lanes, lane, rot, c) {
+                        c += 1;
+                        assert!(!seen[h as usize], "hand {h} played twice");
+                        seen[h as usize] = true;
+                        let (deal, r) = locate(true, planned, 12, h);
+                        assert_eq!(r, rot, "hand {h} belongs to rotation {r}, not {rot}");
+                        assert!(deals_this_rot.insert(deal.unwrap()), "deal {deal:?} twice in rotation {rot}");
+                    }
+                }
+            }
+            assert!(seen[1..].iter().all(|&x| x), "{planned}/{lanes}: every hand is played");
+        }
+    }
 }

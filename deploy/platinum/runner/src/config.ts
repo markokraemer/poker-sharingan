@@ -40,6 +40,7 @@ export interface Config {
     egressNetwork?: string;      // joined temporarily for `pip install`
     binds: string[];             // extra bind mounts, "host:container[:ro]" (e.g. the test blueprint)
     pidsLimit: number;
+    apparmor?: string;           // AppArmor profile for the sandboxes (deploy/production/apparmor/sharingan-sandbox)
   };
 
   sandbox: { cpu: number; ramMb: number; diskGb: number; autoStopMinutes: number };
@@ -174,6 +175,7 @@ export function loadConfig(env: Env = process.env): Config {
       egressNetwork: str("LOCAL_EGRESS_NETWORK"),
       binds: (str("LOCAL_SANDBOX_BINDS", "") as string).split(",").map((s) => s.trim()).filter(Boolean),
       pidsLimit: num("LOCAL_PIDS_LIMIT", 512),
+      apparmor: str("LOCAL_SANDBOX_APPARMOR"),
     },
 
     sandbox: {

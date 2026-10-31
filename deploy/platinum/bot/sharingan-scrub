@@ -1,0 +1,40 @@
+#!/bin/sh
+# sharingan-scrub UID: end every process of UID and remove everything it left behind (files on every mount, SysV IPC),
+# so nothing a bot wrote down reaches whatever runs next in the sandbox. The match worker runs it (as root) after each
+# rotation of duplicate deals, the runner after a requirements install. Exit 0 only when UID is gone without a trace.
+set -u
+u="${1:-}"
+case "$u" in '' | *[!0-9]*) echo "usage: sharingan-scrub UID" >&2; exit 2 ;; esac
+[ "$u" -ge 1000 ] || { echo "sharingan-scrub: refusing uid $u" >&2; exit 2; }
+
+# live (non-zombie) processes of $u; zombies hold nothing and are reaped by init
+alive() {
+  for s in /proc/[0-9]*/status; do
+    awk -v u="$u" '/^State:/ { z = ($2 == "Z") } /^Uid:/ { for (i = 2; i <= 5; i++) if ($i == u && !z) f = 1 } END { exit !f }' "$s" 2>/dev/null && return 0
+  done
+  return 1
+}
+i=0
+while alive; do
+  # kill(-1) as $u reaches every process $u owns (and nothing else)
+  setpriv --reuid="$u" --regid="$u" --clear-groups sh -c 'kill -9 -1' 2>/dev/null
+  i=$((i + 1))
+  [ "$i" -lt 200 ] || { echo "sharingan-scrub: processes of uid $u survive" >&2; exit 1; }
+  sleep 0.05
+done
+
+# SysV shared memory, semaphores, message queues it created
+setpriv --reuid="$u" --regid="$u" --clear-groups ipcrm --all 2>/dev/null
+
+# every file or directory it owns, on every real filesystem (tmpfs mounts included)
+awk '$3 !~ /^(proc|sysfs|cgroup|cgroup2|devpts|securityfs|debugfs|tracefs|bpf|pstore|configfs|fusectl|binfmt_misc|autofs|hugetlbfs|overlay_skip)$/ { print $2 }' /proc/mounts |
+  while read -r m; do
+    find "$m" -xdev \( -user "$u" -o -group "$u" \) -depth -exec rm -rf {} + 2>/dev/null
+  done
+if find / /tmp /var/tmp /dev/shm -xdev \( -user "$u" -o -group "$u" \) -print -quit 2>/dev/null | grep -q .; then
+  echo "sharingan-scrub: files of uid $u survive" >&2
+  exit 1
+fi
+# directory times are the last thing it touched there: reset them
+touch /tmp /var/tmp /dev/shm 2>/dev/null
+exit 0

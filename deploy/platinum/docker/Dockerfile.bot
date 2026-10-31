@@ -51,10 +51,17 @@ COPY --from=tsbuild /wsdep/node_modules/ws /opt/sharingan/node_modules/ws
 
 COPY deploy/platinum/bot/launch_bot.py  /opt/sharingan/launch_bot.py
 COPY deploy/platinum/bot/launch_bot.mjs /opt/sharingan/launch_bot.mjs
-RUN chmod -R a+rX /opt/sharingan && chmod 1777 /opt/sharingan/bot \
- && mkdir -p /work && chmod 0755 /work
+COPY deploy/platinum/bot/sharingan-scrub /usr/local/bin/sharingan-scrub
+RUN chmod -R a+rX /opt/sharingan && chmod 0755 /usr/local/bin/sharingan-scrub \
+ && mkdir -p /opt/sharingan/bot /opt/sharingan/deps /work && chmod 0755 /opt/sharingan/bot /opt/sharingan/deps /work
 
-# Unprivileged user the bot process runs as (the VM is the real boundary; this keeps the signing key and run-time tokens out of the bot's reach).
-RUN useradd -u 10002 -m -s /usr/sbin/nologin bot
+# Unprivileged users. The bot's install (pip) and the remote-bot mode run as 10002; the hosted worker runs each rotation of
+# duplicate deals as its own user, 10010..10015, and wipes what it left before the next (sharingan-scrub). No home
+# directories: HOME is /tmp, a size-capped tmpfs in the sandbox. Nothing on the image is writable by them.
+RUN useradd -u 10002 -M -d /tmp -s /usr/sbin/nologin bot \
+ && for i in 0 1 2 3 4 5; do useradd -u $((10010 + i)) -M -d /tmp -s /usr/sbin/nologin "rot$i" || exit 1; done \
+ && { [ ! -d /run/lock ] || chmod 0755 /run/lock; } \
+ && ww="$(find / -xdev -perm -0002 \( -type d -o -type f \) ! -path /tmp ! -path /var/tmp 2>/dev/null)" \
+ && { [ -z "$ww" ] || { echo "world-writable paths in the bot image (a bot could keep notes there): $ww" >&2; exit 1; }; }
 WORKDIR /opt/sharingan/bot
 CMD ["sleep", "infinity"]

@@ -42,7 +42,7 @@ let platinum: PlatinumClient;
 if (cfg.backend === "local") {
   platinum = new LocalPlatinum({
     engineHost: cfg.local.engineHost, network: cfg.local.network, egressNetwork: cfg.local.egressNetwork,
-    binds: cfg.local.binds, pidsLimit: cfg.local.pidsLimit, arenaHost: new URL(cfg.arena.botUrl).hostname,
+    binds: cfg.local.binds, pidsLimit: cfg.local.pidsLimit, apparmor: cfg.local.apparmor, arenaHost: new URL(cfg.arena.botUrl).hostname,
   });
 } else {
   const { RealPlatinum } = await import("./platinum/real.ts");   // the SDK is only loaded when it is used

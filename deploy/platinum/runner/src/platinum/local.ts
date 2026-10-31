@@ -18,6 +18,8 @@ export interface LocalOpts {
   egressNetwork?: string;
   binds: string[];
   pidsLimit: number;
+  /** AppArmor profile for the sandboxes (LOCAL_SANDBOX_APPARMOR); unset = podman's default. */
+  apparmor?: string;
   /** The arena's hostname: the one destination that needs no extra network. */
   arenaHost: string;
   engine?: Engine;
@@ -25,6 +27,14 @@ export interface LocalOpts {
 
 const LABEL = "sharingan.sandbox";
 const META = "sharingan.meta.";
+
+/** tmpfs mounts of every local sandbox (see createSandbox). */
+export const LOCAL_TMPFS: Record<string, string> = {
+  "/tmp": "rw,nosuid,nodev,size=2g,mode=1777",
+  "/var/tmp": "rw,nosuid,nodev,size=256m,mode=1777",
+  "/opt/sharingan/bot": "rw,nosuid,nodev,size=1g,mode=0755",
+  "/opt/sharingan/deps": "rw,nosuid,nodev,size=2g,mode=0755",
+};
 
 export class LocalPlatinum implements PlatinumClient {
   readonly kind = "local" as const;
@@ -53,7 +63,12 @@ export class LocalPlatinum implements PlatinumClient {
         PidsLimit: this.o.pidsLimit,
         NetworkMode: first ?? "none",
         Binds: this.o.binds.length ? this.o.binds : undefined,
-        SecurityOpt: ["no-new-privileges"],
+        // apparmor: deploy/production/apparmor/sharingan-sandbox (podman's default denies every signal inside the container under crun)
+        SecurityOpt: ["no-new-privileges", ...(this.o.apparmor ? [`apparmor=${this.o.apparmor}`] : [])],
+        // Everything a bot (or its install) can write is a size-capped tmpfs, charged to the container's memory limit:
+        // nothing reaches the host disk. The image itself has no other writable path for the bot users.
+        Tmpfs: LOCAL_TMPFS,
+        Init: true,   // reaps orphans, so a killed bot leaves no zombie behind
       },
       NetworkingConfig: first ? { EndpointsConfig: { [first]: {} } } : undefined,
     };

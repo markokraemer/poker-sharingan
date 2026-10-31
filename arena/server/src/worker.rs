@@ -63,6 +63,12 @@ pub struct WorkerOpts {
     pub hands_out: Option<String>,
     /// House-bot configuration (blueprint, buckets, sizing); `None` = from the environment (`ARENA_BLUEPRINT`, ...).
     pub house_cfg: Option<ServerConfig>,
+    /// Isolation for duplicate deals (`--rotation-uids`, the hosted runner always sets it): rotation r's bot processes run
+    /// as uid `rotation_uids[r]` (the worker must be root), and `scrub_cmd UID` ends everything that uid left behind
+    /// (processes, files, IPC) before the next rotation starts. Each deal appears once per rotation, so with this no bot
+    /// process can remember a deal it saw from another seat.
+    pub rotation_uids: Option<[u32; 6]>,
+    pub scrub_cmd: String,
 }
 
 impl Default for WorkerOpts {
@@ -78,6 +84,8 @@ impl Default for WorkerOpts {
             max_restarts: 3,
             player_id: None,
             aivat: "full".into(),
+            rotation_uids: None,
+            scrub_cmd: "sharingan-scrub".into(),
             quiet: false,
             hands_out: None,
             house_cfg: None,
@@ -424,6 +432,8 @@ struct Lane<'a> {
     lane: usize,
     table_id: String,
     bot: Option<BotProc>,
+    /// The bot command of the rotation being played (wrapped for its uid when isolated).
+    bot_cmd: String,
     table_seq: u64,
     st: LaneStats,
 }
@@ -456,7 +466,7 @@ fn envelope(kind: &str, table_id: &str, hand_id: Option<&str>, seq: Option<u32>,
 
 impl<'a> Lane<'a> {
     fn new(cx: &'a Cx<'a>, lane: usize) -> Self {
-        Lane { cx, lane, table_id: format!("lane-{lane}"), bot: None, table_seq: 0, st: LaneStats { lane, ..Default::default() } }
+        Lane { cx, lane, table_id: format!("lane-{lane}"), bot: None, bot_cmd: String::new(), table_seq: 0, st: LaneStats { lane, ..Default::default() } }
     }
 
     fn alive(&self) -> bool {
@@ -475,7 +485,7 @@ impl<'a> Lane<'a> {
     /// Start the bot process and do the hello/welcome handshake.
     fn start_bot(&mut self) -> Result<(), String> {
         let o = self.cx.opts;
-        let mut b = BotProc::spawn(&o.bot_cmd, self.lane, self.cx.lanes).map_err(|e| format!("spawn failed: {e}"))?;
+        let mut b = BotProc::spawn(&self.bot_cmd, self.lane, self.cx.lanes).map_err(|e| format!("spawn failed: {e}"))?;
         let deadline = Instant::now() + Duration::from_millis(o.startup_timeout_ms);
         loop {
             if Instant::now() >= deadline {
@@ -747,14 +757,19 @@ impl<'a> Lane<'a> {
         Some((HandRec { hand_no, nets }, av, (hand_no, deal_no, rotation, deck_digest, nets)))
     }
 
-    fn run(mut self) -> LaneOut {
+    /// Play this lane's share of rotation `rot` with a fresh bot process (`bot_cmd`), then end it. A lane that gave up on
+    /// its bot (too many restarts) stays given up: its remaining hands are forfeited.
+    fn play_rotation(&mut self, rot: u32, bot_cmd: String, out: &mut LaneOut) {
         let t0 = Instant::now();
-        let mut out = LaneOut { recs: vec![], aivat: HashMap::new(), log: vec![], stats: LaneStats::default() };
-        if let Err(e) = self.start_bot() {
-            self.die(format!("start failed: {e}"));
+        self.bot_cmd = bot_cmd;
+        self.table_seq = 0; // a new process is a new session
+        if self.alive() {
+            if let Err(e) = self.start_bot() {
+                self.die(format!("start failed: {e}"));
+            }
         }
         let mut c = 0u32;
-        while let Some(h) = matches::lane_hand_no(true, self.cx.planned, BLOCK_DEALS, self.cx.lanes, self.lane, c) {
+        while let Some(h) = matches::lane_rotation_hand_no(self.cx.planned, BLOCK_DEALS, self.cx.lanes, self.lane, rot, c) {
             c += 1;
             match self.play_hand(h) {
                 Some((rec, av, log)) => {
@@ -773,10 +788,24 @@ impl<'a> Lane<'a> {
             let bye = envelope("bye", &self.table_id, None, None, self.table_seq + 1, "{}");
             b.finish(&bye);
         }
-        self.st.wall_ms = t0.elapsed().as_millis() as u64;
-        out.stats = self.st;
-        out
+        self.st.wall_ms += t0.elapsed().as_millis() as u64;
     }
+}
+
+/// The bot command for rotation `rot`: as that rotation's own uid when isolated.
+fn rotation_cmd(opts: &WorkerOpts, rot: u32) -> String {
+    match &opts.rotation_uids {
+        Some(u) => format!("exec setpriv --reuid={0} --regid={0} --clear-groups {1}", u[rot as usize], opts.bot_cmd),
+        None => opts.bot_cmd.clone(),
+    }
+}
+
+/// End everything `uid` left behind (see `WorkerOpts::rotation_uids`). A failure fails the run: a run that can't
+/// guarantee the isolation must not be signed.
+fn scrub(cmd: &str, uid: u32) -> Result<(), String> {
+    let st = Command::new("sh").arg("-c").arg(format!("{cmd} {uid}")).stdin(Stdio::null()).status()
+        .map_err(|e| format!("isolation: cannot run {cmd}: {e}"))?;
+    if st.success() { Ok(()) } else { Err(format!("isolation: `{cmd} {uid}` failed ({st})")) }
 }
 
 // ------------------------------------------------------------------------------------ run + result
@@ -841,13 +870,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
     let started_at = now_iso();
     let t0 = Instant::now();
     let finished = AtomicBool::new(false);
-    let outs: Vec<LaneOut> = std::thread::scope(|sc| {
-        let hs: Vec<_> = (0..lanes)
-            .map(|l| {
-                let cx = &cx;
-                sc.spawn(move || Lane::new(cx, l).run())
-            })
-            .collect();
+    let outs: Vec<LaneOut> = std::thread::scope(|sc| -> Result<Vec<LaneOut>, String> {
         if !opts.quiet {
             let (cx, fin) = (&cx, &finished);
             sc.spawn(move || {
@@ -862,10 +885,38 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
                 }
             });
         }
-        let outs = hs.into_iter().map(|h| h.join().expect("lane thread panicked")).collect();
+        // Rotation-major: every lane plays rotation 0 of its deals, then (fresh processes) rotation 1, ... Within one rotation
+        // a deal appears once, so a bot process never meets a deal it already saw from another seat; with
+        // `rotation_uids` nothing it wrote down survives into the next rotation either.
+        let mut ls: Vec<Lane> = (0..lanes).map(|l| Lane::new(&cx, l)).collect();
+        let mut outs: Vec<LaneOut> = (0..lanes).map(|_| LaneOut { recs: vec![], aivat: HashMap::new(), log: vec![], stats: LaneStats::default() }).collect();
+        for rot in 0..6u32 {
+            let cmd = rotation_cmd(opts, rot);
+            let hs: Vec<_> = ls.drain(..).zip(outs.drain(..)).map(|(mut lane, mut out)| {
+                let cmd = cmd.clone();
+                sc.spawn(move || {
+                    lane.play_rotation(rot, cmd, &mut out);
+                    (lane, out)
+                })
+            }).collect();
+            for h in hs {
+                let (lane, out) = h.join().expect("lane thread panicked");
+                ls.push(lane);
+                outs.push(out);
+            }
+            if let Some(uids) = &opts.rotation_uids {
+                if let Err(e) = scrub(&opts.scrub_cmd, uids[rot as usize]) {
+                    finished.store(true, Ordering::Relaxed);
+                    return Err(e);
+                }
+            }
+        }
+        for (lane, out) in ls.iter_mut().zip(outs.iter_mut()) {
+            out.stats = std::mem::take(&mut lane.st);
+        }
         finished.store(true, Ordering::Relaxed);
-        outs
-    });
+        Ok(outs)
+    })?;
     let wall = t0.elapsed();
     let mut recs: Vec<HandRec> = Vec::new();
     let mut aivat: HashMap<u32, [f64; 6]> = HashMap::new();
@@ -922,7 +973,8 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
         "deals_digest": sha256_hex(&dg),
         "bot": {"command_sha256": sha256_hex(opts.bot_cmd.as_bytes())},
         "worker": {"name": "sharingan-arena", "version": env!("CARGO_PKG_VERSION"), "protocol": PROTOCOL, "aivat": opts.aivat,
-                   "decision_timeout_ms": opts.decision_timeout_ms, "max_restarts": opts.max_restarts},
+                   "decision_timeout_ms": opts.decision_timeout_ms, "max_restarts": opts.max_restarts,
+                   "isolated_rotations": opts.rotation_uids.is_some()},
         "per_lane": lane_stats.iter().map(|s| json!({
             "lane": s.lane, "hands": s.hands, "decisions": s.decisions, "timeouts": s.timeouts, "restarts": s.restarts,
             "illegal_actions": s.illegal_actions, "forfeit_hands": s.forfeit_hands, "noise_lines": s.noise_lines,
@@ -945,6 +997,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
 pub const RUN_USAGE: &str = "usage: sharingan-arena run --bot \"<command>\" [--track ladder-v1|sharingan-1] [--hands N] [--lanes L] [--seed S | --seed-file F]
          [--out result.json] [--sign-key-file F] [--player-id ID] [--decision-timeout-ms 5000] [--startup-timeout-ms 30000]
          [--max-restarts 3] [--aivat full|cards|off] [--hands-out FILE] [--quiet]
+         [--rotation-uids U0,U1,U2,U3,U4,U5 [--scrub-cmd sharingan-scrub]]   (as root: each rotation's bot as its own uid, wiped after)
   env: ARENA_BLUEPRINT / ARENA_BUCKETS / ARENA_SIZING select the sharingan-1 house bot (as for the server)";
 
 /// `sharingan-arena run ...`; returns the process exit code.
@@ -989,6 +1042,17 @@ pub fn cli_run(args: Vec<String>) -> i32 {
             "--max-restarts" => o.max_restarts = n!(u32),
             "--aivat" => o.aivat = v!(),
             "--hands-out" => o.hands_out = Some(v!()),
+            "--rotation-uids" => {
+                let u: Vec<u32> = v!().split(',').filter_map(|x| x.trim().parse().ok()).collect();
+                let mut d = u.clone();
+                d.sort_unstable();
+                d.dedup();
+                if u.len() != 6 || d.len() != 6 || u.iter().any(|&x| x < 1000) {
+                    return bad("--rotation-uids needs 6 distinct uids >= 1000, comma separated");
+                }
+                o.rotation_uids = Some([u[0], u[1], u[2], u[3], u[4], u[5]]);
+            }
+            "--scrub-cmd" => o.scrub_cmd = v!(),
             "--quiet" => o.quiet = true,
             "-h" | "--help" => {
                 println!("{RUN_USAGE}");

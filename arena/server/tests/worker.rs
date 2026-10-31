@@ -51,7 +51,7 @@ fn protocol_conformance_hello_welcome_your_turn_hand_end_bye() {
     let d = tmp("proto");
     let (inlog, outlog) = (d.join("in.log"), d.join("out.log"));
     // tee records what the worker sends (stdin of the bot) and what the bot answers (its stdout)
-    let cmd = format!("tee {} | {} | tee {}", inlog.display(), station(), outlog.display());
+    let cmd = format!("tee -a {} | {} | tee -a {}", inlog.display(), station(), outlog.display());
     let r = run_worker(&opts(&bp, &cmd, 24, 1)).unwrap();
     assert_eq!(r["hands"], 24);
     assert_eq!(r["forfeit_hands"], 0);
@@ -69,10 +69,18 @@ fn protocol_conformance_hello_welcome_your_turn_hand_end_bye() {
     let kinds: std::collections::BTreeSet<&str> = ins.iter().map(|m| m["type"].as_str().unwrap()).collect();
     assert_eq!(kinds, ["bye", "hand_end", "welcome", "your_turn"].into_iter().collect());
     assert_eq!(ins.last().unwrap()["type"], "bye");
-    // table_seq: gap-free, +1 per message delivered
+    // one session (process) per rotation: welcome ... bye, table_seq gap-free from 1 within each
+    let mut sessions = 0;
+    let mut next = 0u64;
     for (i, m) in ins.iter().enumerate() {
-        assert_eq!(m["table_seq"], (i + 1) as u64, "table_seq at message {i}");
+        if m["type"] == "welcome" {
+            sessions += 1;
+            next = 1;
+        }
+        assert_eq!(m["table_seq"], next, "table_seq at message {i}");
+        next += 1;
     }
+    assert_eq!(sessions, 6, "a fresh process for each of the 6 rotations");
     // your_turn carries the section 5.3 payload
     let turns: Vec<&Value> = ins.iter().filter(|m| m["type"] == "your_turn").collect();
     assert!(turns.len() >= 24);
@@ -146,7 +154,7 @@ for line in sys.stdin:
     assert_eq!(r["hands"], 24);
     assert_eq!(r["forfeit_hands"], 0, "{r}");
     assert_eq!(lane["timeouts"], 0, "{r}");
-    assert_eq!(lane["noise_lines"], 1);
+    assert_eq!(lane["noise_lines"], 6, "one noise line per process, one process per rotation");
     assert_eq!(lane["illegal_actions"], lane["decisions"], "every decision was first answered illegally once");
     // same score as the plain calling station: illegal answers change nothing
     let base = run_worker(&opts(&bp, &station(), 24, 1)).unwrap();
@@ -711,4 +719,45 @@ fn a_bot_that_floods_stdout_cannot_starve_the_decision_deadline() {
     assert_eq!(r["hands"], 12);
     assert_eq!(r["forfeit_hands"], 12, "{r}");
     assert_eq!(r["crashed_lanes"], 1);
+}
+
+// ---------------------------------------------------------------------------------------------- duplicate deals never leak
+
+#[test]
+fn a_bot_process_never_meets_a_deal_it_already_saw_from_another_seat() {
+    let Some(bp) = blueprint() else { return eprintln!("skipped: no test blueprint") };
+    if std::process::Command::new("python3").arg("-V").output().is_err() {
+        return eprintln!("skipped: no python3");
+    }
+    // a bot with a memory: logs (its pid, every hand_id it is asked about)
+    let py = r#"
+import sys, json, os
+log = open(sys.argv[1], "a")
+print(json.dumps({"v":1,"type":"hello","data":{"protocol":1}}), flush=True)
+for line in sys.stdin:
+    m = json.loads(line)
+    if m["type"] == "your_turn":
+        d = m["data"]
+        log.write("%d %s\n" % (os.getpid(), d["hand_id"])); log.flush()
+        t = "check" if d["legal"].get("check") else "call"
+        print(json.dumps({"v":1,"type":"act","data":{"hand_id":d["hand_id"],"decision_id":d["decision_id"],"type":t}}), flush=True)
+    elif m["type"] == "bye":
+        break
+"#;
+    let d = tmp("memory");
+    let (script, log) = (d.join("memory.py"), d.join("seen.log"));
+    std::fs::write(&script, py).unwrap();
+    let r = run_worker(&opts(&bp, &format!("python3 {} {}", script.display(), log.display()), 144, 2)).unwrap();
+    assert_eq!(r["hands"], 144);
+    let mut seen: std::collections::HashMap<(String, u32), u32> = std::collections::HashMap::new();
+    let mut pids = std::collections::HashSet::new();
+    for line in std::fs::read_to_string(&log).unwrap().lines() {
+        let (pid, hand_id) = line.split_once(' ').unwrap();
+        let hand_no: u32 = hand_id.rsplit("-h").next().unwrap().parse().unwrap();
+        let (deal, _) = arena_server::matches::locate(true, 144, 12, hand_no);
+        pids.insert(pid.to_string());
+        let first = *seen.entry((pid.to_string(), deal.unwrap())).or_insert(hand_no);
+        assert_eq!(first, hand_no, "process {pid} met deal {deal:?} twice (hands {first} and {hand_no})");
+    }
+    assert!(pids.len() >= 12, "a fresh process per lane and rotation: {} processes", pids.len());
 }
