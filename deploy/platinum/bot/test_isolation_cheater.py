@@ -15,6 +15,7 @@ import stat
 import sys
 
 ME = f"{os.getuid()}:{os.getpid()}"
+MARK_PORTS = {40000 + u % 1000 for u in (10002, 10010, 10011, 10012, 10013, 10014, 10015)}
 SOCK = "\0sharingan-cheat"
 PLACES = ["/tmp/notes", "/var/tmp/notes", "/dev/shm/notes", os.path.expanduser("~/notes"), "/opt/sharingan/bot/notes",
           "/opt/sharingan/deps/notes", "/work/notes", "/run/lock/notes"]
@@ -76,7 +77,7 @@ def look():
                 if len(f) > 3 and f[3] == "06":
                     for ep in (f[1], f[2]):
                         port = int(ep.rsplit(":", 1)[1], 16)
-                        if 40000 <= port < 41000:
+                        if port in MARK_PORTS:   # only the ports a cheater binds (ephemeral ports fall in this range too)
                             seen("tcp time_wait", f"{10000 + port - 40000}:tw")
         except OSError:
             pass
