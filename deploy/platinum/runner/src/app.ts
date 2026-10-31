@@ -130,7 +130,7 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
     const hit = tokenCache.get(key);
     if (hit && hit.exp > Date.now()) return hit.playerId ?? undefined;
     const who = await opts.arena.whoami(tok).catch(() => undefined);
-    const playerId = who && !who.admin ? who.playerId : null;
+    const playerId = who && !who.admin && (who.kind ?? "bot") === "bot" ? who.playerId : null;
     if (tokenCache.size > 5000) tokenCache.clear();
     tokenCache.set(key, { playerId, exp: Date.now() + (playerId ? cfg.billing.authCacheS : 10) * 1000 });
     return playerId ?? undefined;
@@ -138,8 +138,10 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
 
   const send = (res: ServerResponse, code: number, body: unknown) => {
     // one error envelope for every error, like the arena's: {error: {code, message, details}}
-    const b = body as { error?: { details?: unknown } };
-    if (b && typeof b === "object" && b.error && b.error.details === undefined) b.error.details = {};
+    const b = body as { error?: unknown };
+    if (b && typeof b === "object" && b.error && typeof b.error === "object" && (b.error as { details?: unknown }).details === undefined) {
+      (b.error as { details?: unknown }).details = {};
+    }
     const text = JSON.stringify(body);
     res.writeHead(code, { ...CORS_HEADERS, "content-type": "application/json", "content-length": Buffer.byteLength(text) });
     res.end(text);

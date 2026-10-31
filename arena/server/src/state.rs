@@ -25,6 +25,9 @@ pub struct AppState {
     pub limiter: crate::limits::RateLimiter,
     /// Bot registrations per client address (see `ServerConfig::bots_per_ip_per_day`).
     pub reg_limiter: crate::limits::RateLimiter,
+    /// Human registrations (the browser play page) per client address: 10x the bot allowance, so people behind one
+    /// address (a carrier NAT, an office) can still play.
+    pub human_reg_limiter: crate::limits::RateLimiter,
     /// Set when shutdown starts: readiness fails and new tables/matches/runs/sockets are refused.
     pub draining: AtomicBool,
     /// `true` once sockets must close (last phase of shutdown).

@@ -143,7 +143,8 @@ export class FakeArena {
         const send = (code: number, j: unknown) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(j)); };
         if (req.method === "GET" && path === "/v1/me") {
           const t = (req.headers.authorization ?? "").replace(/^Bearer /, "");
-          if (t.startsWith("sk_user_")) return send(200, { player_id: `pl_${t.slice(8)}`, name: t.slice(8) });
+          if (t.startsWith("sk_user_")) return send(200, { player_id: `pl_${t.slice(8)}`, name: t.slice(8), kind: "bot" });
+          if (t.startsWith("sk_human_")) return send(200, { player_id: `pl_${t.slice(9)}`, name: t.slice(9), kind: "human" });
           return send(401, { error: { code: "unauthorized", message: "bad token" } });
         }
         if (req.method === "POST" && path === "/v1/bots") return send(201, { player_id: "p_test", token: "sk_bot_token" });

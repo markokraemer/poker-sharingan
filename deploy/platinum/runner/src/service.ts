@@ -203,6 +203,7 @@ export class Service {
     if (req.requirementsFile !== undefined && req.requirementsFile !== null && req.requirementsFile !== "") {
       requirementsFile = str("requirementsFile");
       if (!SAFE_PATH.test(requirementsFile) || requirementsFile.includes("..") || requirementsFile.startsWith("/")) bad("bad requirementsFile");
+      if (requireOwner && !cfg.worker.publicRequirements) bad("requirements are paused for now: vendor pure-Python dependencies into your bot directory");
     }
     const track = str("track", 40);
     if (!TRACKS.has(track)) bad("unknown track");

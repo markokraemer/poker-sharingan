@@ -57,13 +57,13 @@ export class ArenaClient {
   }
 
   /** Whose bot token is this? Calls GET /v1/me with the player's own token. Returns undefined for an unknown token. */
-  async whoami(token: string): Promise<{ playerId: string; name: string; admin: boolean } | undefined> {
+  async whoami(token: string): Promise<{ playerId: string; name: string; admin: boolean; kind?: string } | undefined> {
     const r = await this.doFetch(new URL("/v1/me", this.cfg.url), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
     if (r.status === 401 || r.status === 403) return undefined;
     if (!r.ok) throw new ArenaError(r.status, "whoami_failed", `GET /v1/me -> ${r.status}`);
-    const j = (await r.json()) as { player_id?: string; name?: string; admin?: boolean };
+    const j = (await r.json()) as { player_id?: string; name?: string; admin?: boolean; kind?: string };
     if (!j.player_id) return undefined;
-    return { playerId: j.player_id, name: j.name ?? "", admin: j.admin === true };
+    return { playerId: j.player_id, name: j.name ?? "", admin: j.admin === true, ...(j.kind ? { kind: j.kind } : {}) };
   }
 
   private async call<T>(method: string, path: string, token: string | undefined, body?: string | Uint8Array | object): Promise<T> {

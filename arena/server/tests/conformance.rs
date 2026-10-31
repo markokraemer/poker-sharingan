@@ -1012,10 +1012,14 @@ async fn bot_registrations_are_capped_per_address_humans_and_admin_are_not() {
     let (st, e) = reg("cap_c", "bot", None).await;
     assert_eq!((st, err_code(&e)), (429, "rate_limited"), "{e}");
     assert_eq!(e["error"]["details"]["limit"], "ARENA_BOTS_PER_IP_PER_DAY");
-    assert_eq!(reg("cap_human", "human", None).await.0, 201, "people at the play page are not capped");
+    assert_eq!(reg("cap_human", "human", None).await.0, 201, "people at the play page have their own, 10x roomier bucket");
     assert_eq!(reg("cap_admin", "bot", Some("admin")).await.0, 201, "the admin token is exempt");
     let (st, e) = reg("Sharingan-3", "bot", Some("admin")).await;
     assert_eq!(st, 400, "reserved names stay reserved: {e}");
+    for (name, kind) in [("SHARINGAN-1", "human"), ("nit", "human"), ("house-maniac", "bot"), ("R\u{430}ndom", "bot"), ("\u{ff33}haringan", "bot")] {
+        let (st, e) = reg(name, kind, Some("admin")).await;
+        assert_eq!(st, 400, "{name} ({kind}) is refused: {e}");
+    }
 }
 
 #[tokio::test]

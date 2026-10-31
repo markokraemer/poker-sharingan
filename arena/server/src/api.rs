@@ -238,6 +238,20 @@ struct RegisterReq {
 /// Longest player name, in characters (not bytes).
 pub const MAX_NAME_CHARS: usize = 64;
 
+/// Lowercase with common look-alikes folded to Latin (Cyrillic, Greek, fullwidth), for the reserved-name check only.
+fn latin_skeleton(s: &str) -> String {
+    s.chars()
+        .flat_map(|c| c.to_lowercase())
+        .map(|c| match c {
+            'а' | 'α' => 'a', 'в' | 'β' => 'b', 'с' | 'ϲ' => 'c', 'ԁ' => 'd', 'е' | 'ε' => 'e', 'һ' | 'н' | 'η' => 'h',
+            'і' | 'ι' | 'ӏ' => 'i', 'ј' => 'j', 'к' | 'κ' => 'k', 'м' | 'μ' => 'm', 'ν' => 'v', 'о' | 'ο' => 'o', 'р' | 'ρ' => 'p',
+            'ԛ' => 'q', 'ѕ' => 's', 'т' | 'τ' => 't', 'υ' => 'u', 'ԝ' => 'w', 'х' | 'χ' => 'x', 'у' => 'y', 'ζ' => 'z',
+            '\u{ff01}'..='\u{ff5e}' => char::from_u32(c as u32 - 0xfee0).unwrap_or(c),
+            o => o,
+        })
+        .collect()
+}
+
 /// Free text that is stored and shown to other users (player names, owners, seeds) must not carry control
 /// characters (NUL, newlines, tabs, escapes), bidirectional overrides/isolates (U+202A-202E, U+2066-2069), zero-width and
 /// invisible formatting characters (U+200B-200F, U+2028/2029, U+2060-2064, U+FEFF, U+061C). Accents, emoji and other ordinary Unicode are fine.
@@ -297,18 +311,18 @@ async fn register(
     if name.starts_with("house:") {
         return Err(ApiError::bad_request("the house: prefix is reserved"));
     }
-    // A bot may not pose as SHARINGAN-1 (or a later SHARINGAN) or as one of the reference bots.
-    if kind == "bot" {
-        let lower = name.to_lowercase();
-        let house_names: Vec<String> = app.store.list_players(100_000)?.into_iter().filter(|p| p.house)
-            .map(|p| p.name.trim_start_matches("house:").to_lowercase()).collect();
-        if lower.starts_with("sharingan") || house_names.contains(&lower) {
-            return Err(ApiError::bad_request(format!("the name {name} is reserved for a reference bot; pick another (the bot is named after its file)")));
-        }
-        let admin = crate::state::bearer(&headers).map(|t| ct_eq(&t, &app.admin_token)).unwrap_or(false);
+    // Nobody may pose as SHARINGAN-1 (or a later SHARINGAN) or as a reference bot, under any kind, also not with look-alike
+    // letters ("Rаndom" with a Cyrillic а). House bots are created internally.
+    let lower = latin_skeleton(&name);
+    if lower.starts_with("sharingan") || HouseRegistry::looks_like_house(&lower) || app.house.key_of(&lower).is_some() {
+        return Err(ApiError::bad_request(format!("the name {name} is reserved for a reference bot; pick another (the bot is named after its file)")));
+    }
+    let admin = crate::state::bearer(&headers).map(|t| ct_eq(&t, &app.admin_token)).unwrap_or(false);
+    {
         if !admin && app.cfg.bots_per_ip_per_day > 0.0 {
             let ip = client_ip(&app, &headers, peer.map(|c| (c.0).0));
-            if let Err(ms) = app.reg_limiter.check(&format!("reg:{ip}")) {
+            let limiter = if kind == "bot" { &app.reg_limiter } else { &app.human_reg_limiter };
+            if let Err(ms) = limiter.check(&format!("reg:{ip}")) {
                 return Err(ApiError::rate_limited(
                     "too many new bots from this address today; reuse a bot you have (its token is in ~/.config/sharingan/tokens.json)",
                     json!({"limit": "ARENA_BOTS_PER_IP_PER_DAY", "per_day": app.cfg.bots_per_ip_per_day, "retry_after_ms": ms}),

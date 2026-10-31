@@ -152,7 +152,7 @@ describe("free billing mode", () => {
   });
 
   test("cheap validation runs BEFORE the quota: garbage is a 400 even when the player is over quota or at the concurrency cap", async () => {
-    await boot({ onProcess: hang });
+    await boot({ onProcess: hang }, { PUBLIC_REQUIREMENTS: "true" });
     assert.equal((await api("POST", "/v1/jobs", "sk_user_dan", sub({ idempotencyKey: "a", hands: 1200 }))).status, 202);   // uses the whole daily quota
     assert.equal((await api("POST", "/v1/jobs", "sk_user_dan", sub({ idempotencyKey: "b", hands: 6 }))).status, 400);
     assert.equal((await api("POST", "/v1/jobs", "sk_user_dan", sub({ idempotencyKey: "c" }))).status, 429, "a valid request is over quota");
@@ -169,6 +169,13 @@ describe("free billing mode", () => {
       assert.match(r.json.error.message, re, what);
     }
     assert.equal((await api("POST", "/v1/jobs", "sk_user_dan", sub({ idempotencyKey: "z", artifactTgzBase64: tgzB64({ "./bot.py": "ok", "requirements.txt": "" }), requirementsFile: "requirements.txt" }))).status, 429, "a good artifact reaches the quota check");
+  });
+
+  test("public submits carry no requirements file unless PUBLIC_REQUIREMENTS is on", async () => {
+    await boot({ onProcess: hang });
+    const r = await api("POST", "/v1/jobs", "sk_user_dan", sub({ idempotencyKey: "rq", artifactTgzBase64: tgzB64({ "./bot.py": "ok", "requirements.txt": "numpy" }), requirementsFile: "requirements.txt" }));
+    assert.equal(r.status, 400);
+    assert.match(r.json.error.message, /requirements are paused/);
   });
 
   test("hands are echoed rounded up to a multiple of 6 and agree with hands_total", async () => {
@@ -238,5 +245,16 @@ describe("free billing mode", () => {
     for (const e of [c, a, await api("GET", "/v1/jobs/job_nope", "sk_user_alice"), await api("GET", "/v1/quota", "sk_bad"), await api("DELETE", "/v1/nope", AUTH)]) {
       assert.deepEqual(Object.keys(e.json.error).sort(), ["code", "details", "message"], JSON.stringify(e.json));
     }
+  });
+
+  test("an aborted job still reads back (its error is a plain string), and a human token runs no jobs", async () => {
+    await boot({ onProcess: hang });
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "ab1" }));
+    assert.equal(r.status, 202);
+    assert.equal((await api("POST", `/v1/jobs/${r.json.id}/abort`, "sk_user_alice")).status, 202);
+    await until(async () => (await store.get(r.json.id))?.settled === true);
+    const g = await api("GET", `/v1/jobs/${r.json.id}`, "sk_user_alice");
+    assert.deepEqual([g.status, g.json.status], [200, "aborted"], JSON.stringify(g.json));
+    assert.equal((await api("POST", "/v1/jobs", "sk_human_eve", sub({ idempotencyKey: "h1" }))).status, 401, "browser (human) tokens can't submit");
   });
 });

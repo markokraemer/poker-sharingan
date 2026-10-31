@@ -54,6 +54,8 @@ export interface Config {
     keyId?: string;              // id of the arena's ARENA_WORKER_KEYS entry (`id=secret`)
     signKey?: string;            // the secret; written (as `id=secret`) to a root-only --sign-key-file inside the sandbox for the run
     resultPath: string;
+    /** Public (player) submits may carry a requirements file (installed in a short network window). Off until that install runs unprivileged. */
+    publicRequirements: boolean;
   };
 
   limits: {
@@ -103,6 +105,12 @@ export function loadConfig(env: Env = process.env): Config {
     const n = Number(raw);
     if (!Number.isFinite(n)) bad(`${k} must be a number, got ${raw}`);
     return n;
+  };
+  const bool = (k: string, d: boolean): boolean => {
+    const raw = str(k);
+    if (raw === undefined) return d;
+    if (!/^(true|false|1|0)$/i.test(raw)) bad(`${k} must be true or false, got ${raw}`);
+    return /^(true|1)$/i.test(raw);
   };
   const json = <T>(k: string, d: T): T => {
     const raw = str(k);
@@ -189,6 +197,7 @@ export function loadConfig(env: Env = process.env): Config {
       keyId: str("WORKER_KEY_ID"),
       signKey: str("WORKER_SIGN_KEY"),
       resultPath: str("WORKER_RESULT_PATH", "/work/result.json") as string,
+      publicRequirements: bool("PUBLIC_REQUIREMENTS", false),
     },
 
     limits: {
