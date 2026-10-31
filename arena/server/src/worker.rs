@@ -127,6 +127,27 @@ fn poll_fd(fd: RawFd, events: i16, deadline: Instant) -> Result<(), IoErr> {
     Ok(())
 }
 
+/// Copy a bot's stderr into the worker's, line by line, up to 1 MiB per process (the rest is drained and dropped), so
+/// the bot's own prints still reach the job log. The thread ends when the last holder of the pipe exits.
+fn forward_stderr(err: std::process::ChildStderr) {
+    std::thread::spawn(move || {
+        use std::io::{BufRead, Write};
+        let (mut left, mut cut) = (1usize << 20, false);
+        for line in io::BufReader::new(err).split(b'\n') {
+            let Ok(line) = line else { break };
+            if line.len() < left {
+                left -= line.len() + 1;
+                let mut e = io::stderr().lock();
+                let _ = e.write_all(&line);
+                let _ = e.write_all(b"\n");
+            } else if !cut {
+                cut = true;
+                let _ = writeln!(io::stderr(), "[bot stderr cut at 1 MiB]");
+            }
+        }
+    });
+}
+
 /// A bot subprocess. Both pipes are non-blocking and driven with `poll` against a deadline, so a bot
 /// that stops reading or never answers can never hang the lane thread.
 pub struct BotProc {
@@ -143,7 +164,9 @@ impl BotProc {
     pub fn spawn(cmd: &str, lane: usize, lanes: usize) -> io::Result<BotProc> {
         let mut c = Command::new("sh");
         c.arg("-c").arg(cmd);
-        c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
+        // stderr: a pipe of its own, copied into ours (`forward_stderr`). Never our stderr itself: a bot that shares the
+        // worker's log file could read or measure what an earlier rotation wrote there.
+        c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
         // the bot must not inherit the operator's secrets (or a seed) from the worker's environment
         for k in ["ARENA_ADMIN_TOKEN", "ARENA_RUNNER_TOKEN", "ARENA_WORKER_KEYS", "ARENA_DATABASE_URL", "ARENA_SEED", "SHARINGAN_SEED"] {
             c.env_remove(k);
@@ -151,6 +174,9 @@ impl BotProc {
         c.env("SHARINGAN_PIPE", "1").env("SHARINGAN_LANE", lane.to_string()).env("SHARINGAN_LANES", lanes.to_string());
         c.process_group(0);
         let mut child = c.spawn()?;
+        if let Some(err) = child.stderr.take() {
+            forward_stderr(err);
+        }
         let stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (wfd, rfd) = (stdin.as_raw_fd(), stdout.as_raw_fd());
@@ -420,6 +446,8 @@ struct Cx<'a> {
     planned: u32,
     lanes: usize,
     done: AtomicU32,
+    /// The deals come from a secret per-run seed (not the public track seed).
+    seed_secret: bool,
 }
 
 enum Decision {
@@ -634,7 +662,13 @@ impl<'a> Lane<'a> {
             seats.push(SeatInfo { seat: s, player_id: pid.clone(), name: pid.clone(), kind: "bot".into(), stack: cx.cfg.starting_stack });
         }
         let dk = deck::deal_deck(&cx.seed, deal as u64);
-        let hand_id = format!("{}-h{}", cx.hand_prefix, hand_no);
+        // With a secret seed the id is opaque (keyed by the seed): hand ids would otherwise number the deals, and a bot that
+        // kept notes could match a deal across rotations by its number. Frozen (public) deals keep readable ids.
+        let hand_id = if cx.seed_secret {
+            format!("{}-{}", cx.hand_prefix, &sha256_hex(format!("hand:{}:{hand_no}", cx.seed).as_bytes())[..12])
+        } else {
+            format!("{}-h{}", cx.hand_prefix, hand_no)
+        };
         let deck_digest = seed64(&cards::cards_str(&dk));
         let setup = HandSetup {
             table_id: self.table_id.clone(),
@@ -768,9 +802,17 @@ impl<'a> Lane<'a> {
                 self.die(format!("start failed: {e}"));
             }
         }
-        let mut c = 0u32;
-        while let Some(h) = matches::lane_rotation_hand_no(self.cx.planned, BLOCK_DEALS, self.cx.lanes, self.lane, rot, c) {
-            c += 1;
+        // this lane's deals of the rotation, in an order keyed by the seed (secret for hosted runs): the order of play says
+        // nothing about which deal is which
+        let mut hands = Vec::new();
+        while let Some(h) = matches::lane_rotation_hand_no(self.cx.planned, BLOCK_DEALS, self.cx.lanes, self.lane, rot, hands.len() as u32) {
+            hands.push(h);
+        }
+        let mut rng = cards::Rng::new(mix(mix(self.cx.seed64 ^ 0x5eed_04de_u64, rot as u64), self.lane as u64));
+        for i in (1..hands.len()).rev() {
+            hands.swap(i, (rng.next_u64() % (i as u64 + 1)) as usize);
+        }
+        for h in hands {
             match self.play_hand(h) {
                 Some((rec, av, log)) => {
                     if let Some(a) = av {
@@ -797,6 +839,30 @@ fn rotation_cmd(opts: &WorkerOpts, rot: u32) -> String {
     match &opts.rotation_uids {
         Some(u) => format!("exec setpriv --reuid={0} --regid={0} --clear-groups {1}", u[rot as usize], opts.bot_cmd),
         None => opts.bot_cmd.clone(),
+    }
+}
+
+/// Take the sandbox's loopback interface down (the worker is root with CAP_NET_ADMIN in the sandbox's own network
+/// namespace). Bots talk to the worker over pipes and need no network; a TCP connection a bot makes to itself would
+/// leave TIME_WAIT state (ports it chose) that outlives its processes and that the next rotation could read back.
+fn loopback_down() -> Result<(), String> {
+    unsafe {
+        let fd = libc::socket(libc::AF_INET, libc::SOCK_DGRAM, 0);
+        if fd < 0 {
+            return Err(format!("isolation: socket: {}", io::Error::last_os_error()));
+        }
+        let mut ifr: libc::ifreq = std::mem::zeroed();
+        for (i, b) in b"lo".iter().enumerate() {
+            ifr.ifr_name[i] = *b as libc::c_char;
+        }
+        let r = if libc::ioctl(fd, libc::SIOCGIFFLAGS as _, &mut ifr) < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            ifr.ifr_ifru.ifru_flags &= !(libc::IFF_UP as libc::c_short);
+            if libc::ioctl(fd, libc::SIOCSIFFLAGS as _, &ifr) < 0 { Err(io::Error::last_os_error()) } else { Ok(()) }
+        };
+        libc::close(fd);
+        r.map_err(|e| format!("isolation: cannot take the loopback interface down ({e}); the sandbox needs CAP_NET_ADMIN"))
     }
 }
 
@@ -866,7 +932,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
     let cfg = TableConfig { mode: Some("benchmark".into()), decision_time_ms: opts.decision_timeout_ms, min_players_to_deal: 6, ..Default::default() };
     cfg.validate().map_err(|e| e.message)?;
     let est = EquityEstimator::default();
-    let cx = Cx { opts, house: &house, est: &est, mode, participants: participants.clone(), cfg: cfg.clone(), seed64: seed64(&seed), hand_prefix: hand_prefix(&seed, &track_seed), seed: seed.clone(), planned: hands, lanes, done: AtomicU32::new(0) };
+    let cx = Cx { opts, house: &house, est: &est, mode, participants: participants.clone(), cfg: cfg.clone(), seed64: seed64(&seed), hand_prefix: hand_prefix(&seed, &track_seed), seed: seed.clone(), planned: hands, lanes, done: AtomicU32::new(0), seed_secret: seed != track_seed };
     let started_at = now_iso();
     let t0 = Instant::now();
     let finished = AtomicBool::new(false);
@@ -888,6 +954,12 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
         // Rotation-major: every lane plays rotation 0 of its deals, then (fresh processes) rotation 1, ... Within one rotation
         // a deal appears once, so a bot process never meets a deal it already saw from another seat; with
         // `rotation_uids` nothing it wrote down survives into the next rotation either.
+        if opts.rotation_uids.is_some() {
+            if let Err(e) = loopback_down() {
+                finished.store(true, Ordering::Relaxed);
+                return Err(e);
+            }
+        }
         let mut ls: Vec<Lane> = (0..lanes).map(|l| Lane::new(&cx, l)).collect();
         let mut outs: Vec<LaneOut> = (0..lanes).map(|_| LaneOut { recs: vec![], aivat: HashMap::new(), log: vec![], stats: LaneStats::default() }).collect();
         for rot in 0..6u32 {

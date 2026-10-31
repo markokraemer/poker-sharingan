@@ -88,8 +88,10 @@ def _warn_bot_trouble(job: dict) -> None:
     forfeited). Say so, with the first error line, instead of a clean-looking score."""
     forfeits = job.get("forfeit_hands") or 0
     tail = job.get("bot_log_tail") or ""
-    errs = [ln.strip() for ln in tail.splitlines() if re.search(r"(Error|Exception|Traceback|FORFEIT|timed? ?out)", ln)]
-    if not forfeits and not errs:
+    # the exception line itself ("ValueError: ..."), not the traceback header or the source line that raised it
+    errs = [ln.strip() for ln in tail.splitlines()
+            if re.match(r"^(lane \d+: )?[A-Za-z_][\w.]*(Error|Exception)\b", ln.strip()) or re.search(r"FORFEIT|timed? ?out", ln)]
+    if not forfeits and not errs and "Traceback" not in tail:
         return
     total = job.get("hands_done") or job.get("hands_total") or 0
     msg = f"sharingan: WARNING: your bot had trouble in this run"
@@ -98,7 +100,11 @@ def _warn_bot_trouble(job: dict) -> None:
     print(msg, file=sys.stderr)
     if errs:
         print(f"sharingan: first error: {errs[0][:300]}", file=sys.stderr)
-    print("sharingan: fix it and resubmit; try it locally with `sharingan play <bot> --hands 12`", file=sys.stderr)
+    jid = job.get("id")
+    if jid:
+        print(f"sharingan: the bot's full log (stderr, tracebacks) is `bot_log_tail` in: curl -s <server>/v1/jobs/{jid} "
+              f"-H \"authorization: Bearer $(sharingan token <bot>)\"", file=sys.stderr)
+    print("sharingan: fix it and resubmit; try it locally with `sharingan play <bot> --hands 600` (rare streets need many hands)", file=sys.stderr)
 
 
 def _unreachable(server: str, err: Exception) -> int:
@@ -756,7 +762,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="your arena bot token (default: the one saved for this bot name, registering it once)")
     sm.add_argument("--track", choices=TRACKS, default=DEFAULT_TRACK)
     sm.add_argument("--hands", type=int, default=20000,
-                    help=f"{MIN_HANDS} to {MAX_HANDS}; the default 20000 becomes 20004 (whole deals) and is the only size that ranks; shorter runs are for testing")
+                    help=f"{MIN_HANDS} to {MAX_HANDS}; the default 20000 becomes 20004 (whole deals); verified runs of 20,004 hands or more rank, shorter ones are for testing")
     sm.add_argument("--lanes", type=int, default=0)
     sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
     sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")

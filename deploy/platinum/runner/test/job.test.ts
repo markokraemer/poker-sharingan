@@ -401,6 +401,12 @@ describe("helpers", () => {
     assert.match(c, /^env -i HOME=\/tmp .* sharingan pipe '\/opt\/sharingan\/bot\/my bot\.py'$/);
     assert.doesNotMatch(c, /setpriv/);
   });
+  test("parseProgress ignores long lines (a bot's stderr can't stall the runner with a crafted line)", () => {
+    const t0 = Date.now();
+    assert.equal(parseProgress("1".repeat(65_000) + "\n"), undefined);
+    assert.ok(Date.now() - t0 < 50, `took ${Date.now() - t0} ms`);
+    assert.deepEqual(parseProgress("x\n  sharingan-1 2007/20004 hands (2737 hands/s)\n"), { done: 2007, total: 20004 });
+  });
   test("parseProgress: JSON lines and 'N/M hands'", () => {
     assert.deepEqual(parseProgress('noise\n{"hands_done":120,"hands_total":600}\n'), { done: 120, total: 600 });
     assert.deepEqual(parseProgress('{"type":"progress","data":{"hands_done":6,"hands_total":12}}'), { done: 6, total: 12 });

@@ -28,6 +28,9 @@ export interface LocalOpts {
 const LABEL = "sharingan.sandbox";
 const META = "sharingan.meta.";
 
+/** Where process pid/stdout/stderr files live inside a sandbox: root-only, on the size-capped /tmp tmpfs. */
+export const PROC_DIR = "/tmp/.sharingan-proc";
+
 /** tmpfs mounts of every local sandbox (see createSandbox). */
 export const LOCAL_TMPFS: Record<string, string> = {
   "/tmp": "rw,nosuid,nodev,size=2g,mode=1777",
@@ -69,6 +72,9 @@ export class LocalPlatinum implements PlatinumClient {
         // nothing reaches the host disk. The image itself has no other writable path for the bot users.
         Tmpfs: LOCAL_TMPFS,
         Init: true,   // reaps orphans, so a killed bot leaves no zombie behind
+        // NET_ADMIN in the sandbox's own network namespace only: the worker (root) takes the loopback interface down before
+        // a bot runs (no TCP state a bot could leave for the next rotation). Bot users have no capabilities.
+        CapAdd: ["NET_ADMIN"],
       },
       NetworkingConfig: first ? { EndpointsConfig: { [first]: {} } } : undefined,
     };
@@ -184,10 +190,11 @@ class LocalSandbox implements Sandbox {
 
   async startProcess(o: StartProcessOpts): Promise<ProcessHandle> {
     const n = ++procSeq;
-    const base = `/tmp/proc-${n}`;
+    const base = `${PROC_DIR}/proc-${n}`;
     const lim = o.timeoutMs ? `timeout -s KILL ${Math.max(1, Math.ceil(o.timeoutMs / 1000))} ` : "";
-    // pid file first, then exec so the pid stays the command's; stdout/stderr go to files `logs()` reads back.
-    const script = `echo $$ > ${base}.pid; exec ${lim}"$@" > ${base}.out 2> ${base}.err`;
+    // pid file first, then exec so the pid stays the command's; stdout/stderr go to files `logs()` reads back. The
+    // directory is root-only (0700): the worker's log carries the bot's prints, and no later bot process may read them.
+    const script = `umask 077; mkdir -p -m 0700 ${PROC_DIR} && echo $$ > ${base}.pid && exec ${lim}"$@" > ${base}.out 2> ${base}.err`;
     const execId = await this.execCreate(["sh", "-c", script, "sh", ...o.cmd], { env: o.env, cwd: o.cwd });
     const r = await this.c.engine.request("POST", `/exec/${execId}/start`, { json: { Detach: true, Tty: false } });
     if (r.status >= 300) throw new EngineError(r.status, r.body.toString("utf8").slice(0, 300));

@@ -52,7 +52,8 @@
     const st = document.getElementById("status"), el = document.getElementById("board");
     const k = KEY[sortBy], other = sortBy === "sharingan-1" ? "ladder-v1" : "sharingan-1", ko = KEY[other];
     const v = (r, key) => r[key] ? r[key].mbb : -Infinity;
-    const list = rows.filter(r => r[KEY["sharingan-1"]] || r[KEY["ladder-v1"]]).sort((a, b) => (v(b, k) - v(a, k)) || (v(b, ko) - v(a, ko)) || 0);
+    const ver = r => (r.tracks && r.tracks[sortBy] && r.tracks[sortBy].verified) ? 1 : 0;   // verified rows first, like the API
+    const list = rows.filter(r => r[KEY["sharingan-1"]] || r[KEY["ladder-v1"]]).sort((a, b) => (ver(b) - ver(a)) || (v(b, k) - v(a, k)) || (v(b, ko) - v(a, ko)) || 0);
     const subs = list.filter(r => !r.house).length;
     const tog = t => '<a href="#" data-sort="' + t + '"' + (t === sortBy ? ' class="red"' : "") + ">" + (t === sortBy ? "[" + t + "]" : t) + "</a>";
     st.className = "p muted";

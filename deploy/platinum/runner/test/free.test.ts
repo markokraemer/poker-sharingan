@@ -297,11 +297,33 @@ describe("free billing mode", () => {
       assert.equal(profileUrl(p), "https://x.com/you", p);
     }
     assert.equal(profileUrl("github.com/Alice/"), "https://github.com/alice");
+    assert.equal(profileUrl("https://github.com/alice/some-repo"), "https://github.com/alice", "one person, whatever page of theirs");
+    assert.equal(profileUrl("https://x.com/@You/status/123"), "https://x.com/you");
+    assert.equal(profileUrl("https://de.linkedin.com/in/Alice-B/"), "https://linkedin.com/in/alice-b");
     assert.equal(profileUrl("https://alice.dev/About"), "https://alice.dev/About", "personal sites keep their path");
     assert.equal(addrKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd"), "2001:db8:1:2::/64");
     assert.equal(addrKey("2001:db8:1:2::9"), "2001:db8:1:2::/64");
     assert.equal(addrKey("2001:db8::1"), "2001:db8:0:0::/64");
     assert.equal(addrKey("::ffff:203.0.113.7"), "203.0.113.7");
     assert.equal(addrKey("203.0.113.7"), "203.0.113.7");
+  });
+
+  test("on sharingan-1 the daily quota is per person too (profile or email, across their bots)", async () => {
+    await boot({ onProcess: hang }, { FREE_MAX_HANDS_PER_DAY: "1200", FREE_MAX_CONCURRENT_JOBS: "5" });
+    const s1 = (k: string, over: Record<string, unknown> = {}) => sub({ idempotencyKey: k, track: "sharingan-1", hands: 600, ...over });
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", s1("p1", { contact: "a@example.com", profile: "x.com/a" }))).status, 202);
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice2", s1("p2", { contact: "other@example.com", profile: "https://x.com/A/status/9" }))).status, 202,
+      "same person (same account), other bot: 1200 of 1200 used");
+    const third = await api("POST", "/v1/jobs", "sk_user_alice3", s1("p3", { contact: "A@example.com", profile: "https://twitter.com/a" }));
+    assert.deepEqual([third.status, third.json.error?.code], [429, "quota_hands_per_day_person"], "same email (any case) and account (twitter.com is x.com), third bot");
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_bob", s1("p4", { contact: "b@example.com", profile: "x.com/b" }))).status, 202, "someone else");
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice4", sub({ idempotencyKey: "p5", hands: 600, contact: "a@example.com" }))).status, 202, "ladder-v1 is per bot only");
+  });
+
+  test("an idempotency key reused with a different upload is a conflict, not the old job", async () => {
+    await boot({ onProcess: hang });
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "same", artifactTgzBase64: tgzB64({ "./bot.py": "v1" }) }))).status, 202);
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "same", artifactTgzBase64: tgzB64({ "./bot.py": "v2" }) }));
+    assert.deepEqual([r.status, r.json.error.code], [409, "idempotency_conflict"]);
   });
 });

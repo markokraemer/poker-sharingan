@@ -94,7 +94,9 @@ export function parseProgress(text: string): { done: number; total: number } | u
         if (Number.isFinite(done) && Number.isFinite(total) && total > 0) return { done, total };
       } catch { /* not json */ }
     }
-    const m = t.match(/(\d+)\s*\/\s*(\d+)\s*hands/i);
+    // only short lines: the worker's progress line is short, and a long digit run (a bot can print anything to its
+    // stderr, which ends up in this log) would make the regex crawl
+    const m = t.length <= 200 ? t.match(/(\d+)\s*\/\s*(\d+)\s*hands/i) : null;
     if (m) return { done: Number(m[1]), total: Number(m[2]) };
   }
   return undefined;

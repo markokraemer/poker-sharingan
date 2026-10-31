@@ -252,6 +252,18 @@ def test_submit_warns_when_the_bot_crashed_or_forfeited(tmp_path, monkeypatch, c
     assert "588 of 600 hands forfeited" in err and "RuntimeError: boom" in err
 
 
+def test_the_warning_names_the_exception_not_the_traceback_header():
+    from sharingan import cli
+    import io, contextlib
+    tail = "Traceback (most recent call last):\n  File \"/opt/sharingan/bot/bot.py\", line 9, in act\n    raise ValueError(\"boom on the river\")\nValueError: boom on the river"
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        cli._warn_bot_trouble({"id": "job_9", "hands_done": 20004, "forfeit_hands": 0, "bot_log_tail": tail})
+    out = err.getvalue()
+    assert "first error: ValueError: boom on the river" in out, out
+    assert "bot_log_tail" in out and "job_9" in out
+
+
 # ----------------------------------------------------------------------------- token / submit / play / naming
 
 

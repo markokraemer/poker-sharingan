@@ -56,18 +56,26 @@ shows a score line. `bot_log_tail` is de-duplicated the same way.
 Every accepted job keeps its upload in Postgres (`job_artifacts`). `GET /v1/jobs/:id/artifact` (service token only, `403` for players)
 returns the exact `.tar.gz` that was submitted. This is what the [competition](../../../COMPETITION.md) final table plays:
 
-1. At the deadline (the `sharingan-1` track takes no submits from 2026-11-16 00:00 UTC), save the non-house rows of
-   `GET https://arena.sharingan.poker/v1/leaderboard?track=sharingan-1` in their order (verified rows first, then score vs SHARINGAN-1). The leaders are the
-   top 12 bots, one bot per person (by `profile`).
-2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token and pick the latest job created before the
-   deadline that is `finished`, `verified`, on `track: sharingan-1` and has `hands_done` >= 20004 (the board ignores shorter runs).
-   Its `contact` reaches the owner; `profile` says who they are.
-3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz` (its sha256 is the job's `artifact_sha256`).
-4. Re-run: play every leader's artifact again on fresh deals, 200,004 hands each (a service-token job on `sharingan-1` with `hands: 200000`), so each score comes
-   from the exact upload behind the leaderboard score. A bot qualifies when its re-run score is above 0 (it beat SHARINGAN-1). The top 6 qualifiers are the
-   finalists; if fewer than 6 qualify, copies of SHARINGAN-1 take the empty seats.
-5. Final table: play the six bots against each other at one table, at least 1,000,000 hands, every deal from every seat, each bot in its own sandbox
-   without network, with anonymized names. The highest win rate wins.
+1. At the deadline (the `sharingan-1` track takes no submits from 2026-11-16 00:00 UTC), wait until no `sharingan-1` job is active
+   (runs submitted before the deadline count even when they finish after it), then save the non-house rows of
+   `GET https://arena.sharingan.poker/v1/leaderboard?track=sharingan-1` with their `tracks.sharingan-1.run_id`, in their order (verified
+   rows first, then score vs SHARINGAN-1). The leaders are the top 24 bots, one bot per person: dedupe on `profile` OR `contact`
+   (lowercased); drop entries whose profile can't be a real person.
+2. For each leader, the submission is the job whose `run_id` equals the saved `run_id`: `GET /v1/jobs?userId=<player_id>&limit=100`
+   with the service token. (Don't take "the latest job": two jobs of one bot can finish out of order.) Its `contact` reaches the owner;
+   `profile` says who they are.
+3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz` and check its sha256 against the job's `artifact_sha256`. If the job had a
+   requirements file, also keep the versions it installed (re-run with them pinned).
+4. Re-run: play every leader's artifact again on fresh deals, 200,004 hands each (a service-token job on `sharingan-1` with
+   `hands: 200000`), so each score comes from the exact upload behind the leaderboard score. Raise `RUN_DEADLINE_S` for this window
+   (a 200,004-hand run of a slow bot takes up to 10x a qualifying run). Service-token jobs register a public bot named
+   `<name>-<6 hex>`: delete those bots (`DELETE /v1/bots/{id}`, admin) when the re-runs are done. A bot qualifies when its re-run score is
+   above 0 (it beat SHARINGAN-1). The 6 qualifiers with the highest re-run scores are the finalists; if fewer than 6 qualify, copies of
+   SHARINGAN-1 take the empty seats. Read the finalists' code before the final (covert signalling between bots, or between rotations of a
+   deal, is cheating and is plain to see in code).
+5. Final table: play the six bots against each other at one table, at least 1,000,000 hands, every deal from every seat, each bot in its
+   own sandbox (better: its own host) without network, with anonymized names. The highest luck-corrected (AIVAT) mbb/game among the
+   submitted bots wins.
 
 ## Fresh secret deals
 

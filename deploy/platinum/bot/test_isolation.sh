@@ -11,28 +11,34 @@ IMG="${1:?usage: test_isolation.sh IMAGE MODELS_DIR}"
 MODELS="${2:?usage: test_isolation.sh IMAGE MODELS_DIR}"
 HERE=$(cd "$(dirname "$0")" && pwd)
 C=sharingan-isolation-test
-podman rm -f "$C" >/dev/null 2>&1
-podman run -d --name "$C" --network none --memory 4g --pids-limit 512 --security-opt no-new-privileges --init \
-  --security-opt apparmor="${APPARMOR:-sharingan-sandbox}" \
-  --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 --tmpfs /var/tmp:rw,nosuid,nodev,size=256m,mode=1777 \
-  --tmpfs /opt/sharingan/bot:rw,nosuid,nodev,size=1g,mode=0755 --tmpfs /opt/sharingan/deps:rw,nosuid,nodev,size=2g,mode=0755 \
-  -v "$MODELS:/models:ro" -e ARENA_BLUEPRINT=/models/sharingan-1.plcp -e ARENA_BUCKETS=tables:/models/buckets-200 -e ARENA_SIZING=medium \
-  "$IMG" sleep infinity >/dev/null || exit 1
-podman cp "$HERE/test_isolation_cheater.py" "$C:/opt/sharingan/bot/bot.py" && podman exec "$C" sh -c 'chown root:root /opt/sharingan/bot/bot.py && chmod 0644 /opt/sharingan/bot/bot.py'
+fresh() {  # a new sandbox-like container for each run (the worker changes it: loopback down, users wiped)
+  podman rm -f "$C" >/dev/null 2>&1
+  podman run -d --name "$C" --network none --memory 4g --pids-limit 512 --security-opt no-new-privileges --init \
+    --security-opt apparmor="${APPARMOR:-sharingan-sandbox}" --cap-add NET_ADMIN \
+    --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 --tmpfs /var/tmp:rw,nosuid,nodev,size=256m,mode=1777 \
+    --tmpfs /opt/sharingan/bot:rw,nosuid,nodev,size=1g,mode=0755 --tmpfs /opt/sharingan/deps:rw,nosuid,nodev,size=2g,mode=0755 \
+    -v "$MODELS:/models:ro" -e ARENA_BLUEPRINT=/models/sharingan-1.plcp -e ARENA_BUCKETS=tables:/models/buckets-200 -e ARENA_SIZING=medium \
+    "$IMG" sleep infinity >/dev/null || exit 1
+  podman cp "$HERE/test_isolation_cheater.py" "$C:/opt/sharingan/bot/bot.py" && podman exec "$C" sh -c 'chown root:root /opt/sharingan/bot/bot.py && chmod 0644 /opt/sharingan/bot/bot.py'
+}
 BOT='env -i HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin PYTHONPATH=/opt/sharingan/deps PYTHONUNBUFFERED=1 python3 /opt/sharingan/bot/bot.py'
-run() {  # $1 = label, rest = extra worker args
-  label=$1; shift
-  podman exec "$C" sh -c "mkdir -p /work && cd /work && sharingan-arena run --bot \"\$0\" --track ladder-v1 --hands 1200 --lanes 2 --out /work/r.json --quiet $*" "$BOT" 2>/tmp/iso-$label.err
-  echo "$label: exit $? | hands $(podman exec "$C" python3 -c 'import json; r=json.load(open("/work/r.json")); print(r["hands"], "isolated:", r["worker"].get("isolated_rotations"))')"
+run() {  # $1 = label, $2 = log layout (private: as the runner does it | shared: a world-readable log), rest = worker args
+  label=$1; layout=$2; shift 2
+  if [ "$layout" = private ]; then pre='umask 077; mkdir -p -m 0700 /tmp/.sharingan-proc'; log=/tmp/.sharingan-proc/w; else pre='umask 022'; log=/tmp/proc-1; fi
+  podman exec "$C" sh -c "$pre; mkdir -p /work && cd /work && exec sharingan-arena run --bot \"\$0\" --track ladder-v1 --hands 1200 --lanes 2 --out /work/r.json --quiet $* > $log.out 2> $log.err" "$BOT"
+  rc=$?
+  podman exec "$C" cat "$log.err" > /tmp/iso-$label.err
+  echo "$label: exit $rc | hands $(podman exec "$C" python3 -c 'import json; r=json.load(open("/work/r.json")); print(r["hands"], "isolated:", r["worker"].get("isolated_rotations"))')"
   # notes seen across users (rotations), and notes seen at all
   echo "  crossed between users: $(awk '/^SEEN/ { split($(NF-2), a, ":"); split($NF, b, ":"); if (a[1] != b[1]) n++ } END { print n+0 }' /tmp/iso-$label.err) | seen from other processes: $(grep -c '^SEEN' /tmp/iso-$label.err)"
 }
-run isolated --rotation-uids 10010,10011,10012,10013,10014,10015
+fresh
+run isolated private --rotation-uids 10010,10011,10012,10013,10014,10015
 awk '/^SEEN/ { split($(NF-2), a, ":"); split($NF, b, ":"); if (a[1] != b[1]) print }' /tmp/iso-isolated.err | head
 podman exec "$C" sh -c 'for u in 10010 10011 10012 10013 10014 10015; do n=$(find / -xdev -user $u 2>/dev/null | wc -l); [ "$n" = 0 ] || echo "files of $u left: $n"; done; ps -eo user,pid,cmd 2>/dev/null | grep -c rot || true'
-# control: every rotation as the same user and no scrub -> the cheater must see its notes
-podman exec "$C" sh -c 'sharingan-scrub 10002 >/dev/null 2>&1; true'
+fresh
+# control: every rotation as the same user, no scrub and a world-readable log -> the cheater must see its notes
 BOT="exec setpriv --reuid=10002 --regid=10002 --clear-groups $BOT"
-run control
-grep '^SEEN' /tmp/iso-control.err | awk '{ $(NF-2)=""; $NF=""; print }' | sort | uniq -c | head
+run control shared
+grep '^SEEN' /tmp/iso-control.err | sed -e 's/ from .*//' -e 's/proc-1\.[a-z]*/proc-1.*/' | sort | uniq -c | head -12
 podman rm -f "$C" >/dev/null

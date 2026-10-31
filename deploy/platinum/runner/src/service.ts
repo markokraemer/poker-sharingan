@@ -75,8 +75,13 @@ export function profileUrl(s: string): string | undefined {
   // sites (case-insensitive handles) a lowercase path
   let h = host.replace(/^(www|mobile|m)\./, "");
   if (h === "twitter.com") h = "x.com";
+  if (h.endsWith(".linkedin.com")) h = "linkedin.com";   // de.linkedin.com, uk.linkedin.com, ...
   let p = u.pathname.replace(/\/+$/, "");
-  if (["x.com", "github.com", "linkedin.com"].includes(h)) p = p.toLowerCase();
+  // on the big profile sites the account is the first part of the path (handles are case-insensitive): x.com/you/status/1
+  // and github.com/you/repo are the same person as x.com/you and github.com/you
+  const seg = p.split("/").filter(Boolean).map((s) => s.toLowerCase());
+  if (h === "x.com" || h === "github.com") p = seg[0] ? `/${seg[0].replace(/^@/, "")}` : "";
+  else if (h === "linkedin.com") p = seg[0] === "in" && seg[1] ? `/in/${seg[1]}` : `/${seg.join("/")}`;
   return `https://${h}${p}`;
 }
 
@@ -270,8 +275,18 @@ export class Service {
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
 
   /** FREE mode: per-player quotas (rolling 24 h hands, concurrent jobs). Called under the submit lock. */
-  private async checkFreeQuota(userId: string, hands: number, clientIp?: string): Promise<void> {
+  private async checkFreeQuota(userId: string, hands: number, clientIp?: string, owner?: { track: string; profile?: string; contact?: string }): Promise<void> {
     const b = this.d.cfg.billing;
+    // The competition track counts per person too (profile or email, across all their bots): many bots are no way to draw
+    // more runs. Same allowance as one bot.
+    if (owner && owner.track === "sharingan-1" && (owner.profile || owner.contact)) {
+      const since = Date.now() - 24 * 3600_000;
+      const used = quotaUsed(await this.d.store.listByOwner(owner.track, owner.profile, owner.contact, since), since);
+      if (used + roundHands(hands) > b.freeMaxHandsPerDay) {
+        throw new ServiceError(429, "quota_hands_per_day_person", `daily quota of ${b.freeMaxHandsPerDay} hands on sharingan-1 per person (all your bots together, rolling 24 h) would be exceeded: used ${used}, requested ${roundHands(hands)}`,
+          { limit: b.freeMaxHandsPerDay, used, requested: roundHands(hands) });
+      }
+    }
     if (clientIp && b.freeMaxConcurrentPerIp > 0) {
       const fromIp = (await this.d.store.active()).filter((j) => j.input.clientIp === clientIp).length;
       if (fromIp >= b.freeMaxConcurrentPerIp) {
@@ -312,7 +327,8 @@ export class Service {
     if (asUser && clientIp) input.clientIp = clientIp.slice(0, 64);
     const existing = await this.d.store.byKey(input.idempotencyKey);
     if (existing) {
-      const a = existing.input, same = a.track === input.track && a.hands === input.hands && a.botName === input.botName && a.entry === input.entry;
+      const a = existing.input, same = a.track === input.track && a.hands === input.hands && a.botName === input.botName && a.entry === input.entry
+        && (a.artifactSha256 === undefined || a.artifactSha256 === input.artifactSha256);   // a new upload under an old key is a conflict, not the old job
       if (!same) {
         this.d.log("idempotency_conflict", { key: input.idempotencyKey, was: [a.track, a.hands, a.botName, a.entry], now: [input.track, input.hands, input.botName, input.entry] });
         throw new ServiceError(409, "idempotency_conflict", "this idempotencyKey was already used for a different job; use a new key");
@@ -323,7 +339,7 @@ export class Service {
     if (this.d.cfg.billing.mode === "free") {
       // serialise quota check + insert so two parallel submits cannot both pass the check
       const run = this.submitLock.p.then(async () => {
-        await this.checkFreeQuota(input.userId, input.hands, input.clientIp);
+        await this.checkFreeQuota(input.userId, input.hands, input.clientIp, input.playerId ? { track: input.track, profile: input.profile, contact: input.contact } : undefined);
         const job: Job = { id: `job_${randomBytes(8).toString("hex")}`, input, status: "queued", createdAt: Date.now(), reservedMicro: 0, settled: false };
         const put = await this.d.store.put(job);
         return put;

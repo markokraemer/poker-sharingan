@@ -78,6 +78,8 @@ export interface JobStore {
   /** Terminal but credits not settled yet (crash between teardown and settle). */
   unsettled(): Promise<Job[]>;
   listByUser(userId: string, limit: number): Promise<Job[]>;
+  /** Jobs created since `since` (ms) on `track` whose owner has this profile or this contact (any bot of that person). */
+  listByOwner(track: string, profile: string | undefined, contact: string | undefined, since: number): Promise<Job[]>;
   /** The uploaded bot archive of a job, kept so the organizers can re-run the bot (competition final run). */
   putArtifact(id: string, tgz: Uint8Array): Promise<void>;
   getArtifact(id: string): Promise<Uint8Array | undefined>;
@@ -111,6 +113,11 @@ export class MemoryJobStore implements JobStore {
   async unsettled() { return [...this.jobs.values()].filter((j) => TERMINAL.has(j.status) && !j.settled).map((j) => structuredClone(j)); }
   async listByUser(userId: string, limit: number) {
     return [...this.jobs.values()].filter((j) => j.input.userId === userId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((j) => structuredClone(j));
+  }
+  async listByOwner(track: string, profile: string | undefined, contact: string | undefined, since: number) {
+    const c = contact?.toLowerCase();
+    return [...this.jobs.values()].filter((j) => j.input.track === track && j.createdAt >= since
+      && ((profile !== undefined && j.input.profile === profile) || (c !== undefined && j.input.contact?.toLowerCase() === c))).map((j) => structuredClone(j));
   }
 }
 
@@ -155,6 +162,13 @@ export class PgJobStore implements JobStore {
   }
   async listByUser(userId: string, limit: number) {
     return (await this.pool.query("SELECT doc FROM jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2", [userId, limit])).rows.map((r: { doc: Job }) => r.doc);
+  }
+  async listByOwner(track: string, profile: string | undefined, contact: string | undefined, since: number) {
+    return (await this.pool.query(
+      `SELECT doc FROM jobs WHERE created_at >= to_timestamp($2::double precision / 1000) AND doc->'input'->>'track' = $1
+         AND ((doc->'input'->>'profile') = $3 OR lower(doc->'input'->>'contact') = lower($4))`,
+      [track, since, profile ?? null, contact ?? null],
+    )).rows.map((r: { doc: Job }) => r.doc);
   }
   async putArtifact(id: string, tgz: Uint8Array) {
     await this.pool.query("INSERT INTO job_artifacts(job_id, tgz) VALUES ($1, $2) ON CONFLICT (job_id) DO NOTHING", [id, Buffer.from(tgz)]);
