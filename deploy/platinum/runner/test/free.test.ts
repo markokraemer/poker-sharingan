@@ -326,4 +326,14 @@ describe("free billing mode", () => {
     const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "same", artifactTgzBase64: tgzB64({ "./bot.py": "v2" }) }));
     assert.deepEqual([r.status, r.json.error.code], [409, "idempotency_conflict"]);
   });
+
+  test("a run that fails after the bot started costs its hands, even when the failure looks like ours", async () => {
+    await boot({ onProcess: (p) => setTimeout(() => p.exit(137), 20) }, { FREE_MAX_HANDS_PER_DAY: "1200" });
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "crash", hands: 600 }));
+    await until(async () => (await store.get(r.json.id))?.settled === true);
+    const j = (await store.get(r.json.id))!;
+    assert.equal(j.status, "failed");
+    assert.equal(j.ranBot, true);
+    assert.equal((await api("GET", "/v1/quota", "sk_user_alice")).json.hands_used_24h, 600, `errorClass ${j.errorClass}: still counts`);
+  });
 });

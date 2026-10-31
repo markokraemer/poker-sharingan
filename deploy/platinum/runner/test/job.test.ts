@@ -62,7 +62,10 @@ describe("worker mode", () => {
     const cmd = sbx.procs[0]!.opts.cmd.join(" ");
     assert.match(cmd, /sharingan-arena run --bot 'env -i HOME=\/tmp .*PYTHONPATH=\/opt\/sharingan\/deps .* sharingan pipe '\\''\/opt\/sharingan\/bot\/bot\.py'\\'''/);
     assert.match(cmd, / --rotation-uids 10010,10011,10012,10013,10014,10015$/, "every signed run is played with each rotation as its own user");
-    assert.ok(sbx.shCalls.some((s) => s.includes("chown -R root:root /opt/sharingan/bot") && s.includes("go-w")), "the bot can't write its own directory");
+    const unpack = sbx.shCalls.find((s) => s.includes("tar xzf"))!;
+    assert.match(unpack, /setpriv --reuid=10002 .* tar xzf \/tmp\/bot\.tgz -C \/opt\/sharingan\/bot/, "unpacked by the unprivileged user");
+    assert.ok(unpack.includes("chown -R root:root /opt/sharingan/bot") && unpack.includes("go-w"), "then the bot can't write its own directory");
+    assert.match(unpack, /find -P \/opt\/sharingan\/bot -exec touch -a -h -d 2099-01-01 \{\} \+$/, "and reading a file leaves no access-time mark");
     assert.match(cmd, /--track 'ladder-v1' --hands '600' --lanes '1' --out '\/work\/result\.json' --sign-key-file '\/opt\/sharingan\/worker\.key' --player-id 'p_test'/);
     assert.equal(sbx.procs[0]!.opts.env!.SHARINGAN_JOB_ID, "job_t1");
     assert.ok(!JSON.stringify(sbx.procs[0]!.opts).includes("runner-secret"), "no arena token reaches the sandbox");
@@ -289,7 +292,7 @@ describe("provisioning failures", () => {
     assert.deepEqual(sbx.spec.allowOut, ["pypi.org", "files.pythonhosted.org"]);
     assert.deepEqual(sbx.egress, [[]]);
     const pip = sbx.shCalls.find((s) => s.includes("pip install"))!;
-    assert.match(pip, /cp -r \/opt\/sharingan\/bot \/tmp\/pip-src .* && cd \/tmp\/pip-src && setpriv --reuid=10002 --regid=10002 --clear-groups env -i .* pip install .* --target \/opt\/sharingan\/deps -r '\/tmp\/pip-src\/requirements\.txt'/, "the install runs unprivileged, in a private copy");
+    assert.match(pip, /cp -r \/opt\/sharingan\/bot \/tmp\/pip-src .* && cd \/tmp\/pip-src && setpriv --reuid=10002 --regid=10002 --clear-groups --inh-caps=-all --bounding-set=-all env -i .* pip install .* --target \/opt\/sharingan\/deps -r '\/tmp\/pip-src\/requirements\.txt'/, "the install runs unprivileged, no capabilities, in a private copy");
     const seal = sbx.shCalls.findIndex((s) => s.includes("sharingan-scrub 10002"));
     assert.ok(seal > sbx.shCalls.indexOf(pip), "after the install: deps sealed read-only and the install user wiped");
     assert.match(sbx.shCalls[seal]!, /^sharingan-scrub 10002 --keep \/opt\/sharingan\/deps && chown -R root:root \/opt\/sharingan\/deps && chmod -R a\+rX,go-w/, "wipe the install user first, then seal");

@@ -28,8 +28,8 @@ export interface LocalOpts {
 const LABEL = "sharingan.sandbox";
 const META = "sharingan.meta.";
 
-/** Where process pid/stdout/stderr files live inside a sandbox: root-only, on the size-capped /tmp tmpfs. */
-export const PROC_DIR = "/tmp/.sharingan-proc";
+/** Where process pid/stdout/stderr files live inside a sandbox: on a root-only tmpfs no bot can fill or read. */
+export const PROC_DIR = "/opt/sharingan/run/proc";
 
 /** tmpfs mounts of every local sandbox (see createSandbox). */
 export const LOCAL_TMPFS: Record<string, string> = {
@@ -37,6 +37,7 @@ export const LOCAL_TMPFS: Record<string, string> = {
   "/var/tmp": "rw,nosuid,nodev,size=256m,mode=1777",
   "/opt/sharingan/bot": "rw,nosuid,nodev,size=1g,mode=0755",
   "/opt/sharingan/deps": "rw,nosuid,nodev,size=2g,mode=0755",
+  "/opt/sharingan/run": "rw,nosuid,nodev,size=64m,mode=0700",   // the runner's process logs: root only
 };
 
 export class LocalPlatinum implements PlatinumClient {
@@ -75,6 +76,7 @@ export class LocalPlatinum implements PlatinumClient {
         // NET_ADMIN in the sandbox's own network namespace only: the worker (root) takes the loopback interface down before
         // a bot runs (no TCP state a bot could leave for the next rotation). Bot users have no capabilities.
         CapAdd: ["NET_ADMIN"],
+        Ulimits: [{ Name: "core", Soft: 0, Hard: 0 }],   // no core dumps (they would land on the host's handler)
       },
       NetworkingConfig: first ? { EndpointsConfig: { [first]: {} } } : undefined,
     };
@@ -194,7 +196,7 @@ class LocalSandbox implements Sandbox {
     const lim = o.timeoutMs ? `timeout -s KILL ${Math.max(1, Math.ceil(o.timeoutMs / 1000))} ` : "";
     // pid file first, then exec so the pid stays the command's; stdout/stderr go to files `logs()` reads back. The
     // directory is root-only (0700): the worker's log carries the bot's prints, and no later bot process may read them.
-    const script = `umask 077; mkdir -p -m 0700 ${PROC_DIR} && echo $$ > ${base}.pid && exec ${lim}"$@" > ${base}.out 2> ${base}.err`;
+    const script = `umask 077; mkdir -p -m 0700 ${PROC_DIR} && echo $$ > ${base}.pid && exec ${lim}"$@" > ${base}.out 2> ${base}.err`;   // PROC_DIR: root-only tmpfs
     const execId = await this.execCreate(["sh", "-c", script, "sh", ...o.cmd], { env: o.env, cwd: o.cwd });
     const r = await this.c.engine.request("POST", `/exec/${execId}/start`, { json: { Detach: true, Tty: false } });
     if (r.status >= 300) throw new EngineError(r.status, r.body.toString("utf8").slice(0, 300));

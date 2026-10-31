@@ -22,7 +22,7 @@ podman (rootful, quadlet units, all on network `sharingan-core`)
    sharingan-runner     job API; BILLING_MODE=free; talks to podman through /run/podman/podman.sock
       |  one sandbox container per job (label sharingan.sandbox=1, name run-<job>)
       v
-   sharingan-bot image  NO network (NetworkMode none), models :ro (same page cache), 4 CPU / 12 GiB / 512 pids, bot runs as uid 10002,
+   sharingan-bot image  NO network (NetworkMode none), models :ro (same page cache), 4 CPU / 12 GiB / 512 pids, bot runs as uids 10010-10015 (one per rotation of a deal, wiped in between),
                         signed result -> runner -> arena POST /v1/results -> verified:true. Max 12 jobs in parallel (queue beyond).
 ```
 
@@ -131,7 +131,7 @@ Note: the default Python-urllib User-Agent is blocked by Cloudflare (error 1010)
 
 ## Known limits
 
-- Sandboxes are containers (rootful podman, no network, no-new-privileges, uid 10002, pid/cpu/mem limits), not microVMs. A kernel-level escape would reach root on this host,
+- Sandboxes are containers (rootful podman, no network, no-new-privileges, AppArmor sharingan-sandbox, bot uids 10010-10015 without capabilities, pid/cpu/mem limits), not microVMs. A kernel-level escape would reach root on this host,
   which holds the model and secrets: this host is dedicated to this service for that reason. Move to Platinum microVMs when G15 (shared RO model volume) lands.
 - `requirementsFile` jobs get a short egress window (pip) on the `sharingan-egress` network; arbitrary `setup.py` code runs there.
 - One host: no HA. Restoring from a dead host = new host + this README + backups + the model file.

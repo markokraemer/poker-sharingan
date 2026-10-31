@@ -65,7 +65,7 @@ POST /v1/jobs (userId, bot tarball, track, hands, idempotencyKey)
   2 arena POST /v1/bots                                      a fresh player id for this job (owner = userId)
   3 sandbox create from the bot template, uploads the bot    worker mode: NO network. connect mode: the arena only
   4 optional pip install (PyPI allowed only for this step)   then egress goes back to the base list
-  5 worker mode:  sharingan-arena run --bot "env -i ... setpriv --reuid=10002 ... sharingan pipe bot.py" --track T --hands N
+  5 worker mode:  sharingan-arena run --bot "env -i ... sharingan pipe bot.py" --rotation-uids 10010,...,10015 --track T --hands N
                   --lanes L --out /work/result.json --sign-key-file <id=secret, root-only> --player-id P
                   runner reads result.json, POST /v1/results (ARENA_RUNNER_TOKEN) -> arena checks the HMAC against
                   ARENA_WORKER_KEYS, the frozen panel + seed + blueprint fingerprint -> run stored verified:true

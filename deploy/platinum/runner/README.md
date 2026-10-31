@@ -34,7 +34,7 @@ of 6** (whole deals), and that rounded value is what every response echoes (`han
 quotas and prices use it too). So: rounded up to a multiple of 6, min 600, max 200,000 (a request of 200,000 plays 200,004). The competition ranks
 only a verified run of the full 20,004 hands (`ARENA_RANKED_MIN_HANDS`); a shorter run scores but never ranks.
 
-**Limits on the public arena (free mode)**: 1M hands per bot per rolling 24 h, where every accepted job counts its planned hands even if it is aborted or
+**Limits on the public arena (free mode)**: 1M hands per bot per rolling 24 h (on sharingan-1 also per person: all of one person's bots together, by profile or email), where every accepted job counts its planned hands even if it is aborted or
 fails (only our own infra failures are free); 2 jobs at a time per bot and 2 per client address (`FREE_MAX_CONCURRENT_JOBS`, `FREE_MAX_CONCURRENT_JOBS_PER_IP`);
 10 submits a minute per address (`SUBMITS_PER_MINUTE_PER_IP`); a run must finish within 30 minutes (`RUN_DEADLINE_S=1800`, so roughly under 50 ms per decision
 on average; a single decision may take up to 5 s). The sandbox has Python, no network, 4 CPU and 12 GB. A 20,004-hand job of a fast bot takes about 15 s.
@@ -80,7 +80,7 @@ returns the exact `.tar.gz` that was submitted. This is what the [competition](.
 ## Fresh secret deals
 
 Every worker-mode job gets its own seed `run:<64 lowercase hex>` (`crypto.randomBytes(32)`), written into the sandbox at
-`/opt/sharingan/run.seed` with mode 0400 (root only, like `/opt/sharingan/worker.key`; the bot runs as uid 10002) and handed to the worker
+`/opt/sharingan/run.seed` with mode 0400 (root only, like `/opt/sharingan/worker.key`; the bot runs as uids 10010-10015, one per rotation) and handed to the worker
 as `--seed-file /opt/sharingan/run.seed`. It is never in the bot's environment or arguments. The seed is recorded on the job as
 `deals_seed` only once the job is over (`finished`, `failed` or `aborted`); before that it is `null` in every view.
 

@@ -57,6 +57,13 @@ const PIP_SRC = "/tmp/pip-src";
 const BOT_UID = 10002;
 /** The worker runs rotation r of the duplicate deals as uid ROTATION_UIDS[r] and wipes it before the next (sharingan-scrub). */
 export const ROTATION_UIDS = [10010, 10011, 10012, 10013, 10014, 10015];
+/**
+ * Access times of the bot's (root-owned, read-only) files set far ahead: under relatime a read then never moves them, so
+ * which files a rotation read is no mark the next rotation could see. (podman's tmpfs takes no noatime.)
+ */
+const futureAtime = (dir: string): string => `find -P ${dir} -exec touch -a -h -d 2099-01-01 {} +`;
+/** Become BOT_UID with no capabilities at all (permitted, inheritable, ambient, bounding). */
+const DROP = `setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups --inh-caps=-all --bounding-set=-all`;
 const KEY_PATH = "/opt/sharingan/worker.key";
 /** Per-job secret deal seed, same protection as the key: root-only, never in the bot's env or args. */
 export const SEED_PATH = "/opt/sharingan/run.seed";
@@ -153,8 +160,11 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     if (artifact.length > cfg.limits.maxArtifactBytes) throw new JobFailure("bot", `artifact too large (${artifact.length} > ${cfg.limits.maxArtifactBytes})`);
     await infra(() => sbx!.writeFile("/tmp/bot.tgz", artifact));
     const unpack = await infra(() => sbx!.sh(
-      `mkdir -p ${BOT_DIR} && tar xzf /tmp/bot.tgz -C ${BOT_DIR} --no-same-owner && rm -f /tmp/bot.tgz `
-      + `&& chown -R root:root ${BOT_DIR} && chmod -R a+rX,go-w ${BOT_DIR} && chmod 0755 ${BOT_DIR}`, { timeoutMs: 30_000 },
+      // unpacked by the unprivileged user (a crafted archive can't write outside the bot directory through a link it made),
+      // then root-owned and read-only
+      `mkdir -p ${BOT_DIR} && chown ${BOT_UID}:${BOT_UID} ${BOT_DIR} && chmod 0644 /tmp/bot.tgz `
+      + `&& ${DROP} tar xzf /tmp/bot.tgz -C ${BOT_DIR} --no-same-owner --no-same-permissions && rm -f /tmp/bot.tgz `
+      + `&& chown -R root:root ${BOT_DIR} && chmod -R a+rX,go-w ${BOT_DIR} && chmod 0755 ${BOT_DIR} && ${futureAtime(BOT_DIR)}`, { timeoutMs: 30_000 },
     ));
     if (unpack.exitCode !== 0) throw new JobFailure("bot", `could not unpack the artifact: ${unpack.stderr.trim().slice(0, 300)}`);
     const has = await infra(() => sbx!.sh(`test -f ${shq(`${BOT_DIR}/${input.entry}`)}`));
@@ -166,7 +176,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
       // in a private copy of the bot directory (local packages like `./mypkg` build in place; relative paths resolve from it).
       const pip = await infra(() => sbx!.sh(
         `mkdir -p ${DEPS_DIR} && rm -rf ${PIP_SRC} && cp -r ${BOT_DIR} ${PIP_SRC} && chown -R ${BOT_UID}:${BOT_UID} ${DEPS_DIR} ${PIP_SRC} `
-        + `&& cd ${PIP_SRC} && setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups `
+        + `&& cd ${PIP_SRC} && ${DROP} `
         + `env -i HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin pip install --no-cache-dir --disable-pip-version-check --no-warn-script-location `
         + `--target ${DEPS_DIR} -r ${shq(`${PIP_SRC}/${input.requirementsFile!}`)}`, { timeoutMs: 300_000 },
       ));
@@ -174,7 +184,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
       await infra(() => sbx!.setEgress(baseAllow));
       // First end everything the install started (nothing of BOT_UID may still run while root walks DEPS_DIR), then seal
       // DEPS_DIR root-owned and read-only. Nothing the install wrote outside DEPS_DIR survives into the run.
-      const lock = await infra(() => sbx!.sh(`sharingan-scrub ${BOT_UID} --keep ${DEPS_DIR} && chown -R root:root ${DEPS_DIR} && chmod -R a+rX,go-w ${DEPS_DIR}`, { timeoutMs: 60_000 }));
+      const lock = await infra(() => sbx!.sh(`sharingan-scrub ${BOT_UID} --keep ${DEPS_DIR} && chown -R root:root ${DEPS_DIR} && chmod -R a+rX,go-w ${DEPS_DIR} && ${futureAtime(DEPS_DIR)}`, { timeoutMs: 60_000 }));
       if (lock.exitCode !== 0) throw new JobFailure("infra", `could not seal the install: ${(lock.stderr || lock.stdout).trim().slice(-300)}`);
     }
 
@@ -258,13 +268,17 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     });
     if (!w.cmdTemplate.includes("{seedfile}")) cmd += ` --seed-file ${shq(SEED_PATH)}`;   // a custom template must not drop the seed
     if (!w.cmdTemplate.includes("--rotation-uids")) cmd += ` --rotation-uids ${ROTATION_UIDS.join(",")}`;   // nor the isolation
+    // the pip window's network must be gone (a failed disconnect must not leave it attached): only loopback may remain
+    const nets = await infra(() => sbx!.sh("ls /sys/class/net"));
+    const ifs = nets.stdout.split(/\s+/).filter(Boolean);
+    if (nets.exitCode !== 0 || ifs.some((i) => i !== "lo")) throw new JobFailure("infra", `the sandbox still has a network (${ifs.join(", ")}); not starting the run`);
     const wp = await infra(() => sbx!.startProcess({
       cmd: ["sh", "-c", `mkdir -p ${shq(dir)} && cd ${shq(dir)} && exec ${cmd}`],
       env: { ...w.env, SHARINGAN_JOB_ID: jobId, SHARINGAN_OWNER: input.userId, SHARINGAN_BOT_NAME: input.botName, SHARINGAN_TRACK: input.track },
       timeoutMs: Math.max(1000, deadline - Date.now()),
     }));
     proc = wp;
-    await set({ status: "running", handsTotal: input.hands });
+    await set({ status: "running", handsTotal: input.hands, ranBot: true });
 
     // wait for the worker to exit
     let failures = 0;
@@ -331,7 +345,7 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
     // The token goes in the process env only, never in the sandbox's create-time env.
     const launcher = input.language === "python" ? ["python3", "/opt/sharingan/launch_bot.py"] : ["node", "/opt/sharingan/launch_bot.mjs"];
     const cp = await infra(() => sbx!.startProcess({
-      cmd: ["setpriv", `--reuid=${BOT_UID}`, `--regid=${BOT_UID}`, "--clear-groups", ...launcher],
+      cmd: ["setpriv", `--reuid=${BOT_UID}`, `--regid=${BOT_UID}`, "--clear-groups", "--inh-caps=-all", "--bounding-set=-all", ...launcher],
       cwd: BOT_DIR,
       env: { BOT_FILE: `${BOT_DIR}/${input.entry}`, ARENA_URL: cfg.arena.botUrl, ARENA_TOKEN: bot.token, PYTHONUNBUFFERED: "1", HOME: "/home/bot" },
       timeoutMs: Math.max(1000, deadline - Date.now()),   // guest-side hard stop for the bot process

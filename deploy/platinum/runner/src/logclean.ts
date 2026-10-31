@@ -7,7 +7,8 @@
 
 const LANE_PREFIX = /^\s*(?:\[(?:lane\s*)?\d+\]|\(lane \d+\)|lane[ _-]?\d+\s*[:|]) ?/i;
 const indented = (l: string) => /^[ \t]/.test(l);
-const isProgress = (l: string) => /\d+\s*\/\s*\d+\s*hands/i.test(l) || (l.trimStart().startsWith("{") && /"hands_(?:done|total)"|"hands_planned"/.test(l));
+// length-guarded: a bot's prints reach this log, and a long digit run would make the first regex crawl
+const isProgress = (l: string) => (l.length <= 200 && /\d+\s*\/\s*\d+\s*hands/i.test(l)) || (l.trimStart().startsWith("{") && /"hands_(?:done|total)"|"hands_planned"/.test(l));
 export const isScoreLine = (l: string) => /mbb\/game/i.test(l) && /\bhands\b/i.test(l);
 
 export interface CleanOpts { maxChars?: number; dropScore?: boolean }
@@ -15,7 +16,7 @@ export interface CleanOpts { maxChars?: number; dropScore?: boolean }
 /** De-duplicated excerpt (first occurrence wins, order kept), tail-limited to `maxChars` on a line boundary. */
 export function cleanLog(text: string, opts: CleanOpts = {}): string {
   const maxChars = opts.maxChars ?? 800;
-  const lines = text.replace(/\r/g, "").split("\n").map((l) => l.replace(LANE_PREFIX, "").trimEnd())
+  const lines = text.replace(/\r/g, "").split("\n").map((l) => (l.length > 2000 ? `${l.slice(0, 2000)} [...]` : l).replace(LANE_PREFIX, "").trimEnd())
     .filter((l) => l.trim() !== "" && !isProgress(l) && !(opts.dropScore && isScoreLine(l)));
   const seen = new Set<string>();
   const out: string[] = [];

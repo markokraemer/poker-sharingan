@@ -87,11 +87,13 @@ export function profileUrl(s: string): string | undefined {
 
 /**
  * Hands a player used in the window: every accepted job costs its planned hands, finished or not, so stopping a run that
- * looks bad (abort, crash) is no free retry. Only our own failures (infra) are free. (Progress counts come from the bot's
- * sandbox and can't be trusted anyway.)
+ * looks bad (abort, crash) is no free retry. Only our own failures before the bot ran are free. (Progress counts come
+ * from the bot's sandbox and can't be trusted anyway.)
  */
 function quotaUsed(jobs: Job[], since: number): number {
-  return jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass === "infra")).reduce((n, j) => n + j.input.hands, 0);
+  // A failure before the bot's code ran is ours and free; once it ran, a bot could cause an "infra" failure itself (fill a
+  // disk, exhaust processes) to throw away a run that went badly, so that costs its hands too.
+  return jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass === "infra" && !j.ranBot)).reduce((n, j) => n + j.input.hands, 0);
 }
 
 class Semaphore {

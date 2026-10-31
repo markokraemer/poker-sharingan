@@ -14,7 +14,7 @@
 #   node 22 + poker-sharingan        (sdk/typescript) + ws, launch_bot.mjs
 #   /opt/sharingan/launch_bot.{py,mjs}  thin wrappers that CONNECT a bot to /v1/play (remote-bot mode only)
 # The image has no entrypoint process: the runner starts everything with sandbox.process.start().
-# The user's bot runs as uid 10002 (setpriv); the worker runs as root and keeps its signing key (written at run time,
+# The user's bot runs unprivileged (each rotation of duplicate deals as its own uid, 10010..10015; installs as 10002); the worker runs as root and keeps its signing key (written at run time,
 # mode 0400) out of the bot's reach.
 
 ARG ARENA_IMAGE=localhost/sharingan-arena:local
@@ -61,6 +61,7 @@ RUN chmod -R a+rX /opt/sharingan && chmod 0755 /usr/local/bin/sharingan-scrub \
 RUN useradd -u 10002 -M -d /tmp -s /usr/sbin/nologin bot \
  && for i in 0 1 2 3 4 5; do useradd -u $((10010 + i)) -M -d /tmp -s /usr/sbin/nologin "rot$i" || exit 1; done \
  && { [ ! -d /run/lock ] || chmod 0755 /run/lock; } \
+ && find / -xdev -perm /6000 -type f -exec chmod a-s {} + \
  && ww="$(find / -xdev -perm -0002 \( -type d -o -type f \) ! -path /tmp ! -path /var/tmp 2>/dev/null)" \
  && { [ -z "$ww" ] || { echo "world-writable paths in the bot image (a bot could keep notes there): $ww" >&2; exit 1; }; }
 WORKDIR /opt/sharingan/bot

@@ -28,7 +28,61 @@ def seen(how, src):
         print(f"SEEN {how} from {src} by {ME}", file=sys.stderr, flush=True)
 
 
+def priv(what):
+    print(f"PRIV {what} (as {ME})", file=sys.stderr, flush=True)
+
+
+def probe_privileges():
+    """Anything a bot user must not be able to do; `PRIV <what>` for each that works."""
+    try:
+        for ln in open("/proc/self/status"):
+            if ln.split(":")[0] in ("CapEff", "CapPrm", "CapInh", "CapAmb") and int(ln.split()[1], 16):
+                priv(ln.strip())
+    except OSError:
+        pass
+    try:
+        os.setuid(0)
+        priv("setuid(0)")
+    except OSError:
+        pass
+    for pid in os.listdir("/proc"):
+        try:
+            if pid.isdigit() and open(f"/proc/{pid}/comm").read().strip() == "sharingan-arena":
+                try:
+                    os.kill(int(pid), 0)
+                    priv(f"signal the worker ({pid})")
+                except OSError:
+                    pass
+                try:
+                    open(f"/proc/{pid}/environ").read(1)
+                    priv("read the worker's environment")
+                except OSError:
+                    pass
+        except OSError:
+            pass
+    for path in ("/opt/sharingan/worker.key", "/opt/sharingan/run.seed", "/models/sharingan-1.plcp"):
+        try:
+            open(path, "rb").read(1)
+            priv(f"read {path}")
+        except OSError:
+            pass
+    try:
+        os.listdir("/opt/sharingan/run")
+        priv("list the runner's directory")
+    except OSError:
+        pass
+
+
 def look():
+    # access times: a file of the (root-owned) bot directory read by an earlier user, m<uid % 16>
+    for i in range(16):
+        try:
+            st = os.stat(f"/opt/sharingan/bot/m{i}")
+            # moved by a read: later than the file's change time, and not the far-future value the runner seals it with
+            if st.st_ctime_ns < st.st_atime_ns < 3786825600 * 10**9:
+                seen(f"atime m{i}", f"{10000 + i}:atime")
+        except OSError:
+            pass
     for p in PLACES:
         try:
             with open(p) as f:
@@ -90,6 +144,10 @@ def look():
 
 
 def write_notes():
+    try:
+        open(f"/opt/sharingan/bot/m{os.getuid() % 16}").read()   # moves its access time, unless the mount says noatime
+    except OSError:
+        pass
     for p in PLACES:
         try:
             with open(p, "w") as f:
@@ -149,6 +207,7 @@ def write_notes():
         os._exit(0)
 
 
+probe_privileges()
 look()
 write_notes()
 print(json.dumps({"v": 1, "type": "hello", "data": {"protocol": 1}}), flush=True)

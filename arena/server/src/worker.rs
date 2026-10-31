@@ -131,19 +131,37 @@ fn poll_fd(fd: RawFd, events: i16, deadline: Instant) -> Result<(), IoErr> {
 /// the bot's own prints still reach the job log. The thread ends when the last holder of the pipe exits.
 fn forward_stderr(err: std::process::ChildStderr) {
     std::thread::spawn(move || {
-        use std::io::{BufRead, Write};
+        use std::io::{Read, Write};
+        // reads in chunks (a line without an end can't grow memory); lines over 4 KiB are cut
         let (mut left, mut cut) = (1usize << 20, false);
-        for line in io::BufReader::new(err).split(b'\n') {
-            let Ok(line) = line else { break };
-            if line.len() < left {
-                left -= line.len() + 1;
+        let (mut r, mut buf, mut line) = (err, [0u8; 8192], Vec::with_capacity(4096));
+        let mut emit = |line: &mut Vec<u8>, left: &mut usize, cut: &mut bool| {
+            if line.len() < *left {
+                *left -= line.len() + 1;
                 let mut e = io::stderr().lock();
-                let _ = e.write_all(&line);
+                let _ = e.write_all(line);
                 let _ = e.write_all(b"\n");
-            } else if !cut {
-                cut = true;
+            } else if !*cut {
+                *cut = true;
                 let _ = writeln!(io::stderr(), "[bot stderr cut at 1 MiB]");
             }
+            line.clear();
+        };
+        loop {
+            let n = match r.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => n,
+            };
+            for &b in &buf[..n] {
+                if b == b'\n' {
+                    emit(&mut line, &mut left, &mut cut);
+                } else if line.len() < 4096 {
+                    line.push(b);
+                }
+            }
+        }
+        if !line.is_empty() {
+            emit(&mut line, &mut left, &mut cut);
         }
     });
 }
@@ -837,7 +855,7 @@ impl<'a> Lane<'a> {
 /// The bot command for rotation `rot`: as that rotation's own uid when isolated.
 fn rotation_cmd(opts: &WorkerOpts, rot: u32) -> String {
     match &opts.rotation_uids {
-        Some(u) => format!("exec setpriv --reuid={0} --regid={0} --clear-groups {1}", u[rot as usize], opts.bot_cmd),
+        Some(u) => format!("exec setpriv --reuid={0} --regid={0} --clear-groups --inh-caps=-all --bounding-set=-all {1}", u[rot as usize], opts.bot_cmd),
         None => opts.bot_cmd.clone(),
     }
 }
@@ -946,7 +964,7 @@ pub fn run_worker(opts: &WorkerOpts) -> Result<Value, String> {
                     let d = cx.done.load(Ordering::Relaxed);
                     if d * 10 / cx.planned.max(1) > last * 10 / cx.planned.max(1) {
                         last = d;
-                        eprintln!("  {} {}/{} hands ({:.0} hands/s)", cx.opts.track, d, cx.planned, d as f64 / t0.elapsed().as_secs_f64());
+                        let _ = writeln!(io::stderr(), "  {} {}/{} hands ({:.0} hands/s)", cx.opts.track, d, cx.planned, d as f64 / t0.elapsed().as_secs_f64());
                     }
                 }
             });

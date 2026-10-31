@@ -193,7 +193,7 @@ test("startProcess runs detached with pid file, log redirects, env, cwd and a ki
   assert.equal(ex.json.WorkingDir, "/work");
   assert.deepEqual(ex.json.Env, ["A=1"]);
   const script = ex.json.Cmd[2] as string;
-  assert.match(script, /umask 077; mkdir -p -m 0700 \/tmp\/\.sharingan-proc && echo \$\$ > \/tmp\/\.sharingan-proc\/proc-\d+\.pid && exec timeout -s KILL 90 "\$@" > \/tmp\/\.sharingan-proc\/proc-\d+\.out 2> \/tmp\/\.sharingan-proc\/proc-\d+\.err/);
+  assert.match(script, /umask 077; mkdir -p -m 0700 \/opt\/sharingan\/run\/proc && echo \$\$ > \/opt\/sharingan\/run\/proc\/proc-\d+\.pid && exec timeout -s KILL 90 "\$@" > \/opt\/sharingan\/run\/proc\/proc-\d+\.out 2> \/opt\/sharingan\/run\/proc\/proc-\d+\.err/);
   assert.deepEqual(ex.json.Cmd.slice(3), ["sh", "sleep-forever", "1"]);
   assert.deepEqual(await p.status(), { running: true });
   await sbx.delete();

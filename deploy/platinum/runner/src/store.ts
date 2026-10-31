@@ -65,6 +65,8 @@ export interface Job {
   resultAck?: Record<string, unknown>;
   /** worker mode: the secret deal seed (`run:<64 hex>`) of this run. Set only when the job is over; never shown before. */
   dealsSeed?: string;
+  /** The bot's code started running (the worker was started). A failure after this costs quota even when it is ours. */
+  ranBot?: boolean;
 }
 
 export interface JobStore {

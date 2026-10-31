@@ -21,14 +21,29 @@ alive() {
 i=0
 while alive; do
   # kill(-1) as $u reaches every process $u owns (and nothing else)
-  setpriv --reuid="$u" --regid="$u" --clear-groups sh -c 'kill -9 -1' 2>/dev/null
+  setpriv --reuid="$u" --regid="$u" --clear-groups --inh-caps=-all --bounding-set=-all sh -c 'kill -9 -1' 2>/dev/null
   i=$((i + 1))
   [ "$i" -lt 200 ] || { echo "sharingan-scrub: processes of uid $u survive" >&2; exit 1; }
   sleep 0.05
 done
 
-# SysV shared memory, semaphores, message queues it created
-setpriv --reuid="$u" --regid="$u" --clear-groups ipcrm --all 2>/dev/null
+# SysV shared memory, semaphores, message queues it created or owns: removed by id as root (an owner can re-mode an
+# object so even it can't list it), then checked gone. Columns: shm/sem/msg id is field 2, uid/cuid are named in the header.
+ipc_left() {
+  for t in shm sem msg; do
+    f=/proc/sysvipc/$t
+    [ -r "$f" ] || continue
+    awk -v u="$u" -v t="$t" 'NR == 1 { for (i = 1; i <= NF; i++) { if ($i == "uid") cu = i; if ($i == "cuid") cc = i } next }
+                             ($cu == u || $cc == u) { print t, $2 }' "$f"
+  done
+}
+ipc_left | while read -r t id; do
+  case $t in shm) ipcrm -m "$id" ;; sem) ipcrm -s "$id" ;; msg) ipcrm -q "$id" ;; esac 2>/dev/null
+done
+if [ -n "$(ipc_left)" ]; then
+  echo "sharingan-scrub: SysV IPC of uid $u survives" >&2
+  exit 1
+fi
 
 # every file or directory it owns, on every real filesystem (tmpfs mounts included)
 awk '$3 !~ /^(proc|sysfs|cgroup|cgroup2|devpts|securityfs|debugfs|tracefs|bpf|pstore|configfs|fusectl|binfmt_misc|autofs|hugetlbfs|overlay_skip)$/ { print $2 }' /proc/mounts |
