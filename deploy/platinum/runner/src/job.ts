@@ -52,6 +52,8 @@ const PYPI_HOSTS = ["pypi.org", "files.pythonhosted.org"];
 const BOT_DIR = "/opt/sharingan/bot";
 /** pip --target for the bot's requirements; on PYTHONPATH. Installed as BOT_UID, then root-owned and read-only. */
 const DEPS_DIR = "/opt/sharingan/deps";
+/** pip's working copy of the bot directory (owned by BOT_UID; removed with everything else of that user by sharingan-scrub). */
+const PIP_SRC = "/tmp/pip-src";
 const BOT_UID = 10002;
 /** The worker runs rotation r of the duplicate deals as uid ROTATION_UIDS[r] and wipes it before the next (sharingan-scrub). */
 export const ROTATION_UIDS = [10010, 10011, 10012, 10013, 10014, 10015];
@@ -158,11 +160,13 @@ export async function executeJob(deps: JobDeps, jobId: string, artifact: Uint8Ar
 
     // 4 ---- deps, then drop PyPI again
     if (needsPip) {
-      // Unprivileged (BOT_UID) into DEPS_DIR: a package's setup code must not reach the worker, the key or the seed.
+      // Unprivileged (BOT_UID) into DEPS_DIR: a package's setup code must not reach the worker, the key or the seed. pip works
+      // in a private copy of the bot directory (local packages like `./mypkg` build in place; relative paths resolve from it).
       const pip = await infra(() => sbx!.sh(
-        `mkdir -p ${DEPS_DIR} && chown ${BOT_UID}:${BOT_UID} ${DEPS_DIR} && setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups `
+        `mkdir -p ${DEPS_DIR} && rm -rf ${PIP_SRC} && cp -r ${BOT_DIR} ${PIP_SRC} && chown -R ${BOT_UID}:${BOT_UID} ${DEPS_DIR} ${PIP_SRC} `
+        + `&& cd ${PIP_SRC} && setpriv --reuid=${BOT_UID} --regid=${BOT_UID} --clear-groups `
         + `env -i HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin pip install --no-cache-dir --disable-pip-version-check --no-warn-script-location `
-        + `--target ${DEPS_DIR} -r ${shq(`${BOT_DIR}/${input.requirementsFile!}`)}`, { timeoutMs: 300_000 },
+        + `--target ${DEPS_DIR} -r ${shq(`${PIP_SRC}/${input.requirementsFile!}`)}`, { timeoutMs: 300_000 },
       ));
       if (pip.exitCode !== 0) throw new JobFailure("bot", `pip install failed: ${(pip.stderr || pip.stdout).trim().slice(-400)}`);
       await infra(() => sbx!.setEgress(baseAllow));

@@ -212,11 +212,13 @@ pub fn leaderboard(
         })
         .collect();
     // With a track: that track's score. Without: like the site, sharingan-1 first, then ladder-v1, then the match score.
+    // Verified cells rank above every unverified one: an unverified run (the bot ran elsewhere) never outranks a verified.
     let cell = |r: &LeaderboardRow, t: &str| r.tracks.get(t).map(|c| c.mbb_per_game).unwrap_or(f64::NEG_INFINITY);
-    let key = |r: &LeaderboardRow| -> [f64; 3] {
+    let ver = |r: &LeaderboardRow, t: &str| if r.tracks.get(t).map(|c| c.verified).unwrap_or(false) { 1.0 } else { 0.0 };
+    let key = |r: &LeaderboardRow| -> [f64; 4] {
         match track {
-            Some(t) => [cell(r, t), 0.0, 0.0],
-            None => [cell(r, "sharingan-1"), cell(r, "ladder-v1"), r.score_mbb_per_hand.unwrap_or(f64::NEG_INFINITY)],
+            Some(t) => [ver(r, t), cell(r, t), 0.0, 0.0],
+            None => [ver(r, "sharingan-1"), cell(r, "sharingan-1"), cell(r, "ladder-v1"), r.score_mbb_per_hand.unwrap_or(f64::NEG_INFINITY)],
         }
     };
     rows.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap_or(std::cmp::Ordering::Equal));
@@ -257,6 +259,21 @@ mod tests {
         assert_eq!(cell(&[v1.clone(), ab.clone()]), ("v1".into(), true), "an aborted (partial) run never counts");
         assert_eq!(cell(&[v1.clone(), u.clone(), v2.clone()]), ("v2".into(), true), "the latest verified run wins");
         assert_eq!(cell(&[u.clone()]), ("u".into(), false), "unverified shows while there is nothing verified");
+    }
+
+    #[test]
+    fn verified_rows_rank_above_unverified_ones() {
+        let mk = |id: &str| PlayerRecord { player_id: id.into(), name: id.into(), kind: "bot".into(), owner: None, created_at: "t".into(), house: false,
+                                           token_hash: String::new(), webhook_url: None, webhook_secret: None };
+        let players: HashMap<String, PlayerRecord> = ["p_v", "p_u"].iter().map(|p| (p.to_string(), mk(p))).collect();
+        let mut v = run("v", true, "finished", "2026-11-01T00:00:00Z", -50.0);
+        v.player_id = "p_v".into();
+        let mut u = run("u", false, "finished", "2026-11-01T00:00:00Z", 900.0);
+        u.player_id = "p_u".into();
+        for t in [None, Some("sharingan-1")] {
+            let rows = leaderboard(&[], &players, &[u.clone(), v.clone()], 0, 0, true, t);
+            assert_eq!(rows.iter().map(|r| r.player_id.as_str()).collect::<Vec<_>>(), ["p_v", "p_u"], "track {t:?}");
+        }
     }
 
     #[test]

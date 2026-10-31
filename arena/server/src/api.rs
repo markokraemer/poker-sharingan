@@ -63,7 +63,7 @@ pub fn router(app: Arc<AppState>) -> Router {
         .with_state(app)
 }
 
-/// Per-token (anonymous: per-IP) token-bucket limiter; 429 `rate_limited` with `Retry-After`.
+/// Per-address (internal callers: per-token) token-bucket limiter; 429 `rate_limited` with `Retry-After`.
 /// Health probes, CORS preflights and the admin/runner tokens are exempt.
 async fn rate_limit(State(app): App, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path();
@@ -76,17 +76,14 @@ async fn rate_limit(State(app): App, req: axum::extract::Request, next: axum::mi
             return next.run(req).await;
         }
     }
-    let key = match &tok {
-        Some(t) => format!("t:{}", &sha256_hex(t.as_bytes())[..16]),
-        None => {
-            let fwd = if app.cfg.trust_proxy {
-                req.headers().get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|s| s.trim().to_string())
-            } else {
-                None
-            };
-            let ip = fwd.or_else(|| {
-                req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip().to_string())
-            });
+    // Public traffic (through our proxy) is limited per client address, whatever token it sends: a fresh random token
+    // must not buy a fresh bucket. Internal callers (no forwarded address, e.g. the inference server checking a token)
+    // per token.
+    let key = match (forwarded_ip(&app, req.headers()), &tok) {
+        (Some(ip), _) => format!("ip:{ip}"),
+        (None, Some(t)) => format!("t:{}", &sha256_hex(t.as_bytes())[..16]),
+        (None, None) => {
+            let ip = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| addr_key(&c.0.ip().to_string()));
             format!("ip:{}", ip.unwrap_or_default())
         }
     };
@@ -181,6 +178,7 @@ async fn runner_hosted(State(app): App, headers: HeaderMap, Json(req): Json<Host
     run.hosted = req.hosted;
     run.verified = req.hosted || house;
     app.store.put_run(&run)?;
+    app.leaderboard_changed();
     Ok(Json(json!({"run_id": run.run_id, "player_id": run.player_id, "hosted": run.hosted, "verified": run.verified})))
 }
 
@@ -268,12 +266,30 @@ pub fn check_text(what: &str, s: &str) -> Res<()> {
 
 /// The caller's address: the first `X-Forwarded-For` hop behind our proxy (`ARENA_TRUST_PROXY`), else the socket peer.
 fn client_ip(app: &AppState, headers: &HeaderMap, peer: Option<std::net::SocketAddr>) -> String {
-    let fwd = if app.cfg.trust_proxy {
-        headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|s| s.trim().to_string())
-    } else {
-        None
-    };
-    fwd.or_else(|| peer.map(|a| a.ip().to_string())).unwrap_or_default()
+    forwarded_ip(app, headers).or_else(|| peer.map(|a| addr_key(&a.ip().to_string()))).unwrap_or_default()
+}
+
+/// The client address our proxy forwarded (`X-Forwarded-For`, first hop), as a per-address key; `None` without a proxy.
+fn forwarded_ip(app: &AppState, headers: &HeaderMap) -> Option<String> {
+    if !app.cfg.trust_proxy {
+        return None;
+    }
+    headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(|s| addr_key(s.trim())).filter(|s| !s.is_empty())
+}
+
+/// One key per subscriber: an IPv4 address as is, an IPv6 address by its /64 (one host gets a whole /64 to rotate through).
+pub fn addr_key(ip: &str) -> String {
+    match ip.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V6(v6)) => match v6.to_ipv4_mapped() {
+            Some(v4) => v4.to_string(),
+            None => {
+                let s = v6.segments();
+                format!("{:x}:{:x}:{:x}:{:x}::/64", s[0], s[1], s[2], s[3])
+            }
+        },
+        Ok(a) => a.to_string(),
+        Err(_) => ip.to_string(),
+    }
 }
 
 async fn register(
@@ -898,13 +914,30 @@ struct LbQ {
 }
 
 async fn get_leaderboard(State(app): App, Query(q): Query<LbQ>) -> Res<Json<Value>> {
+    // Every page view of the site asks for this, and it reads every result and run: keep each answer for 2 s.
+    let ck = format!("{:?}|{:?}|{:?}", q.min_hands, q.include_house, q.track);
+    if let Some((at, v)) = app.lb_cache.lock().unwrap().get(&ck) {
+        if at.elapsed() < std::time::Duration::from_secs(2) {
+            return Ok(Json(v.clone()));
+        }
+    }
+    let v = leaderboard_json(&app, &q)?;
+    let mut c = app.lb_cache.lock().unwrap();
+    if c.len() > 256 {
+        c.clear();
+    }
+    c.insert(ck, (std::time::Instant::now(), v.clone()));
+    Ok(Json(v))
+}
+
+fn leaderboard_json(app: &AppState, q: &LbQ) -> Res<Value> {
     let results = app.store.all_results()?;
     let runs = app.store.list_runs(None, None, 100_000)?;
     let players: HashMap<String, PlayerRecord> = app.store.list_players(100_000)?.into_iter().map(|p| (p.player_id.clone(), p)).collect();
     let min = q.min_hands.unwrap_or(app.cfg.min_leaderboard_hands);
     let ranked = app.cfg.ranked_min_hands;
     let rows = leaderboard(&results, &players, &runs, min, ranked, q.include_house.unwrap_or(true), q.track.as_deref());
-    Ok(Json(json!({"min_hands": min, "ranked_min_hands": ranked, "track": q.track, "rows": rows})))
+    Ok(json!({"min_hands": min, "ranked_min_hands": ranked, "track": q.track, "rows": rows}))
 }
 
 /// Admin only: delete a (non-house) bot with its benchmark runs and every match it played in
@@ -930,5 +963,6 @@ async fn delete_bot(State(app): App, headers: HeaderMap, Path(id): Path<String>)
         app.store.delete_run(&r.run_id)?;
     }
     app.store.delete_player(&id)?;
+    app.leaderboard_changed();
     Ok(Json(json!({"deleted": id, "name": p.name, "matches": matches.len(), "runs": runs.len()})))
 }

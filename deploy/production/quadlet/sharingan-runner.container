@@ -11,13 +11,13 @@ User=0:0
 EnvironmentFile=/srv/sharingan/secrets/runner.env
 Environment=PORT=8090 SANDBOX_BACKEND=local BILLING_MODE=free
 Environment=ARENA_URL=http://sharingan-core:8080 DEFAULT_JOB_MODE=worker
-Environment=FREE_MAX_HANDS_PER_DAY=1000000 FREE_MAX_CONCURRENT_JOBS=2 FREE_MAX_CONCURRENT_JOBS_PER_IP=4
+Environment=FREE_MAX_HANDS_PER_DAY=1000000 FREE_MAX_CONCURRENT_JOBS=2 FREE_MAX_CONCURRENT_JOBS_PER_IP=2 COMPETITION_CLOSES_AT=2026-11-16T00:00:00Z
 Environment=MAX_CONCURRENT_RUNS=12 BOT_CPU=4 BOT_RAM_MB=12288 BOT_DISK_GB=5 LOCAL_PIDS_LIMIT=512
-Environment=MAX_LANES=8 DEFAULT_LANES=4 MAX_HANDS=200000 RUN_DEADLINE_S=7200 POLL_INTERVAL_MS=1000
+Environment=MAX_LANES=8 DEFAULT_LANES=4 MAX_HANDS=200000 RUN_DEADLINE_S=1800 SUBMITS_PER_MINUTE_PER_IP=10 POLL_INTERVAL_MS=1000
 Environment=CONTAINER_HOST=unix:///var/run/engine.sock LOCAL_BOT_IMAGE=localhost/sharingan-bot:prod
 Environment=LOCAL_BOT_NETWORK=sharingan-botnet LOCAL_EGRESS_NETWORK=sharingan-egress
 Environment=LOCAL_SANDBOX_BINDS=/srv/sharingan/models:/models:ro LOCAL_SANDBOX_APPARMOR=sharingan-sandbox
-Environment=WORKER_KEY_ID=runner1
+Environment=WORKER_KEY_ID=runner1 PUBLIC_REQUIREMENTS=true
 EnvironmentFile=/srv/sharingan/config/runner-public.env
 Environment=PUBLIC_BASE_URL=https://arena.sharingan.poker
 Volume=/run/podman/podman.sock:/var/run/engine.sock

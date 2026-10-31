@@ -4,7 +4,7 @@
 //   run(job)         concurrency slot -> executeJob (sandbox, play, teardown) -> settle credits
 //   settleJob(id)    charge = price of the hands the arena says were played (0 when WE failed); the rest is released
 //   recover()        after a crash: fail orphaned jobs, settle finished-but-unsettled ones, release dangling reservations
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { ArenaClient } from "./arena.ts";
 import { ArchiveError, scanTgz } from "./archive.ts";
 import type { Config, JobMode } from "./config.ts";
@@ -71,8 +71,22 @@ export function profileUrl(s: string): string | undefined {
   if (u.username || u.password || u.port) return undefined;
   const host = u.hostname.toLowerCase();
   if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(host) || host.endsWith(".local")) return undefined;   // a public name, not an IP
-  u.protocol = "https:";
-  return u.toString();
+  // one canonical form per person: no www, twitter.com is x.com, no query/fragment/trailing slash, and on the big profile
+  // sites (case-insensitive handles) a lowercase path
+  let h = host.replace(/^(www|mobile|m)\./, "");
+  if (h === "twitter.com") h = "x.com";
+  let p = u.pathname.replace(/\/+$/, "");
+  if (["x.com", "github.com", "linkedin.com"].includes(h)) p = p.toLowerCase();
+  return `https://${h}${p}`;
+}
+
+/**
+ * Hands a player used in the window: every accepted job costs its planned hands, finished or not, so stopping a run that
+ * looks bad (abort, crash) is no free retry. Only our own failures (infra) are free. (Progress counts come from the bot's
+ * sandbox and can't be trusted anyway.)
+ */
+function quotaUsed(jobs: Job[], since: number): number {
+  return jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass === "infra")).reduce((n, j) => n + j.input.hands, 0);
 }
 
 class Semaphore {
@@ -110,8 +124,7 @@ export class Service {
     const b = this.d.cfg.billing;
     const jobs = await this.d.store.listByUser(userId, 1000);
     const since = Date.now() - 24 * 3600_000;
-    const used = jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass !== "bot"))
-      .reduce((n, j) => n + (TERMINAL.has(j.status) ? (j.handsDone ?? 0) : j.input.hands), 0);
+    const used = quotaUsed(jobs, since);
     return { user_id: userId, billing: b.mode, hands_per_day_limit: b.freeMaxHandsPerDay, hands_used_24h: used,
       concurrent_limit: b.freeMaxConcurrent, concurrent_active: jobs.filter((j) => !TERMINAL.has(j.status)).length };
   }
@@ -207,6 +220,10 @@ export class Service {
     }
     const track = str("track", 40);
     if (!TRACKS.has(track)) bad("unknown track");
+    // the qualifying window: after it the competition track takes no new public runs, so the board stays the final standing
+    if (requireOwner && track === "sharingan-1" && cfg.competition.closesAt !== undefined && Date.now() >= cfg.competition.closesAt) {
+      throw new ServiceError(403, "competition_closed", `the sharingan-1 track closed at ${new Date(cfg.competition.closesAt).toISOString()} (the competition's qualifying window); ladder-v1 is open`);
+    }
     const hands = req.hands === undefined ? cfg.limits.defaultHands : Number(req.hands);
     if (!Number.isInteger(hands) || hands < cfg.limits.minHands || hands > cfg.limits.maxHands) bad(`hands must be an integer in ${cfg.limits.minHands}..${cfg.limits.maxHands}`);
     let lanes: number | undefined;
@@ -234,6 +251,7 @@ export class Service {
     const compact = b64.replace(/\s+/g, "");
     if (compact.length === 0 || compact.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) bad("artifactTgzBase64 is not valid base64");
     const artifact = Buffer.from(compact, "base64");
+    const artifactSha256 = createHash("sha256").update(artifact).digest("hex");
     if (artifact.length === 0) bad("artifactTgzBase64 is empty");
     if (artifact.length > cfg.limits.maxArtifactBytes) bad(`artifact too large (max ${cfg.limits.maxArtifactBytes} bytes)`);
     // a gzip tarball that actually contains the entry file (and the requirements file, if named); stops early, never unpacks
@@ -246,7 +264,7 @@ export class Service {
       throw e;
     }
     // hands are echoed back rounded up to whole deals (6 hands), so the job says what is actually played
-    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode, ...(contact ? { contact } : {}), ...(profile ? { profile: profileUrl(profile)! } : {}) }, artifact };
+    return { input: { userId, botName, language, entry, requirementsFile, track, hands: roundHands(hands), lanes, idempotencyKey, mode, artifactSha256, ...(contact ? { contact } : {}), ...(profile ? { profile: profileUrl(profile)! } : {}) }, artifact };
   }
 
   private readonly submitLock = { p: Promise.resolve() as Promise<unknown> };
@@ -267,8 +285,7 @@ export class Service {
     if (active >= b.freeMaxConcurrent) {
       throw new ServiceError(429, "quota_concurrent", `at most ${b.freeMaxConcurrent} jobs at once; wait for one to finish`, { limit: b.freeMaxConcurrent, active });
     }
-    const used = jobs.filter((j) => j.createdAt >= since && !(j.status === "failed" && j.errorClass !== "bot"))
-      .reduce((n, j) => n + (TERMINAL.has(j.status) ? (j.handsDone ?? 0) : j.input.hands), 0);
+    const used = quotaUsed(jobs, since);
     if (used + roundHands(hands) > b.freeMaxHandsPerDay) {
       throw new ServiceError(429, "quota_hands_per_day", `daily quota of ${b.freeMaxHandsPerDay} hands (rolling 24 h) would be exceeded: used ${used}, requested ${roundHands(hands)}`,
         { limit: b.freeMaxHandsPerDay, used, requested: roundHands(hands) });
@@ -315,7 +332,11 @@ export class Service {
       const put = await run;
       if (!put.created) return { job: put.job, deduped: true };
       const job = put.job;
-      await this.keepArtifact(job.id, artifact);
+      if (!(await this.keepArtifact(job.id, artifact))) {
+        // a run whose upload we can't keep could set a score nobody can re-run: don't play it
+        const failed = await this.d.store.patch(job.id, { status: "failed", errorClass: "infra", error: "could not store the upload; please submit again", finishedAt: Date.now(), settled: true });
+        return { job: failed, deduped: false };
+      }
       this.d.log("job_accepted", { job: job.id, user: input.userId, track: input.track, hands: input.hands, mode: input.mode, billing: "free" });
       const p = this.run(job.id, artifact).catch((e) => this.d.log("job_run_crashed", { job: job.id, error: String(e) }));
       this.running.set(job.id, p);
@@ -345,9 +366,9 @@ export class Service {
     return { job, deduped: false };
   }
 
-  /** Keep the uploaded bot so the organizers can re-run it later. A storage hiccup is logged, never fails the job. */
-  private async keepArtifact(jobId: string, artifact: Uint8Array): Promise<void> {
-    try { await this.d.store.putArtifact(jobId, artifact); } catch (e) { this.d.log("artifact_store_failed", { job: jobId, error: String(e) }); }
+  /** Keep the uploaded bot so the organizers can re-run it later (the final table plays exactly this upload). */
+  private async keepArtifact(jobId: string, artifact: Uint8Array): Promise<boolean> {
+    try { await this.d.store.putArtifact(jobId, artifact); return true; } catch (e) { this.d.log("artifact_store_failed", { job: jobId, error: String(e) }); return false; }
   }
 
   async getArtifact(jobId: string): Promise<Uint8Array | undefined> { return this.d.store.getArtifact(jobId); }

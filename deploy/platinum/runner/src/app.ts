@@ -16,6 +16,7 @@
 // Every response carries CORS headers (any origin: auth is a bearer token, never a cookie) and OPTIONS is answered 204
 // without auth, so the sharingan.poker web page can call the public routes (/v1/jobs*, /v1/quota) straight from the browser.
 // A public player (arena bot token) gets publicJobView(); the service token gets the full jobView().
+import { isIPv6 } from "node:net";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { ArenaClient } from "./arena.ts";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -32,6 +33,38 @@ export const CORS_HEADERS = {
   "access-control-max-age": "86400",
 } as const;
 
+/** One key per subscriber: IPv4 as is, IPv6 by its /64 (a host gets a whole /64 to rotate through), IPv4-mapped as IPv4. */
+export function addrKey(ip: string): string {
+  if (!isIPv6(ip)) return ip;
+  const m = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (m) return m[1]!;
+  const [head = "", tail = ""] = ip.split("::");
+  const h = head ? head.split(":") : [], t = ip.includes("::") && tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...h, ...Array<string>(8 - h.length - t.length).fill("0"), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
+
+/** Public submits per client address (SUBMITS_PER_MINUTE_PER_IP): a burst of that many, then that many a minute. */
+class Bucket {
+  private m = new Map<string, { n: number; t: number }>();
+  private readonly cap: number;
+  private readonly perMs: number;
+  constructor(cap: number, perMs: number) {
+    this.cap = cap;
+    this.perMs = perMs;
+  }
+  take(k: string): boolean {
+    const now = Date.now();
+    const b = this.m.get(k) ?? { n: this.cap, t: now };
+    b.n = Math.min(this.cap, b.n + (now - b.t) / this.perMs);
+    b.t = now;
+    if (this.m.size > 50_000) this.m.clear();
+    this.m.set(k, b);
+    if (b.n < 1) return false;
+    b.n -= 1;
+    return true;
+  }
+}
 export function jobView(j: Job) {
   return {
     id: j.id,
@@ -65,6 +98,7 @@ export function jobView(j: Job) {
     cogs_micro: j.cogsMicro ?? null,
     platinum_usd: j.platinumUsd ?? null,
     bot_log_tail: j.botLogTail ?? null,
+    artifact_sha256: j.input.artifactSha256 ?? null,
     deals_seed: TERMINAL.has(j.status) ? j.dealsSeed ?? null : null,   // secret while the run is in flight
     created_at: new Date(j.createdAt).toISOString(),
     finished_at: j.finishedAt ? new Date(j.finishedAt).toISOString() : null,
@@ -90,6 +124,7 @@ export function publicJobView(j: Job) {
     bot_log_tail: j.botLogTail ?? null,
     run_id: j.runId ?? null,
     arena_player_id: j.arenaPlayerId ?? null,
+    artifact_sha256: j.input.artifactSha256 ?? null,
     deals_seed: TERMINAL.has(j.status) ? j.dealsSeed ?? null : null,
     created_at: new Date(j.createdAt).toISOString(),
     finished_at: j.finishedAt ? new Date(j.finishedAt).toISOString() : null,
@@ -136,6 +171,7 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
     return playerId ?? undefined;
   };
 
+  const submitBucket = cfg.limits.submitsPerMinutePerIp > 0 ? new Bucket(cfg.limits.submitsPerMinutePerIp, 60_000 / cfg.limits.submitsPerMinutePerIp) : undefined;
   const send = (res: ServerResponse, code: number, body: unknown) => {
     // one error envelope for every error, like the arena's: {error: {code, message, details}}
     const b = body as { error?: unknown };
@@ -198,7 +234,10 @@ export function createApp(svc: Service, cfg: Config, opts: { ready?: () => Promi
       }
       if (method === "POST" && path === "/v1/jobs") {
         // behind our proxy chain (Cloudflare edge -> Caddy) X-Forwarded-For is the client address; the edge overwrites it
-        const ip = String(req.headers["x-forwarded-for"] ?? "").split(",")[0]!.trim() || req.socket.remoteAddress || undefined;
+        const ip = addrKey(String(req.headers["x-forwarded-for"] ?? "").split(",")[0]!.trim() || req.socket.remoteAddress || "") || undefined;
+        if (player && ip && submitBucket && !submitBucket.take(ip)) {
+          return send(res, 429, { error: { code: "rate_limited", message: "too many submits from this address; wait a minute", details: { per_minute: cfg.limits.submitsPerMinutePerIp } } });
+        }
         const { job, deduped } = await svc.submit(await json(req, jobBodyLimit), player, ip);
         return send(res, deduped ? 200 : 202, { id: job.id, status: job.status, deduped, hands: job.input.hands, ...(player ? {} : { reserved_micro: job.reservedMicro }) });
       }

@@ -462,6 +462,7 @@ pub async fn finalize(app: Arc<AppState>, rt: Arc<MatchRuntime>, status: &'stati
     if let Err(e) = app.store.put_results(&rt.id, &rows).and_then(|_| app.store.put_match(&rec)) {
         tracing::error!("match {}: store results: {e}", rt.id);
     }
+    app.leaderboard_changed();
     if let Some(b) = &rt.bench {
         match app.store.get_run(&b.run_id) {
             Ok(Some(mut run)) => {
@@ -475,6 +476,7 @@ pub async fn finalize(app: Arc<AppState>, rt: Arc<MatchRuntime>, status: &'stati
                 if let Err(e) = app.store.put_run(&run) {
                     tracing::error!("run {}: {e}", b.run_id);
                 }
+                app.leaderboard_changed();
                 let prog = json!({"run_id": b.run_id, "track": b.track, "match_id": rt.id, "status": status,
                     "hands_done": played, "hands_total": rt.planned, "mbb_per_game": run.mbb_per_game,
                     "ci95_mbb": run.ci95_mbb, "method": run.method, "verified": run.verified});

@@ -28,6 +28,8 @@ pub struct AppState {
     /// Human registrations (the browser play page) per client address: 10x the bot allowance, so people behind one
     /// address (a carrier NAT, an office) can still play.
     pub human_reg_limiter: crate::limits::RateLimiter,
+    /// `GET /v1/leaderboard` answers by query, kept 2 s.
+    pub lb_cache: std::sync::Mutex<HashMap<String, (std::time::Instant, serde_json::Value)>>,
     /// Set when shutdown starts: readiness fails and new tables/matches/runs/sockets are refused.
     pub draining: AtomicBool,
     /// `true` once sockets must close (last phase of shutdown).
@@ -65,6 +67,11 @@ pub fn bearer(headers: &HeaderMap) -> Option<String> {
 }
 
 impl AppState {
+    /// A run or result was written (or deleted): the next leaderboard answer is computed fresh.
+    pub fn leaderboard_changed(&self) {
+        self.lb_cache.lock().unwrap().clear();
+    }
+
     pub fn authenticate_token(&self, token: &str) -> Res<Principal> {
         if ct_eq(token, &self.admin_token) {
             return Ok(Principal::Admin);

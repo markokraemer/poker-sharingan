@@ -29,6 +29,8 @@ export interface JobInput {
   profile?: string;
   /** Public submits: the client address (from our proxy), for the per-address concurrency cap. Never shown publicly. */
   clientIp?: string;
+  /** sha256 of the uploaded .tar.gz: the identity of the bot that set a score (shown to its owner, kept with the upload). */
+  artifactSha256?: string;
 }
 
 export interface Job {

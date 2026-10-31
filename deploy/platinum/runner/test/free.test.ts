@@ -1,12 +1,13 @@
 // BILLING_MODE=free: no ledger, per-player quotas, public players authenticate with their ARENA bot token.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, test } from "node:test";
-import { createApp, jobView, publicJobView } from "../src/app.ts";
+import { addrKey, createApp, jobView, publicJobView } from "../src/app.ts";
 import { ArenaClient } from "../src/arena.ts";
 import { MemoryLedger } from "../src/ledger.ts";
 import { noopLog } from "../src/log.ts";
-import { Service } from "../src/service.ts";
+import { profileUrl, Service } from "../src/service.ts";
 import { MemoryJobStore, type Job } from "../src/store.ts";
 import { SimulatedCheckoutGateway } from "../src/stripe.ts";
 import { AUTH, FakeArena, FakePlatinum, tgzB64, until, workerResult, testConfig, type Behavior } from "./helpers.ts";
@@ -124,7 +125,7 @@ describe("free billing mode", () => {
     await until(async () => (await store.get(id))?.settled === true);
     const pub = (await api("GET", `/v1/jobs/${id}`, "sk_user_alice")).json;
     assert.deepEqual(Object.keys(pub).sort(), [
-      "arena_player_id", "bot_log_tail", "bot_name", "ci95_mbb", "created_at", "deals_seed", "error", "finished_at", "forfeit_hands", "hands", "hands_done",
+      "arena_player_id", "artifact_sha256", "bot_log_tail", "bot_name", "ci95_mbb", "created_at", "deals_seed", "error", "finished_at", "forfeit_hands", "hands", "hands_done",
       "hands_total", "id", "mbb_per_game", "run_id", "status", "track", "verified",
     ]);
     assert.equal(pub.hands, 606);
@@ -256,5 +257,51 @@ describe("free billing mode", () => {
     const g = await api("GET", `/v1/jobs/${r.json.id}`, "sk_user_alice");
     assert.deepEqual([g.status, g.json.status], [200, "aborted"], JSON.stringify(g.json));
     assert.equal((await api("POST", "/v1/jobs", "sk_human_eve", sub({ idempotencyKey: "h1" }))).status, 401, "browser (human) tokens can't submit");
+  });
+
+  test("the sharingan-1 track closes at COMPETITION_CLOSES_AT; ladder-v1 stays open", async () => {
+    await boot({ onProcess: hang }, { COMPETITION_CLOSES_AT: new Date(Date.now() - 1000).toISOString() });
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "late", track: "sharingan-1" }));
+    assert.deepEqual([r.status, r.json.error.code], [403, "competition_closed"]);
+    assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "ladder" }))).status, 202);
+  });
+
+  test("an aborted job still costs its planned hands (stopping a bad-looking run is no free retry)", async () => {
+    await boot({ onProcess: hang }, { FREE_MAX_HANDS_PER_DAY: "1200" });
+    const a = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "q1", hands: 600 }));
+    assert.equal((await api("POST", `/v1/jobs/${a.json.id}/abort`, "sk_user_alice")).status, 202);
+    await until(async () => (await store.get(a.json.id))?.settled === true);
+    const q = await api("GET", "/v1/quota", "sk_user_alice");
+    assert.equal(q.json.hands_used_24h, 600);
+    const b = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "q2", hands: 1200 }));
+    assert.deepEqual([b.status, b.json.error.code], [429, "quota_hands_per_day"]);
+  });
+
+  test("the job carries the sha256 of the exact upload", async () => {
+    await boot({ onProcess: hang });
+    const art = tgzB64({ "./bot.py": "def act(s): pass" });
+    const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "sha", artifactTgzBase64: art }));
+    const g = await api("GET", `/v1/jobs/${r.json.id}`, "sk_user_alice");
+    assert.equal(g.json.artifact_sha256, createHash("sha256").update(Buffer.from(art, "base64")).digest("hex"));
+  });
+
+  test("public submits are rate limited per address (SUBMITS_PER_MINUTE_PER_IP)", async () => {
+    await boot({ onProcess: hang }, { SUBMITS_PER_MINUTE_PER_IP: "3" });
+    const codes = [];
+    for (let i = 0; i < 4; i++) codes.push((await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: `rl${i}`, hands: 6 }))).status);
+    assert.deepEqual(codes, [400, 400, 400, 429], "garbage counts too: every submit is an upload to unpack");
+  });
+
+  test("profile links have one canonical form per person; addresses one key per subscriber", () => {
+    for (const p of ["https://twitter.com/You/", "x.com/you", "@you", "https://www.x.com/YOU?s=21#top", "http://mobile.twitter.com/you"]) {
+      assert.equal(profileUrl(p), "https://x.com/you", p);
+    }
+    assert.equal(profileUrl("github.com/Alice/"), "https://github.com/alice");
+    assert.equal(profileUrl("https://alice.dev/About"), "https://alice.dev/About", "personal sites keep their path");
+    assert.equal(addrKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd"), "2001:db8:1:2::/64");
+    assert.equal(addrKey("2001:db8:1:2::9"), "2001:db8:1:2::/64");
+    assert.equal(addrKey("2001:db8::1"), "2001:db8:0:0::/64");
+    assert.equal(addrKey("::ffff:203.0.113.7"), "203.0.113.7");
+    assert.equal(addrKey("203.0.113.7"), "203.0.113.7");
   });
 });

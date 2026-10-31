@@ -124,6 +124,7 @@ pub async fn post_result(State(app): State<Arc<AppState>>, headers: HeaderMap, J
         finished_at: Some(result["finished_at"].as_str().map(String::from).unwrap_or_else(now_iso)),
     };
     app.store.put_run(&run)?;
+    app.leaderboard_changed();
     let mut v = serde_json::to_value(&run).unwrap();
     v["hands_total"] = json!(run.hands_planned);
     v["key_id"] = json!(key_id);

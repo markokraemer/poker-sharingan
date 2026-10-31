@@ -53,6 +53,7 @@ pub fn build_state(cfg: ServerConfig) -> Result<Arc<AppState>, String> {
         limiter: limits::RateLimiter::new(rate_rps, rate_burst),
         reg_limiter: limits::RateLimiter::new(bots_per_day / 86_400.0, bots_per_day),
         human_reg_limiter: limits::RateLimiter::new(10.0 * bots_per_day / 86_400.0, 10.0 * bots_per_day),
+        lb_cache: Default::default(),
         draining: std::sync::atomic::AtomicBool::new(false),
         shutdown: tokio::sync::watch::channel(false).0,
         tables: RwLock::new(HashMap::new()),

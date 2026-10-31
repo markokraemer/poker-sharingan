@@ -182,6 +182,7 @@ pub async fn create_run(
         finished_at: None,
     };
     app.store.put_run(&run)?;
+    app.leaderboard_changed();
     matches::start(&app, &rt)?;
     Ok((StatusCode::CREATED, Json(run_json(&app, run))))
 }
