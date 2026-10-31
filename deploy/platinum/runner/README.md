@@ -31,12 +31,20 @@ and only then the per-player quota (`429`) or credit reservation (`402`).
 
 **Hands**: the request must be in `MIN_HANDS`..`MAX_HANDS` (default 600..200,000); the number actually played is **rounded up to a multiple
 of 6** (whole deals), and that rounded value is what every response echoes (`hands: 601` is answered as `hands: 606`, matching `hands_total`;
-quotas and prices use it too). So: rounded up to a multiple of 6, min 600, max 200,000 (a request of 200,000 plays 200,004).
+quotas and prices use it too). So: rounded up to a multiple of 6, min 600, max 200,000 (a request of 200,000 plays 200,004). The competition ranks
+only a verified run of the full 20,004 hands (`ARENA_RANKED_MIN_HANDS`); a shorter run scores but never ranks.
+
+**Limits on the public arena (free mode)**: 1M hands per bot per rolling 24 h, where every accepted job counts its planned hands even if it is aborted or
+fails (only our own infra failures are free); 2 jobs at a time per bot and 2 per client address (`FREE_MAX_CONCURRENT_JOBS`, `FREE_MAX_CONCURRENT_JOBS_PER_IP`);
+10 submits a minute per address (`SUBMITS_PER_MINUTE_PER_IP`); a run must finish within 30 minutes (`RUN_DEADLINE_S=1800`, so roughly under 50 ms per decision
+on average; a single decision may take up to 5 s). The sandbox has Python, no network, 4 CPU and 12 GB. A 20,004-hand job of a fast bot takes about 15 s.
+From `COMPETITION_CLOSES_AT` (2026-11-16 00:00 UTC, i.e. after November 15, 23:59 UTC) the `sharingan-1` track takes no public submits (`403 competition_closed`);
+`ladder-v1` stays open. The service token is not affected.
 
 ### Job view
 
 A public player (arena bot token) sees only: `id, status, bot_name, track, hands, hands_total, hands_done, mbb_per_game, ci95_mbb, verified,
-forfeit_hands, error, bot_log_tail, run_id, arena_player_id, deals_seed, created_at, finished_at`. Failures on our side show a generic
+forfeit_hands, error, bot_log_tail, run_id, arena_player_id, artifact_sha256 (sha256 of the uploaded .tar.gz), deals_seed (once the job is over), created_at, finished_at`. Failures on our side show a generic
 `error`. The service token (`RUNNER_AUTH_TOKEN`) still gets the full view (sandbox, cost and ledger fields, `contact` and `profile`). `contact` and `profile` are never in the public view.
 
 `error` for a failing bot is one clear first line (for example `the bot never answered a decision (600/600 hands forfeited); nothing was
@@ -48,14 +56,18 @@ shows a score line. `bot_log_tail` is de-duplicated the same way.
 Every accepted job keeps its upload in Postgres (`job_artifacts`). `GET /v1/jobs/:id/artifact` (service token only, `403` for players)
 returns the exact `.tar.gz` that was submitted. This is what the [competition](../../../COMPETITION.md) final table plays:
 
-1. At the deadline, save the non-house rows of `GET https://arena.sharingan.poker/v1/leaderboard` in its default order (score vs
-   SHARINGAN-1). Qualified: verified, score above 0. Take the top 6, one bot per person (by `profile`); copies of SHARINGAN-1 fill
-   empty seats. Optionally re-run the leading bots' artifacts (step 3) on fresh deals with more hands to confirm the standings.
+1. At the deadline (the `sharingan-1` track takes no submits from 2026-11-16 00:00 UTC), save the non-house rows of
+   `GET https://arena.sharingan.poker/v1/leaderboard?track=sharingan-1` in their order (verified rows first, then score vs SHARINGAN-1). The leaders are the
+   top 12 bots, one bot per person (by `profile`).
 2. For each `player_id`: `GET /v1/jobs?userId=<player_id>&limit=50` with the service token and pick the latest job created before the
    deadline that is `finished`, `verified`, on `track: sharingan-1` and has `hands_done` >= 20004 (the board ignores shorter runs).
    Its `contact` reaches the owner; `profile` says who they are.
-3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz`.
-4. Play the six bots against each other at one table, every deal from every seat, in a sandbox without network.
+3. `GET /v1/jobs/<job id>/artifact > <player_id>.tgz` (its sha256 is the job's `artifact_sha256`).
+4. Re-run: play every leader's artifact again on fresh deals, 200,004 hands each (a service-token job on `sharingan-1` with `hands: 200000`), so each score comes
+   from the exact upload behind the leaderboard score. A bot qualifies when its re-run score is above 0 (it beat SHARINGAN-1). The top 6 qualifiers are the
+   finalists; if fewer than 6 qualify, copies of SHARINGAN-1 take the empty seats.
+5. Final table: play the six bots against each other at one table, at least 1,000,000 hands, every deal from every seat, each bot in its own sandbox
+   without network, with anonymized names. The highest win rate wins.
 
 ## Fresh secret deals
 

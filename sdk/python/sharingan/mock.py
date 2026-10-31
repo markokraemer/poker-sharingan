@@ -148,6 +148,8 @@ class MockArena:
                 auth = (self.headers.get("Authorization") or "").replace("Bearer ", "")
                 if auth not in arena.tokens:
                     return self._err(401, "unauthorized", "bad token")
+                if method == "GET" and path == "/v1/me":
+                    return self._send(200, arena.players[arena.tokens[auth]])
                 if arena.benchmarks and parts[:2] == ["v1", "benchmarks"]:
                     pid = arena.tokens[auth]
                     if len(parts) == 4 and parts[3] == "runs" and method == "POST":

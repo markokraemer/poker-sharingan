@@ -6,6 +6,7 @@
     sharingan play mybot.py --vs sharingan-1 [--server URL]
     sharingan serve mybot.py --port 9000 [--secret S]
     sharingan submit mybot.py --contact EMAIL --profile URL [--token T] [--hands N]   # hosted job on the server's runner: verified score
+    sharingan token [mybot.py|NAME]                                           # print the saved bot token (for curl: $(sharingan token mybot.py))
     sharingan pipe mybot.py                                                   # stdin/stdout, for `sharingan-arena run --bot "sharingan pipe mybot.py"`
     sharingan eval mybot.py --local [--track T] [--hands N] [--lanes L]       # run the local worker binary, no server
 
@@ -25,6 +26,7 @@ import signal
 import sys
 import time
 from typing import Any, List, Optional
+from urllib.parse import urlparse
 
 from .bot import Bot
 from .client import ApiException, ArenaClient, Runner
@@ -60,12 +62,14 @@ def load_bot(path: str) -> Bot:
     spec.loader.exec_module(mod)
     inst = getattr(mod, "bot", None)
     if isinstance(inst, Bot):
+        if inst.name == Bot.name:    # nobody named it: it is called after its file (one bot name = one token = one leaderboard row)
+            inst.name = name
         return inst
     classes = [c for c in vars(mod).values()
                if inspect.isclass(c) and issubclass(c, Bot) and c is not Bot and c.__module__ == mod.__name__]
     if classes:
         b = classes[0]()
-        if b.name == "bot":
+        if b.name == Bot.name:
             b.name = name
         return b
     fn = getattr(mod, "act", None)
@@ -160,7 +164,22 @@ def _load_tokens() -> dict:
 
 OWNER_FILE = os.path.join(os.path.dirname(TOKENS_FILE), "owner.json")
 RANKED_HANDS = 20004    # the public arena ranks verified runs of at least this many hands (ARENA_RANKED_MIN_HANDS)
+MIN_HANDS, MAX_HANDS = 600, 200000   # what a hosted job may ask for (the server rounds up to whole deals of 6)
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_HOST = re.compile(r"^([a-z0-9-]+\.)+[a-z]{2,}$")
+
+
+def _profile_ok(s: str) -> bool:
+    """Same test as the server: a public http(s) link (scheme optional, `@handle` means X); no credentials, port or IP."""
+    if re.match(r"^@\w{1,15}$", s):
+        return True
+    try:
+        u = urlparse(s if re.match(r"^[a-z][a-z0-9+.-]*://", s, re.I) else "https://" + s)
+        host, port = (u.hostname or "").lower(), u.port
+    except ValueError:
+        return False
+    return (u.scheme in ("http", "https") and not (u.username or u.password or port)
+            and bool(_HOST.match(host)) and not host.endswith(".local"))
 
 
 def _owner(args: argparse.Namespace) -> Optional[dict]:
@@ -184,6 +203,10 @@ def _owner(args: argparse.Namespace) -> Optional[dict]:
     if not _EMAIL.match(contact):
         print(f"sharingan: --contact must be an email address, got {contact!r}", file=sys.stderr)
         return None
+    if not _profile_ok(profile):
+        print(f"sharingan: --profile must be a link to your X, LinkedIn, GitHub or personal page, like https://x.com/you; got {profile!r}",
+              file=sys.stderr)
+        return None
     return {"contact": contact, "profile": profile}
 
 
@@ -198,18 +221,22 @@ def _save_owner(owner: dict) -> None:
         pass
 
 
-def bot_token(api: ArenaClient, name: str) -> str:
-    """The saved token for bot `name` on this server, or register the bot once and save its token (0600), so every
-    eval / benchmark / submit of the same bot lands on the same leaderboard row."""
+def bot_login(api: ArenaClient, name: str) -> "tuple[str, str]":
+    """(player_id, token) of bot `name` on this server: the saved one, or register the bot once and save its token (0600), so
+    every eval / benchmark / play / submit of the same bot lands on the same leaderboard row (and burns no new registration).
+    The client is left authenticated as that bot."""
     key = f"{api.base_url}|{name}"
     saved = _load_tokens().get(key)
     if isinstance(saved, dict) and saved.get("token"):
         try:
-            api.request("GET", "/v1/me", token=saved["token"])
-            return saved["token"]
+            me = api.request("GET", "/v1/me", token=saved["token"])
+            pid = (me.get("player_id") if isinstance(me, dict) else None) or saved.get("player_id") or ""
+            api.token = saved["token"]
+            return pid, saved["token"]
         except ApiException as e:
             if e.status != 401:
-                return saved["token"]
+                api.token = saved["token"]
+                return saved.get("player_id") or "", saved["token"]
     me = api.register_bot(name)
     tokens = _load_tokens()
     tokens[key] = {"player_id": me.player_id, "token": me.token}
@@ -223,7 +250,46 @@ def bot_token(api: ArenaClient, name: str) -> str:
     except OSError:
         where = "NOT saved, keep it"
     print(f"sharingan: registered {name} as {me.player_id}; token {me.token} ({where})", file=sys.stderr)
-    return me.token or ""
+    return me.player_id, me.token or ""
+
+
+def bot_token(api: ArenaClient, name: str) -> str:
+    """The saved token for bot `name` on this server, registering the bot once if there is none (see `bot_login`)."""
+    return bot_login(api, name)[1]
+
+
+def _bot_name_for(arg: str) -> str:
+    """The bot name a CLI argument stands for: a bot file (or directory) is named after its stem, anything else is a name."""
+    if os.path.exists(arg) or arg.endswith(".py") or os.sep in arg:
+        return os.path.splitext(os.path.basename(arg.rstrip("/\\")))[0][:40] or "bot"
+    return arg
+
+
+def _token(args: argparse.Namespace) -> int:
+    """`sharingan token [BOT]`: print the saved token and nothing else, so `$(sharingan token mybot.py)` works in a shell."""
+    base = ArenaClient(args.server).base_url
+    prefix = base + "|"
+    mine = {k[len(prefix):]: v["token"] for k, v in _load_tokens().items()
+            if k.startswith(prefix) and isinstance(v, dict) and v.get("token")}
+    if args.bot:
+        name = _bot_name_for(args.bot)
+        if name in mine:
+            print(mine[name])
+            return 0
+        have = f" Saved for this server: {', '.join(sorted(mine))}." if mine else ""
+        print(f"sharingan: no saved token for bot {name!r} on {base}.{have}\n"
+              "It is saved the first time you run `sharingan submit`, `benchmark`, `eval` or `play` with that bot.", file=sys.stderr)
+        return 1
+    if len(mine) == 1:
+        print(next(iter(mine.values())))
+        return 0
+    if not mine:
+        print(f"sharingan: no saved token for {base} (looked in {TOKENS_FILE}). "
+              "Run `sharingan submit mybot.py` first, or pass --server.", file=sys.stderr)
+    else:
+        print(f"sharingan: {len(mine)} bots have a saved token on {base}: {', '.join(sorted(mine))}. "
+              "Say which one: `sharingan token mybot.py`.", file=sys.stderr)
+    return 1
 
 
 class _Progress:
@@ -405,18 +471,21 @@ async def _eval(args: argparse.Namespace) -> int:
             return rc
     args.vs = args.vs or "ladder"
     try:
-        me = await asyncio.to_thread(api.register_bot, bot.name)
+        pid, token = await asyncio.to_thread(bot_login, api, bot.name)
     except OSError as e:  # URLError, ConnectionRefusedError
         return _unreachable(args.server, e)
+    except ApiException as e:
+        print(f"sharingan: could not register: {e}", file=sys.stderr)
+        return 1
     hands = max(6, (args.hands // 6) * 6)  # whole deals: 6 rotations each
-    runner = Runner(bot, args.server, me.token or "")
+    runner = Runner(bot, args.server, token)
     rtask = asyncio.ensure_future(runner.run())
     try:
         cfg = {"variant": "nlhe", "max_seats": 6, "small_blind": 50, "big_blind": 100, "ante": 0, "straddle": False,
                "starting_stack": 10000, "stack_mode": "reset", "decision_time_ms": args.decision_ms,
                "time_bank_ms": 0, "timeout_action": "check_fold", "rake": {"percent": 0, "cap": 0},
                "min_players_to_deal": 6, "odd_chip_rule": "first_left_of_button", "show_mode": "standard"}
-        body = dict(table_config=cfg, participants=[me.player_id] + _house(args.vs), hands_planned=hands,
+        body = dict(table_config=cfg, participants=[pid] + _house(args.vs), hands_planned=hands,
                     duplicate={"enabled": True, "rotations": 6, "deck_from": "seed"}, seed=args.seed)
         try:
             m = await asyncio.to_thread(lambda: api.create_match(**body))
@@ -437,7 +506,7 @@ async def _eval(args: argparse.Namespace) -> int:
             await asyncio.sleep(0.5)
         if sys.stderr.isatty():
             print("\r" + " " * 30 + "\r", end="", file=sys.stderr)
-        s = _score(cur, me.player_id)
+        s = _score(cur, pid)
         if not s:
             print("sharingan: match finished but no standings for this bot", file=sys.stderr)
             return 1
@@ -453,14 +522,14 @@ async def _play(args: argparse.Namespace) -> int:
     bot = load_bot(args.bot)
     api = ArenaClient(args.server)
     try:
-        me = await asyncio.to_thread(api.register_bot, bot.name)
+        pid, token = await asyncio.to_thread(bot_login, api, bot.name)   # the saved token: no new registration per run
         if args.table:
             tid = args.table
-            await asyncio.to_thread(api.join_table, tid, args.seat, me.player_id)
+            await asyncio.to_thread(api.join_table, tid, args.seat, pid)
         else:
             t = await asyncio.to_thread(api.create_table, decision_time_ms=args.decision_ms)
             tid = t.table_id
-            await asyncio.to_thread(api.join_table, tid, 0, me.player_id)
+            await asyncio.to_thread(api.join_table, tid, 0, pid)
             for i, h in enumerate(_house(args.vs), start=1):  # house bots fill the empty seats
                 await asyncio.to_thread(api.join_table, tid, i, h)
     except OSError as e:
@@ -470,7 +539,7 @@ async def _play(args: argparse.Namespace) -> int:
         return 1
     print(f"table {tid}: {bot.name} vs {args.vs}. Ctrl-C to stop.", file=sys.stderr)
 
-    runner = Runner(bot, args.server, me.token or "", max_hands=args.hands or None)
+    runner = Runner(bot, args.server, token, max_hands=args.hands or None)
     orig = getattr(bot, "on_hand_end", None)
 
     def on_end(e):  # print one line per hand, then defer to the bot's own hook
@@ -551,27 +620,36 @@ def _eval_local(args: argparse.Namespace) -> int:
 def _submit(args: argparse.Namespace) -> int:
     """Hosted job: upload the bot, the server's runner plays it in an isolated sandbox, a verified score lands on the leaderboard."""
     import base64
+    import hashlib
     import io
     import tarfile
     path = os.path.abspath(args.bot)
     if not os.path.exists(path):
         print(f"sharingan: no such file: {args.bot}", file=sys.stderr)
         return 2
+    # Check everything we can before the first request: registering a bot spends the per-address registration cap.
+    if not MIN_HANDS <= args.hands <= MAX_HANDS:
+        print(f"sharingan: --hands must be between {MIN_HANDS:,} and {MAX_HANDS:,}, got {args.hands:,}", file=sys.stderr)
+        return 2
     owner = _owner(args)
     if owner is None:
+        return 2
+    entry = args.entry or "bot.py"
+    if os.path.isdir(path) and not os.path.isfile(os.path.join(path, entry)):
+        print(f"sharingan: {args.bot} has no {entry} (pass --entry FILE)", file=sys.stderr)
         return 2
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         if os.path.isdir(path):
-            entry = args.entry or "bot.py"
             tar.add(path, arcname=".", filter=lambda ti: None if "__pycache__" in ti.name or ".git" in ti.name else ti)
         else:
             entry = os.path.basename(path)
             tar.add(path, arcname=entry)
+    sha = hashlib.sha256(buf.getvalue()).hexdigest()   # the server hashes the same bytes and shows it as artifact_sha256
     api = ArenaClient(args.server)
     token = args.token
     if not token:
-        name = os.path.splitext(os.path.basename(path.rstrip("/")))[0][:40] or "bot"
+        name = _bot_name_for(path)
         try:
             token = bot_token(api, name)
         except ApiException as e:
@@ -591,13 +669,18 @@ def _submit(args: argparse.Namespace) -> int:
     try:
         job = api.request("POST", "/v1/jobs", body, token=token)
     except ApiException as e:
-        print(f"sharingan: submit refused: {e.status} {e.code}: {e.message}", file=sys.stderr)
+        if e.code == "competition_closed":
+            print(f"sharingan: submit refused: {e.message}", file=sys.stderr)
+            print("sharingan: the sharingan-1 track takes no new public submits; ladder-v1 is still open (--track ladder-v1)", file=sys.stderr)
+        else:
+            print(f"sharingan: submit refused: {e.status} {e.code}: {e.message}", file=sys.stderr)
         return 1
     except OSError as e:
         return _unreachable(args.server, e)
     _save_owner(owner)
     jid = job["id"]
-    print(f"sharingan: job {jid} accepted ({args.hands} hands on {args.track})", file=sys.stderr, flush=True)
+    print(f"sharingan: job {jid} accepted ({job.get('hands') or args.hands} hands on {args.track}; "
+          f"upload sha256 {(job.get('artifact_sha256') or sha)[:12]})", file=sys.stderr, flush=True)
     t0, last = time.time(), None
     api.timeout = 30.0
     while True:
@@ -621,13 +704,16 @@ def _submit(args: argparse.Namespace) -> int:
         if j.get("bot_log_tail"):
             print(j["bot_log_tail"][-1500:], file=sys.stderr)
         return 1
+    short = j["verified"] and j["hands_done"] < RANKED_HANDS   # scores, but a short run never ranks
+    tag = (f"VERIFIED, NOT RANKED: under {RANKED_HANDS:,} hands" if short else "VERIFIED") if j["verified"] else "unverified"
     print(f"{j['bot_name']}: {j['mbb_per_game']:+.1f} +- {j['ci95_mbb']:.1f} mbb/game over {j['hands_done']} hands on {j['track']} "
-          f"[{'VERIFIED' if j['verified'] else 'unverified'}, hosted job {jid}]")
+          f"[{tag}, hosted job {jid}]")
     _warn_bot_trouble(j)
-    if j["verified"] and j["hands_done"] < RANKED_HANDS:
-        print(f"sharingan: not ranked: the leaderboard counts verified runs of {RANKED_HANDS:,}+ hands, this one had {j['hands_done']:,}; "
+    if short:
+        print(f"sharingan: not ranked: the leaderboard counts verified runs of {RANKED_HANDS:,} hands, this one had {j['hands_done']:,}; "
               "submit without --hands for a ranked run", file=sys.stderr)
-    print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
+    else:
+        print(f"leaderboard: {leaderboard_url(args.server, args.track)}")
     return 0
 
 
@@ -669,7 +755,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--server", default=os.environ.get("SHARINGAN_SERVER", DEFAULT_SERVER))
     sm.add_argument("--token", default=os.environ.get("SHARINGAN_TOKEN"), help="your arena bot token (default: the one saved for this bot name, registering it once)")
     sm.add_argument("--track", choices=TRACKS, default=DEFAULT_TRACK)
-    sm.add_argument("--hands", type=int, default=20000)
+    sm.add_argument("--hands", type=int, default=20000,
+                    help=f"{MIN_HANDS} to {MAX_HANDS}; the default 20000 becomes 20004 (whole deals) and is the only size that ranks; shorter runs are for testing")
     sm.add_argument("--lanes", type=int, default=0)
     sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
     sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")
@@ -678,6 +765,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--key", default=None, help="idempotency key (resubmitting the same key returns the same job)")
     sm.add_argument("--timeout", type=float, default=0)
     sm.add_argument("--quiet", action="store_true")
+    tk = sub.add_parser("token", help="print the saved bot token (for curl: $(sharingan token mybot.py))")
+    tk.add_argument("bot", nargs="?", default=None, help="mybot.py (named after the file) or a bot name; omit when only one bot is saved for the server")
+    tk.add_argument("--server", default=os.environ.get("SHARINGAN_SERVER", DEFAULT_SERVER))
     pp = sub.add_parser("pipe", help="serve the bot over stdin/stdout (pipe protocol) for `sharingan-arena run --bot \"sharingan pipe mybot.py\"`")
     pp.add_argument("bot")
     b = sub.add_parser("benchmark", help="run a benchmark track (ladder-v1 | sharingan-1) and print mbb/game ± CI")
@@ -714,6 +804,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _pipe(a)
         if a.cmd == "submit":
             return _submit(a)
+        if a.cmd == "token":
+            return _token(a)
         if a.cmd == "eval":
             return asyncio.run(_eval(a))
         if a.cmd == "benchmark":

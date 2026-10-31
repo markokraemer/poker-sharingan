@@ -4,7 +4,9 @@ Everything measured so far, in one place. Conventions: 6-max no-limit hold'em, 1
 mbb/game = thousandths of a big blind per hand (1 mbb/game = 0.1 bb/100), 95% confidence intervals. Blueprints: **A** = paper-style menu,
 **B** = `local` menu, **C** = `medium` menu (final). See [EVALUATION.md](EVALUATION.md) for how each number is produced.
 
-SHARINGAN-1 = C@2e10 + turn/river search (the arena bot). The full-budget run (C@final, 1.83e11 iterations) is training and will be SHARINGAN-2.
+SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it with search; the leaderboard's sharingan-1 track, `sharingan play --vs sharingan-1`
+and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
+The full-budget run (C@final, 1.83e11 iterations) is training and will be SHARINGAN-2.
 
 
 ### Training runs
@@ -58,7 +60,7 @@ Defaults: 200k iterations; opponents' beliefs from the blueprint likelihood, our
 
 * B-final vs 5× chart6 / loose / tight / RLCard: +134 / +174 / +130 / +587. Every external bot loses when seated with 5× B.
 * HU 200 bb blueprint vs **Slumbot** (2,400 live hands): +14 ± 66 bb/100. Not significant.
-* **Open Poker** (openpoker.ai,), all-in-adjusted bb/100:
+* **Open Poker** (openpoker.ai), all-in-adjusted bb/100:
 
 | session | config | hands | result |
 |---|---|---|---|

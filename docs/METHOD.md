@@ -44,4 +44,4 @@ See [EVALUATION.md](EVALUATION.md).
 
 ## 7. What differs from the paper
 
-See the "Deviations from the paper" section of the README.
+See [Deviations from the paper](RESULTS.md#deviations-from-the-paper) in RESULTS.md.

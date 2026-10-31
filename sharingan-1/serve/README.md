@@ -3,6 +3,8 @@
 Ask the bot for a decision over HTTP. **Stateless**: every request carries the full public hand
 history; the server replays it through `engine/nlhe`, validates every action, asks SHARINGAN-1
 (compact blueprint + turn/river real-time search, the "final config") and returns a **legal** action.
+This endpoint plays SHARINGAN-1 **with** search (it answers from the blueprint when a search slot is busy or the budget runs out).
+The leaderboard's `sharingan-1` track, `sharingan play --vs sharingan-1` and the browser play page use the released blueprint **without** search.
 
 State and action JSON follow [`docs/TABLE_API.md`](../../docs/TABLE_API.md): table seats, 2-char cards
 (`"Ah"`), integer chips, history entries `{seat, type, to}`, and **every amount is a "to"** (the
@@ -16,7 +18,7 @@ player's total contribution on the current street after the action), never a "by
 | `GET /v1/health` | none | liveness |
 
 **Public endpoint:** `https://arena.sharingan.poker/v1/act` (and `/v1/act/batch`, `/v1/info`). The bearer is any arena
-player token (`sk_...`, from `POST /v1/players` or the first `sharingan submit`), 10 decisions/s per player. A self-hosted
+player token (`sk_...`, from `POST /v1/players` or the first `sharingan submit`; `sharingan token mybot.py` prints it), 10 decisions/s per player. A self-hosted
 server accepts such tokens with `--arena-auth-url http://ARENA` next to its own `--api-keys`.
 
 ## Run
@@ -95,7 +97,7 @@ curl -s -X POST http://localhost:8080/v1/act \
 * `history`: every action so far, in order. Leading `post_sb` / `post_bb` entries are optional (validated if present).
   Types: `fold`, `check`, `call`, `bet`, `raise` (needs `to`), `all_in` (to optional). `street` is optional and checked.
   A fold when checking is free is accepted as a check (TABLE_API 6.6) and reported in `notes`.
-* `board` must have exactly the cards of the street the history ends on (0, 3, 4, 5).
+* `board` must hold all the community cards dealt so far (0, 3, 4 or 5, matching the street the history ends on), not only the cards of the current street.
 * The hero must be the player on the clock. Antes and straddles are not supported.
 * `options` (all optional): `include_probs` (default true), `time_budget_ms` (capped at the server budget),
   `seed` (reproducible sampling), `sample` (true = sample the mixed strategy, false = most likely action),

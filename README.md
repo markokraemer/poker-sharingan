@@ -7,9 +7,9 @@
 
 In poker, luck hides skill for thousands of hands. We replay every deal from every seat and subtract the luck, so the score actually means something.
 
-## Competition: $5,000 in prizes, final table November 16
+## Competition: $3,333 in prizes, final table November 16
 
-Beat SHARINGAN-1 to qualify on the [leaderboard](https://sharingan.poker/leaderboard/) by November 15. The top 6 meet at the final table on November 16 and play each other. $5,000 in prizes. Enter with `sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you`. Rules and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome: DM [@markokraemer](https://x.com/markokraemer).
+Beat SHARINGAN-1 to qualify: submit to the [leaderboard](https://sharingan.poker/leaderboard/) by November 15 (23:59 UTC). The organizers then re-run the leading bots on fresh deals, and the top 6 that still beat it play each other at the final table on November 16. $3,333 in prizes. Enter with `sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you`. Rules and terms: [COMPETITION.md](COMPETITION.md). Sponsors welcome: DM [@markokraemer](https://x.com/markokraemer).
 
 ## Open source (this repo)
 
@@ -21,7 +21,7 @@ Beat SHARINGAN-1 to qualify on the [leaderboard](https://sharingan.poker/leaderb
 
 ## Hosted (free during beta)
 
-We host the arena: your bot plays the field at scale on our machines, you get a verified, ranked score and every hand history. Paid credits for large volumes come later.
+We host the arena: your bot plays the field at scale on our machines, you get a verified score on the leaderboard and the deal seed (`deals_seed`) to replay the run locally. Paid credits for large volumes come later.
 
 ## Your bot's API
 
@@ -38,13 +38,13 @@ Full spec: [docs/TABLE_API.md](docs/TABLE_API.md). The SDK hides all of this beh
 ## SHARINGAN-1
 
 A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat poker pros at six-player no-limit.
-SHARINGAN-1 is blueprint C@2e10 with turn and river search, the bot behind these results:
+SHARINGAN-1 is blueprint C@2e10, played with turn and river search. Results:
 
-- won +77.6 bb/100 over 2,329 live hands on a public bot arena
-- a best response trained to exploit it, with the same bet sizes, still loses to it
+- the search bot won +77.6 bb/100 over 2,329 live hands on a public bot arena
+- a best response trained to exploit its blueprint, with the same bet sizes, still loses to it
 - a longer-trained checkpoint (C@4.77e10, also released) beats SvanBot, the #1 bot on that arena, in both seatings
 
-The leaderboard's sharingan-1 track and the inference API play its released blueprint, without real-time search.
+With search or without: the inference API (`/v1/act`) plays SHARINGAN-1 with turn and river search (it falls back to the blueprint when a search slot is busy). The leaderboard's sharingan-1 track, `sharingan play --vs sharingan-1` and the play page on sharingan.poker use the released blueprint without search.
 
 Weights: [huggingface.co/markokraemer/sharingan-1](https://huggingface.co/markokraemer/sharingan-1) ([model card](MODEL_CARD.md)) · Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
 
@@ -63,9 +63,9 @@ The same file is an Agent Skill in [skills/poker-sharingan](skills/poker-sharing
 ```bash
 pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 export SHARINGAN_SERVER=https://arena.sharingan.poker
-sharingan submit mybot.py --contact you@example.com --profile https://x.com/you   # our machines play 20,000 hands in ~10 s: VERIFIED score on the leaderboard
+sharingan submit mybot.py --contact you@example.com --profile https://x.com/you   # our machines play 20,004 hands (about 15 s for a fast bot): VERIFIED score on the leaderboard
 sharingan submit mybot.py --track sharingan-1     # the hard test: five copies of SHARINGAN-1 (contact + profile are saved after the first submit)
-sharingan benchmark mybot.py                      # same, but the bot runs on your machine (LLM bots, network access)
+sharingan benchmark mybot.py                      # unverified: the bot runs on your machine (LLM bots, network access); never counts for the competition
 ```
 
 Play SHARINGAN-1 live at [sharingan.poker/play](https://sharingan.poker/play), see the [leaderboard](https://sharingan.poker/leaderboard). The public arena is `https://arena.sharingan.poker` (REST, WebSocket `/v1/play`, hosted jobs `/v1/jobs`); how it is deployed: [deploy/production](deploy/production/README.md).

@@ -26,7 +26,7 @@ export async function handleWebhook(bot: BotLike, body: string, signature?: stri
   return [200, out];
 }
 
-/** Serve `POST /act` (your_turn -> act) and swallow `POST /events`. Node only. */
+/** Serve `POST /act` (your_turn -> act) and swallow `POST /events`. Node only. The signature header is `X-Sharingan-Signature` (the older `X-Signature` is still accepted). */
 export function serveWebhook(bot: BotLike, opts: { port?: number; secret?: string; path?: string } = {}): Promise<Server> {
   const path = opts.path ?? "/act";
   const srv = createServer((req, res) => {
@@ -35,7 +35,7 @@ export function serveWebhook(bot: BotLike, opts: { port?: number; secret?: strin
     req.on("end", async () => {
       const body = Buffer.concat(chunks).toString();
       const [status, out] = req.url?.replace(/\/+$/, "") === path
-        ? await handleWebhook(bot, body, req.headers["x-signature"] as string | undefined, opts.secret)
+        ? await handleWebhook(bot, body, (req.headers["x-sharingan-signature"] ?? req.headers["x-signature"]) as string | undefined, opts.secret)
         : [200, {}] as [number, object];
       res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(out));
     });

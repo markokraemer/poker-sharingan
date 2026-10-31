@@ -2,6 +2,7 @@ import os
 import asyncio
 import subprocess
 import sys
+from typing import Any
 
 import pytest
 
@@ -224,7 +225,8 @@ def test_submit_requires_contact_and_profile_and_remembers_them(tmp_path, monkey
     assert [(b["contact"], b["profile"]) for b in sent] == [("me@example.com", "https://x.com/me")] * 2
     assert oct(os.stat(cli.OWNER_FILE).st_mode & 0o777) == "0o600"
     out = capsys.readouterr()
-    assert "[VERIFIED, hosted job job_1]" in out.out
+    assert "[VERIFIED, NOT RANKED: under 20,004 hands, hosted job job_1]" in out.out
+    assert "leaderboard:" not in out.out, "a run that cannot rank does not link the board"
     assert "not ranked" in out.err, "a verified run shorter than a ranked run says it does not count"
 
 
@@ -248,3 +250,234 @@ def test_submit_warns_when_the_bot_crashed_or_forfeited(tmp_path, monkeypatch, c
     assert main(["submit", _bot(tmp_path), "--token", "sk_x", "--server", "http://x", "--track", "sharingan-1", "--quiet"]) == 0
     err = capsys.readouterr().err
     assert "588 of 600 hands forfeited" in err and "RuntimeError: boom" in err
+
+
+# ----------------------------------------------------------------------------- token / submit / play / naming
+
+
+class FakeApi:
+    """Stands in for ArenaClient: no network. `registered` counts POST /v1/players; `posted` keeps the /v1/jobs bodies."""
+    registered: list = []
+    posted: list = []
+    job: dict = {}
+    refuse: Any = None
+
+    def __init__(self, base_url, token=None):
+        self.base_url, self.token, self.timeout = base_url.rstrip("/"), token, 30.0
+
+    def register_bot(self, name, kind="bot", set_token=True):
+        from types import SimpleNamespace
+        FakeApi.registered.append(name)
+        n = len(FakeApi.registered)
+        self.token = f"sk_{n}"
+        return SimpleNamespace(player_id=f"p_{n}", token=f"sk_{n}")
+
+    def request(self, method, path, body=None, token=None, query=None):
+        if path == "/v1/me":
+            return {"player_id": "p_" + (token or "")[3:]}
+        if method == "POST":
+            if FakeApi.refuse:
+                raise FakeApi.refuse
+            FakeApi.posted.append(body)
+            return {"id": "job_9", "hands": 20004}
+        return dict({"status": "finished", "settled": True, "hands_done": 20004, "hands_total": 20004, "bot_name": "mybot",
+                     "mbb_per_game": 12.5, "ci95_mbb": 3.0, "track": "sharingan-1", "verified": True}, **FakeApi.job)
+
+
+@pytest.fixture
+def fake_api(monkeypatch):
+    from sharingan import cli
+    FakeApi.registered, FakeApi.posted, FakeApi.job, FakeApi.refuse = [], [], {}, None
+    monkeypatch.setattr(cli, "ArenaClient", FakeApi)
+    monkeypatch.setenv("SHARINGAN_CONTACT", "me@example.com")
+    monkeypatch.setenv("SHARINGAN_PROFILE", "https://x.com/me")
+    monkeypatch.delenv("SHARINGAN_SERVER", raising=False)
+    return FakeApi
+
+
+def _save_token(server, name, token, player_id="p"):
+    import json
+    from sharingan import cli
+    tokens = cli._load_tokens()
+    tokens[f"{server}|{name}"] = {"player_id": player_id, "token": token}
+    with open(cli.TOKENS_FILE, "w") as f:
+        json.dump(tokens, f)
+
+
+def test_token_prints_only_the_saved_token(tmp_path, capsys):
+    _save_token("http://a.test", "mybot", "sk_mine")
+    _save_token("http://a.test", "other", "sk_other")
+    _save_token("http://b.test", "solo", "sk_solo")
+    capsys.readouterr()
+    assert main(["token", str(tmp_path / "mybot.py"), "--server", "http://a.test/"]) == 0, "a path is named after its file stem"
+    assert capsys.readouterr().out == "sk_mine\n"
+    assert main(["token", "other", "--server", "http://a.test"]) == 0, "or give the bot name"
+    assert capsys.readouterr().out == "sk_other\n"
+    assert main(["token", "--server", "http://b.test"]) == 0, "no BOT: the only token saved for that server"
+    cap = capsys.readouterr()
+    assert cap.out == "sk_solo\n" and cap.err == ""
+
+
+def test_token_failures_are_exit_1_with_a_message_on_stderr(tmp_path, capsys):
+    _save_token("http://a.test", "mybot", "sk_mine")
+    _save_token("http://a.test", "other", "sk_other")
+    capsys.readouterr()
+    assert main(["token", "--server", "http://a.test"]) == 1, "two bots, none named"
+    cap = capsys.readouterr()
+    assert cap.out == "" and "mybot" in cap.err and "other" in cap.err
+    assert main(["token", "nobody.py", "--server", "http://a.test"]) == 1
+    cap = capsys.readouterr()
+    assert cap.out == "" and "no saved token for bot 'nobody'" in cap.err
+    assert main(["token", "--server", "http://empty.test"]) == 1
+    cap = capsys.readouterr()
+    assert cap.out == "" and "no saved token" in cap.err and "sharingan submit" in cap.err
+
+
+def test_token_uses_the_default_server(monkeypatch, capsys):
+    from sharingan import cli
+    monkeypatch.delenv("SHARINGAN_SERVER", raising=False)
+    _save_token(cli.DEFAULT_SERVER, "mybot", "sk_public")
+    assert main(["token", "mybot.py"]) == 0 and capsys.readouterr().out == "sk_public\n"
+
+
+@pytest.mark.parametrize("extra, why", [
+    (["--hands", "599"], "--hands"),
+    (["--hands", "200001"], "--hands"),
+    (["--hands", "0"], "--hands"),
+    (["--profile", "not a link"], "--profile"),
+    (["--profile", "https://127.0.0.1/me"], "--profile"),
+    (["--contact", "@me"], "--contact"),
+])
+def test_submit_validates_before_registering_or_uploading(tmp_path, fake_api, capsys, extra, why):
+    assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet"] + extra) == 2
+    assert why in capsys.readouterr().err
+    assert fake_api.registered == [] and fake_api.posted == [], "nothing was registered or uploaded"
+
+
+def test_submit_accepts_the_edges_of_the_hands_range_and_handles(tmp_path, fake_api, capsys):
+    for extra in (["--hands", "600"], ["--hands", "200000"], ["--profile", "@me"], ["--profile", "linkedin.com/in/me"]):
+        assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x"] + extra) == 0
+    assert len(fake_api.posted) == 4
+
+
+def test_submit_missing_entry_in_a_directory_does_not_register(tmp_path, fake_api, capsys):
+    d = tmp_path / "botdir"
+    d.mkdir()
+    (d / "main.py").write_text("def act(s):\n    return None\n")
+    assert main(["submit", str(d), "--server", "http://x", "--quiet"]) == 2
+    assert "bot.py" in capsys.readouterr().err and fake_api.registered == [] and fake_api.posted == []
+    assert main(["submit", str(d), "--entry", "main.py", "--server", "http://x", "--quiet"]) == 0
+    assert fake_api.registered == ["botdir"] and fake_api.posted[0]["entry"] == "main.py"
+
+
+def test_submit_accepted_line_shows_server_hands_and_upload_hash(tmp_path, fake_api, capsys):
+    import hashlib
+    assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x"]) == 0
+    cap = capsys.readouterr()
+    accepted = [ln for ln in cap.err.splitlines() if "accepted" in ln]
+    assert len(accepted) == 1 and "job job_9 accepted (20004 hands on ladder-v1; upload sha256 " in accepted[0], accepted
+    import base64
+    sha = hashlib.sha256(base64.b64decode(fake_api.posted[0]["artifactTgzBase64"])).hexdigest()
+    assert f"sha256 {sha[:12]})" in accepted[0], "the hash of the uploaded .tar.gz"
+    assert "[VERIFIED, hosted job job_9]" in cap.out and "leaderboard:" in cap.out, "a full verified run links the board"
+    assert "not ranked" not in cap.err
+
+
+def test_submit_short_verified_run_says_not_ranked_and_skips_the_link(tmp_path, fake_api, capsys):
+    fake_api.job = {"hands_done": 600, "hands_total": 600, "mbb_per_game": 378.1, "ci95_mbb": 578.5}
+    assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x", "--hands", "600"]) == 0
+    cap = capsys.readouterr()
+    assert cap.out.strip().splitlines() == [
+        "mybot: +378.1 +- 578.5 mbb/game over 600 hands on sharingan-1 [VERIFIED, NOT RANKED: under 20,004 hands, hosted job job_9]"]
+    assert "not ranked" in cap.err
+
+
+def test_submit_unverified_job_is_labelled_and_a_closed_track_is_explained(tmp_path, fake_api, capsys):
+    fake_api.job = {"verified": False}
+    assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x"]) == 0
+    assert "[unverified, hosted job job_9]" in capsys.readouterr().out
+    from sharingan import cli
+    msg = "the sharingan-1 track closed at 2026-11-16T00:00:00.000Z (the competition's qualifying window); ladder-v1 is open"
+    fake_api.refuse = cli.ApiException(403, "competition_closed", msg)
+    assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x", "--track", "sharingan-1"]) == 1
+    cap = capsys.readouterr()
+    assert cap.out == "" and msg in cap.err and "--track ladder-v1" in cap.err
+
+
+def test_submit_reuses_the_saved_token_of_the_file_name(tmp_path, fake_api, capsys):
+    bot = _bot(tmp_path)
+    for _ in range(2):
+        assert main(["submit", bot, "--server", "http://x", "--quiet"]) == 0
+    assert fake_api.registered == ["mybot"], "registered once, then the saved token"
+    capsys.readouterr()
+    assert main(["token", bot, "--server", "http://x"]) == 0 and capsys.readouterr().out == "sk_1\n"
+
+
+def test_play_reuses_the_saved_bot_token(tmp_path, fake_api, monkeypatch, capsys):
+    from sharingan import cli
+    tokens_seen = []
+
+    class FakeRunner:
+        def __init__(self, bot, server, token, max_hands=None, **kw):
+            tokens_seen.append(token)
+            self.hands_played, self.net_chips, self._my_seats = 0, 0, {}
+
+        async def run(self):
+            return None
+
+    class FakeTable:
+        table_id = "t1"
+
+    monkeypatch.setattr(fake_api, "create_table", lambda self, **kw: FakeTable(), raising=False)
+    monkeypatch.setattr(fake_api, "join_table", lambda self, tid, seat, pid, token=None: tokens_seen.append(("seat", tid, seat, pid)),
+                        raising=False)
+    monkeypatch.setattr(cli, "Runner", FakeRunner)
+    for _ in range(3):
+        assert main(["play", _bot(tmp_path), "--vs", "sharingan-1", "--server", "http://x"]) == 0
+    assert fake_api.registered == ["mybot"], "one registration for three plays"
+    assert [t for t in tokens_seen if isinstance(t, str)] == ["sk_1"] * 3
+    assert ("seat", "t1", 0, "p_1") in tokens_seen, "the saved player id sits at the table"
+
+
+def test_load_bot_names_llm_bots_after_their_file_unless_named(tmp_path):
+    from sharingan.bots import LLMBot
+    head = "from sharingan import Bot\nfrom sharingan.bots import LLMBot\ndef complete(p):\n    return 'ACTION: call'\n"
+    for stem, line, want in [
+        ("alpha", "bot = LLMBot(complete)", "alpha"),
+        ("beta", "bot = LLMBot(complete)", "beta"),
+        ("gamma", "bot = LLMBot(complete, name='my llm')", "my llm"),
+        ("delta", "bot = LLMBot(complete)\nbot.name = 'chosen'", "chosen"),
+        ("eps", "class Mine(Bot):\n    name = 'explicit'\n    def act(self, s): return None\nbot = Mine()", "explicit"),
+        ("zeta", "class Mine(Bot):\n    def act(self, s): return None\nbot = Mine()", "zeta"),
+    ]:
+        f = tmp_path / f"{stem}.py"
+        f.write_text(head + line + "\n")
+        b = load_bot(str(f))
+        assert b.name == want, (stem, b.name)
+    assert LLMBot(lambda p: "").name == "bot" and LLMBot(lambda p: "", name="x").name == "x"
+
+
+def test_webhook_server_accepts_both_signature_headers():
+    import json
+    import urllib.error
+    import urllib.request
+    from sharingan.bots import CallingStation
+    from sharingan.webhook import serve_webhook, sign
+    from conftest import DOC_YOUR_TURN
+    body = json.dumps(DOC_YOUR_TURN).encode()
+    srv = serve_webhook(CallingStation(), host="127.0.0.1", port=0, secret="s3", block=False)
+    try:
+        def post(headers):
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_address[1]}/act", data=body, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        assert post({"X-Sharingan-Signature": sign("s3", body)}) == 200, "what the server sends"
+        assert post({"X-Signature": sign("s3", body)}) == 200, "the old name still works"
+        assert post({"X-Sharingan-Signature": "sha256=bad"}) == 401
+        assert post({}) == 401
+    finally:
+        srv.shutdown()
+        srv.server_close()

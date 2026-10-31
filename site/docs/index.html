@@ -17,7 +17,7 @@
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span class="p">Four steps. Your bot plays the house ladder and gets a luck-corrected, verified score on the leaderboard.</span></div>
-  <div class="l"><span class="p"><span class="red">$5,000 in prizes</span>: qualify on the sharingan-1 track (step 4) by November 15, 2026; the top 6 meet at the final table on November 16. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
+  <div class="l"><span class="p"><span class="red">$3,333 in prizes</span>: qualify on the sharingan-1 track (step 4) by November 15, 2026 (23:59 UTC). The organizers then re-run the leading bots on fresh deals, and the top 6 that still beat SHARINGAN-1 meet at the final table on November 16. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">Using an agent?</div>
   <div class="l"></div>
@@ -50,21 +50,23 @@ def act(s):
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">4. Submit (free, verified)</div>
   <div class="l"></div>
-  <div class="l"><span class="p">Our machines play the bot in an isolated sandbox (Python, no network, 4 CPU, 12 GB) on fresh secret deals, replayed from every seat so luck cancels. The score is signed and shown as <span class="red">verified</span> on the leaderboard.</span></div>
+  <div class="l"><span class="p">Our machines play the bot in an isolated sandbox (Python, no network, 4 CPU, 12 GB) on fresh secret deals, replayed from every seat so luck cancels, each rotation by a fresh copy of your bot. The score is signed and shown as <span class="red">verified</span> on the leaderboard. Only a verified run of the full 20,004 hands ranks; a shorter <span class="red">--hands</span> run is for testing.</span></div>
   <div class="l"></div>
   <div class="l"><span class="code">sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # competition entry: vs five SHARINGAN-1
 sharingan submit mybot.py                        # ladder-v1, a softer field (does not count for prizes)
 # mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job job_...]</span></div>
   <div class="l"></div>
-  <div class="l"><span class="p">No account needed: the first run registers the bot, named after the file (<span class="red">deepstack.py</span> plays as deepstack), and saves its token in <span class="red">~/.config/sharingan/tokens.json</span>, so later runs land on the same row. Every submit needs <span class="red">--contact</span> (your email) and <span class="red">--profile</span> (a link to your X, LinkedIn, GitHub or personal page): never shown publicly, saved after the first submit. On another machine: <span class="red">export SHARINGAN_TOKEN=sk_...</span>. More files: <span class="red">sharingan submit botdir/ --entry bot.py --requirements requirements.txt</span>. Hands: 600 to 200,000 (rounded up to a multiple of 6). Free: 1M hands per bot per day, 2 jobs at a time.</span></div>
+  <div class="l"><span class="p">No account needed: the first run registers the bot, named after the file (<span class="red">deepstack.py</span> plays as deepstack), and saves its token in <span class="red">~/.config/sharingan/tokens.json</span>, so later runs land on the same row. Every submit needs <span class="red">--contact</span> (your email) and <span class="red">--profile</span> (a link to your X, LinkedIn, GitHub or personal page): never shown publicly, saved after the first submit. Print the token with <span class="red">sharingan token mybot.py</span>; on another machine: <span class="red">export SHARINGAN_TOKEN=sk_...</span>. More files: <span class="red">sharingan submit botdir/ --entry bot.py --requirements requirements.txt</span>. A <span class="red">Bot</span> subclass keeps state only within one rotation of a deal (about a sixth of a run), and hosted runs fire only <span class="red">on_hand_end</span> and <span class="red">on_error</span>: rebuild state from <span class="red">s.history</span>.</span></div>
+  <div class="l"><span class="p muted">Limits (free): hands 600 to 200,000 (rounded up to a multiple of 6, so 200,000 becomes 200,004); 1M hands per bot per rolling 24 h, and every accepted job counts its planned hands even if it is aborted or fails; 2 jobs at a time per bot and per address; 10 submits a minute per address. A run must finish within 30 minutes, so roughly under 50 ms per decision on average (a single decision may take up to 5 s). A fast bot plays 20,004 hands in about 15 s. The sharingan-1 track takes no public submits after November 15, 2026, 23:59 UTC; ladder-v1 stays open.</span></div>
   <div class="l"></div>
   <div class="l muted">BOT NEEDS THE NETWORK (LLM, REMOTE MODEL)</div>
-  <div class="l"><span class="code">sharingan benchmark mybot.py --hands 1200        # runs on your machine over a WebSocket: ranked, not verified</span></div>
+  <div class="l"><span class="code">sharingan benchmark mybot.py --hands 1200        # runs on your machine over a WebSocket: unverified, does not count for the competition</span></div>
   <div class="l"></div>
-  <div class="l muted">OR RAW HTTP (your arena bot token is the bearer)</div>
+  <div class="l muted">OR RAW HTTP (your arena bot token is the bearer: TOKEN=$(sharingan token mybot.py))</div>
   <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"botName":"mybot","language":"python","entry":"mybot.py",
-  "track":"ladder-v1","hands":20000,"idempotencyKey":"run-1","artifactTgzBase64":"'$(tar czf - mybot.py | base64 | tr -d '\n')'"}'
+  "track":"ladder-v1","hands":20000,"idempotencyKey":"run-1","contact":"you@example.com","profile":"https://x.com/you",
+  "artifactTgzBase64":"'$(tar czf - mybot.py | base64 | tr -d '\n')'"}'
 # -> {"id":"job_..."}: JOB_ID=job_...
 curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs/$JOB_ID -H "authorization: Bearer $TOKEN"   # status, score, verified
 curl -s -X POST <span class="api">https://arena.sharingan.poker</span>/v1/jobs/$JOB_ID/abort -H "authorization: Bearer $TOKEN"
@@ -101,7 +103,7 @@ curl -s <span class="api">https://arena.sharingan.poker</span>/v1/matches/$MATCH
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">Ask SHARINGAN-1</div>
   <div class="l"></div>
-  <div class="l"><span class="p">Send a spot, get the bot's action and probabilities. Any arena token, 10 decisions/s. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md">Request format</a>.</span></div>
+  <div class="l"><span class="p">Send a spot, get the bot's action and probabilities. This plays SHARINGAN-1 with turn and river search (the leaderboard plays its blueprint without search). Any arena token, 10 decisions/s. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md">Request format</a>.</span></div>
   <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/act -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"small_blind":50,"big_blind":100,"button_seat":3,"hero_seat":0,"hole_cards":["Ah","Kd"],"board":[],
        "players":[{"seat":0,"stack_start":10000},{"seat":1,"stack_start":10000},{"seat":2,"stack_start":10000},

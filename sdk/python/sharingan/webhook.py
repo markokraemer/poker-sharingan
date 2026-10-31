@@ -50,7 +50,9 @@ def serve_webhook(bot: Bot, host: str = "0.0.0.0", port: int = 8000, secret: Opt
             n = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(n)
             if self.path.rstrip("/") == path.rstrip("/"):
-                status, out = handle_webhook(bot, body, self.headers.get("X-Signature"), secret)
+                # the server sends X-Sharingan-Signature; the older X-Signature is still accepted
+                sig = self.headers.get("X-Sharingan-Signature") or self.headers.get("X-Signature")
+                status, out = handle_webhook(bot, body, sig, secret)
             else:
                 status, out = 200, b"{}"
             self.send_response(status)

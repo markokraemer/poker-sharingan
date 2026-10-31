@@ -13,7 +13,7 @@ Cloudflare Worker `sharingan-arena-edge`  (deploy/platinum/edge)  adds X-Edge-Se
       v
 Caddy (host, :443)   403 unless X-Edge-Secret matches. Path routing on ONE hostname:
       |  /v1/jobs* /v1/quota /v1/credits* /v1/webhooks/*   -> runner  127.0.0.1:8090
-      |  /v1/act* /v1/info /v1/health                       -> serve   127.0.0.1:8081   (needs a serve API key)
+      |  /v1/act* /v1/info /v1/health                       -> serve   127.0.0.1:8081   (a serve API key or any arena bot token)
       |  everything else (REST, WebSocket /v1/play)         -> arena   127.0.0.1:8080
       v
 podman (rootful, quadlet units, all on network `sharingan-core`)
@@ -34,7 +34,7 @@ Firewall (ufw): inbound 22, 80, 443 only (+ DNS from the container bridge, + for
 
 `BILLING_MODE=free` in the runner: jobs cost nothing, no ledger, the Stripe webhook route is off. Public users authenticate with their **arena bot
 token** (`Authorization: Bearer sk_...`; the runner validates it with `GET /v1/me` on the arena, cached 60 s) and only see their own jobs.
-Quotas per player: `FREE_MAX_HANDS_PER_DAY=1000000` (rolling 24 h) and `FREE_MAX_CONCURRENT_JOBS=2` (HTTP 429 `quota_hands_per_day` / `quota_concurrent`);
+Quotas per player: `FREE_MAX_HANDS_PER_DAY=1000000` (rolling 24 h) and `FREE_MAX_CONCURRENT_JOBS=2` (HTTP 429 `quota_hands_per_day` / `quota_concurrent`; a job's planned hands count even if it is aborted or fails, only our own infra failures are free), plus `FREE_MAX_CONCURRENT_JOBS_PER_IP=2` and `SUBMITS_PER_MINUTE_PER_IP=10` per client address;
 `GET /v1/quota` shows usage. Public users always run in `worker` mode. `RUNNER_AUTH_TOKEN` stays the trusted service token (any `userId`).
 To go paid later: set `BILLING_MODE=paid` + `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `PRICE_USD_PER_1K_HANDS` (the paid path is unchanged, see
 `deploy/platinum/README.md`); the webhook URL is `https://arena.sharingan.poker/v1/webhooks/stripe`. In paid mode public users need a service in front that

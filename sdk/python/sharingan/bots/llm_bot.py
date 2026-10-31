@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Awaitable, Callable, Union
+from typing import Awaitable, Callable, Optional, Union
 
 from ..bot import Bot
 from ..helpers import parse_action_text, render_state, safe_action
@@ -23,9 +23,12 @@ SYSTEM_PROMPT = (
 
 
 class LLMBot(Bot):
-    name = "llm_bot"
+    """No class-level name: the CLI names the bot after its file (so two LLM bots are two leaderboard rows). Pass `name=` to choose."""
 
-    def __init__(self, complete: Callable[[str], Union[str, Awaitable[str]]], system_prompt: str = SYSTEM_PROMPT):
+    def __init__(self, complete: Callable[[str], Union[str, Awaitable[str]]], system_prompt: str = SYSTEM_PROMPT,
+                 name: Optional[str] = None):
+        if name:
+            self.name = name
         self.complete = complete
         self.system_prompt = system_prompt
         self.last_prompt = ""

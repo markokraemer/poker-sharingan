@@ -2,7 +2,7 @@
 
 > A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-1, an open-source Pluribus reproduction. Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
 
-$5,000 in prizes: beat SHARINGAN-1 to qualify (verified, sharingan-1 track). The leaderboard closes 23:59 UTC on November 15, 2026; the top 6 meet at the final table on November 16. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+$3,333 in prizes: beat SHARINGAN-1 to qualify (verified full 20,004-hand run, sharingan-1 track). Submits close 23:59 UTC on November 15, 2026; the organizers then re-run the leading bots on fresh deals and the top 6 that still beat SHARINGAN-1 meet at the final table on November 16. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 - [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
 - [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP

@@ -41,7 +41,7 @@ A plain object works too: `run({ act: (s) => check() }, URL, token)`.
 | `Runner` / `run()` | WebSocket: hello, `resume` after reconnect, 15 s ping, duplicate/gap detection (`table_seq`, `seq`), `decision_id` idempotency, re-answer after `illegal_action`/`bad_amount`, deadline guard |
 | `Bot` / `BotLike` | `act(state): Action \| Promise<Action>`; optional `onConnect/onHandStart/onAction/onStreet/onHandEnd/onError` |
 | helpers | `toCall`, `potOdds`, `minRaiseTo`, `maxRaiseTo`, `potRaiseTo(s, 0.75)`, `bbMultipleTo(s, 3)`, `clampRaiseTo`, `legalize`, `safeAction`, `preflopStrength`, `renderState`, ... |
-| webhook | `serveWebhook(bot, { port, secret })` / `handleWebhook(...)` for stateless bots (Node) |
+| webhook | `serveWebhook(bot, { port, secret })` / `handleWebhook(...)` for stateless bots (Node). Signature header `X-Sharingan-Signature` (the older `X-Signature` is still accepted). Webhook mode is off on arena.sharingan.poker; it is for self-hosted arenas |
 
 Types are the wire shapes (snake_case), no conversion layer: `YourTurn`, `Legal`, `ActionEvent`, `HandStart`, `HandEnd`, `Table`, ...
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Leaderboard - Poker Sharingan</title>
-<meta name="description" content="Poker bots ranked by luck-corrected score against fixed fields, with house reference bots.">
+<meta name="description" content="Poker bots ranked by luck-corrected score against fixed fields, with house reference bots. Verified runs of the full 20,004 hands rank.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
@@ -30,9 +30,9 @@
   <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">LEADERBOARD</span></a></h1><nav class="nav"><a href="../play/" data-int>Play</a><a href="./" data-int class="on">Leaderboard</a><a href="../docs/" data-int>Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><span class="p"><span class="red">$5,000 in prizes</span>. The board closes at 23:59 UTC on November 15, 2026; the top 6 bots that beat SHARINGAN-1 meet at the final table on November 16. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
+  <div class="l"><span class="p"><span class="red">$3,333 in prizes</span>. The sharingan-1 track takes submits until 23:59 UTC on November 15, 2026. The organizers then re-run the leading bots on fresh deals, and the top 6 that still beat SHARINGAN-1 meet at the final table on November 16. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md">Rules and terms</a>.</span></div>
   <div class="l"><span class="p">Score is mbb per game (1000 mbb = 1 big blind), luck-corrected, ± 95% interval. Higher is better.</span></div>
-  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. On the sharingan-1 track SHARINGAN-1 plays five copies of itself, so its true score is 0; the ± is the noise of 20,004 hands. ✓ = verified: our machines ran the bot for the full 20,004 hands. # counts verified submitted bots only, so on sharingan-1 it is the prize standing.</span></div>
+  <div class="l"><span class="p muted">REFERENCE rows are house bots run on the same 20,004-hand tracks. On the sharingan-1 track SHARINGAN-1 plays five copies of itself (its released blueprint, no real-time search), so its true score is 0; the ± is the noise of 20,004 hands. ✓ = verified: our machines ran the bot for the full 20,004 hands. Shorter runs never rank, and unverified bots (run on the submitter's machine) are listed below every verified one and never count for the competition. # counts verified submitted bots only, so on sharingan-1 it is the qualifying standing.</span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><span id="status" class="p muted">LOADING...</span></div>
   <div class="l"></div>
@@ -62,7 +62,7 @@
     list.forEach((r) => {
       const name = String(r.name == null ? r.player_id : r.name).replace(/^house:/, "");
       const t = r.tracks && r.tracks[sortBy], ok = t && t.verified ? '<span class="red">✓</span>' : "";
-      // # = place among verified submitted bots: on sharingan-1, the prize standing (unverified bots don't count, so no number)
+      // # = place among verified submitted bots: on sharingan-1, the qualifying standing (unverified bots don't count, so no number)
       const num = r.house ? '<span class="muted">REF</span>' : (t && t.verified ? String(++n) : '<span class="muted">-</span>');
       const nm = window.esc(name) + (r.house ? ' <span class="muted">REFERENCE</span>' : (t && !t.verified ? ' <span class="muted">UNVERIFIED</span>' : ""));
       const hands = (r.hands || 0).toLocaleString("en-US");

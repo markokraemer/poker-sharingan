@@ -24,14 +24,16 @@ SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poke
 **trained strategy files** and the **card abstraction tables**. Code, training and evaluation tooling: https://github.com/markokraemer/poker-sharingan
 (Rust workspace, "library: custom": there is no `transformers`/`pytorch` loader; the weights are read by the Rust crates `blueprint` and `bench`).
 
-SHARINGAN-1 = blueprint **C@2e10** (`medium` bet sizes) + turn/river real-time search: the bot the arena runs and every result on the leaderboard's
-`sharingan-1` track is played against. The full-budget run (1.83e11 iterations) is training and will be released as SHARINGAN-2.
+SHARINGAN-1 = blueprint **C@2e10** (`medium` bet sizes) + turn/river real-time search (the search is code, not weights). Where it plays with search and where not:
+the inference API (`/v1/act`) plays the full bot (it falls back to the blueprint when a search slot is busy); the leaderboard's `sharingan-1` track,
+`sharingan play --vs sharingan-1` and the browser play page use the released blueprint **without** search. The full-budget run (1.83e11 iterations)
+is training and will be released as SHARINGAN-2.
 
 ## What is in this repository
 
 | file | size | what it is |
 |---|---|---|
-| `sharingan-1.plcp.part-*` | 124.7 GB | **SHARINGAN-1**: blueprint C after 2e10 iterations (PLCP1 compact). The bot that played live and runs the arena |
+| `sharingan-1.plcp.part-*` | 124.7 GB | **SHARINGAN-1**: blueprint C after 2e10 iterations (PLCP1 compact). The blueprint of the bot that played live (with search on top). The arena's leaderboard track and play page run it without search |
 | `C-medium-4.77e10.plcp.part-*` | 141.7 GB | blueprint C after 4.77e10 iterations: strongest checkpoint evaluated (+3.8 mbb/game vs SHARINGAN-1) |
 | `B-local-2e10.plcp.part-*` | 28.3 GB | blueprint B (smaller `local` menu): the light option for normal machines |
 | `A-paper-2e10.plcp.part-*` | 186.9 GB | blueprint A (paper-style menu) |
@@ -103,11 +105,11 @@ Infoset counts: C reached 12.2B infosets (78% of a 460 GB store); A reached 17.0
 | A | `paper` | 3.43e10 (stopped) | ~66 h | store full at 17.0B infosets |
 | C final (SHARINGAN-2) | `medium` | training | | target 1.83e11 iterations (about 8 days of total compute, matching the paper) |
 
-Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each; total compute for the released checkpoints about EUR 480.
+Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each. The runs B, C and A above add up to about 134 server-hours, about EUR 250 at that rate (training only).
 
 ## Evaluation
 
-All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100), 95% CI. Full tables and caveats are in the GitHub README.
+All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100), 95% CI. Full tables and caveats are in [docs/RESULTS.md](https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md).
 
 | test | result |
 |---|---|
@@ -117,7 +119,7 @@ All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100),
 | trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (the exploiter loses) |
 | search (turn+river) vs 5 x C@2e10 | +87 +- 27 |
 | search (turn+river) vs rule bots chart6 / loose / tight | +59 / +108 / +66 |
-| Open Poker live, final config, 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |
+| Open Poker live, final config (with search), 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |
 | offline vs SvanBot at its live budget, C@4.77e10 blueprint: 1 SvanBot vs 5 x blueprint / 1 blueprint vs 5 x SvanBot | SvanBot -46.9 +- 21.2 / blueprint +56.7 +- 34.7 |
 
 ## Intended use
