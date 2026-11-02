@@ -73,9 +73,13 @@ returns the exact `.tar.gz` that was submitted. This is what the [competition](.
    above 0 (it beat SHARINGAN-1). The 6 qualifiers with the highest re-run scores are the finalists; if fewer than 6 qualify, copies of
    SHARINGAN-1 take the empty seats. Read the finalists' code before the final (covert signalling between bots, or between rotations of a
    deal, is cheating and is plain to see in code).
-5. Final table: play the six bots against each other at one table, at least 1,000,000 hands, every deal from every seat, each bot in its
-   own sandbox (better: its own host) without network, with anonymized names. The highest luck-corrected (AIVAT) mbb/game among the
-   submitted bots wins.
+5. Final table: `sudo python3 deploy/production/final_table.py --bots DIR --out DIR` on the arena host, with one `<label>.tgz`
+   per finalist in DIR (plus `<label>.entry` / `<label>.req` when the job had them). It plays one duplicate match of 999,996
+   hands on 12 tables, every deal from every seat, each finalist in its own sandbox (bot image, sharingan-sandbox AppArmor,
+   no capabilities, 4 CPU / 12 GB, a network that reaches only the arena) under an anonymous name, house:sharingan-1 in empty
+   seats, other players' cards withheld until the match ends, and writes the standings, every hand and each bot's log. The
+   highest luck-corrected (AIVAT) mbb/game among the finalists wins. Dry run first with throwaway bots and `--hands 1200 --cleanup`
+   (checked 2026-11-02: three finalists incl. one with requirements, ~1 min). A million hands takes roughly an hour.
 
 ## Fresh secret deals
 
