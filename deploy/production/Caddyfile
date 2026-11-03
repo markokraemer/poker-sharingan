@@ -1,6 +1,6 @@
 # Origin TLS + path routing for the production host. All proxied traffic must carry the Cloudflare Worker's shared secret
 # (X-Edge-Secret); ACME (Let's Encrypt) is handled by Caddy itself before any of this.
-51-158-203-112.sslip.io {
+51-158-206-42.sslip.io {
 	encode zstd gzip
 
 	@denied not header X-Edge-Secret {$EDGE_SECRET}

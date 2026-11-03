@@ -3,7 +3,7 @@
 //
 // The origin only accepts traffic that carries the shared secret header, so the Worker is the only way in:
 //   wrangler secret put EDGE_SECRET       (same value as EDGE_SECRET in /srv/sharingan/secrets/caddy.env on the host)
-//   vars.UPSTREAM                          e.g. https://51-158-203-112.sslip.io
+//   vars.UPSTREAM                          e.g. https://51-158-206-42.sslip.io
 // WebSocket upgrades pass through fetch() unchanged.
 export interface Env { UPSTREAM: string; EDGE_SECRET: string }
 
