@@ -41,14 +41,14 @@ A from-scratch reproduction of [Pluribus](https://doi.org/10.1126/science.aay240
 SHARINGAN-1 is blueprint C@2e10, played with turn and river search. Results:
 
 - the search bot won +77.6 bb/100 over 2,329 live hands on a public bot arena
-- a best response trained to exploit its blueprint, with the same bet sizes, still loses to it
+- a short-trained best response (12M iterations, same bet sizes) found no profitable exploit of its blueprint: a sanity check, not a measure of exploitability
 - a longer-trained checkpoint (C@4.77e10, also released) beats SvanBot, the #1 bot on that arena, in both seatings
 
 With search or without: the inference API (`/v1/act`) plays SHARINGAN-1 with turn and river search (it falls back to the blueprint when a search slot is busy). The leaderboard's sharingan-1 track, `sharingan play --vs sharingan-1` and the play page on sharingan.poker use the released blueprint without search.
 
 Weights: [huggingface.co/markokraemer/sharingan-1](https://huggingface.co/markokraemer/sharingan-1) ([model card](MODEL_CARD.md)) · Details: [docs/RESULTS.md](docs/RESULTS.md) · How it works: [docs/METHOD.md](docs/METHOD.md)
 
-SHARINGAN-2, from the full-length training run, is next.
+[SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2), the same run trained to the full 1.83e11 iterations, beats SHARINGAN-1 head to head by **+5.1 ± 1.2 mbb/game** (3 vs 3, 4M deals; +8.6 ± 1.9 as 1 vs 5). The leaderboard keeps SHARINGAN-1 as its opponent for the current competition.
 
 ## Run it
 

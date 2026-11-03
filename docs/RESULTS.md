@@ -6,7 +6,14 @@ mbb/game = thousandths of a big blind per hand (1 mbb/game = 0.1 bb/100), 95% co
 
 SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it with search; the leaderboard's sharingan-1 track, `sharingan play --vs sharingan-1`
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
-The full-budget run (C@final, 1.83e11 iterations) is training and will be SHARINGAN-2.
+The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
+
+| test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |
+|---|---|---|---|
+| SHARINGAN-2 vs SHARINGAN-1 (C@2e10) | **+5.09 ± 1.16** | +8.60 ± 1.89 | −7.64 ± 1.88 |
+| SHARINGAN-2 vs C@4.77e10 | **+1.97 ± 0.97** | +3.76 ± 1.57 | −1.95 ± 1.58 |
+
+Trained best response (12M iterations) vs SHARINGAN-2: the exploiter loses −247 ± 58 (−323 ± 62 against SHARINGAN-1). A true best response cannot lose to the strategy it exploits, so this exploiter is far too weak to measure exploitability: it finds no leak in either, and cannot tell them apart. Head-to-head play is the evidence that SHARINGAN-2 is stronger.
 
 
 ### Training runs

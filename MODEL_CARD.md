@@ -27,7 +27,7 @@ SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poke
 SHARINGAN-1 = blueprint **C@2e10** (`medium` bet sizes) + turn/river real-time search (the search is code, not weights). Where it plays with search and where not:
 the inference API (`/v1/act`) plays the full bot (it falls back to the blueprint when a search slot is busy); the leaderboard's `sharingan-1` track,
 `sharingan play --vs sharingan-1` and the browser play page use the released blueprint **without** search. The full-budget run (1.83e11 iterations)
-is training and will be released as SHARINGAN-2.
+is released as [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2): it beats SHARINGAN-1 by +5.1 ± 1.2 mbb/game (3 vs 3, 4M deals).
 
 ## What is in this repository
 
@@ -103,7 +103,7 @@ Infoset counts: C reached 12.2B infosets (78% of a 460 GB store); A reached 17.0
 | B | `local` | 2e10 (finished) | ~9.5 h | |
 | C | `medium` | 5.55e10 (stopped) | ~58 h | 180k -> 355k it/s; still improving |
 | A | `paper` | 3.43e10 (stopped) | ~66 h | store full at 17.0B infosets |
-| C final (SHARINGAN-2) | `medium` | training | | target 1.83e11 iterations (about 8 days of total compute, matching the paper) |
+| C final (SHARINGAN-2) | `medium` | 1.83e11 (finished 2026-11-02) | | the paper's budget; beats SHARINGAN-1 by +5.1 ± 1.2, C@4.77e10 by +2.0 ± 1.0 (3 vs 3) |
 
 Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each. The runs B, C and A above add up to about 134 server-hours, about EUR 250 at that rate (training only).
 
@@ -116,7 +116,7 @@ All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100),
 | C@2e10 vs B-final (3+3, 4M deals/format) | +1.6 +- 1.3 |
 | C@4.77e10 vs C@2e10 (3+3) | +3.8 +- 1.0 |
 | A@2e10 vs C@2e10 (3+3) | -4.0 +- 1.3 |
-| trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (the exploiter loses) |
+| trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (the exploiter loses: too short a run to find a leak; a sanity check, not an exploitability measure) |
 | search (turn+river) vs 5 x C@2e10 | +87 +- 27 |
 | search (turn+river) vs rule bots chart6 / loose / tight | +59 / +108 / +66 |
 | Open Poker live, final config (with search), 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |
