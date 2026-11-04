@@ -1079,6 +1079,127 @@ now records that the 1.83e11 run finished on 2026-11-02. These edits change no e
 code or model; the prior 148-test / six-build restored-main validation still applies.
 No new poker A/B claim is attached to documentation edits.
 
+### Hardening iteration 8 — preserve pure decisions while repricing mixed passive odds (2026-11-04, preregistered)
+
+**Hypothesis.** Iteration 6 transferred mass from pure fold into call and from pure call
+into fold whenever prices differed. That may explain its adaptive regression, though
+this mechanism is not established. Test a narrower, parameter-free correction only
+when both abstract fold and call masses are positive. For `q = call/(pot+call)`, multiply
+the call/fold odds by `q_shadow/q_real`, renormalize within the original fold+call mass,
+and leave every raise entry unchanged. In symbols, with original passive mass `m=f+c`
+and `r=q_shadow/q_real`, use `c_new=m*(c*r)/(f+c*r)`, `f_new=m-c_new`.
+Pure fold, pure call, zero passive mass, free checks and equal-price decisions must
+remain bit-identical. This remains a heuristic for a multiway game, not a range model.
+
+**Candidate scope.** Reuse only the opt-in plumbing/test structure from the retired
+prototype, replace its correction entirely, and give it distinct selectors:
+`TrackOpts::passive_odds` (false by default), `--passive-odds` / `--no-passive-odds`,
+offline `ARENA_PASSIVE_ODDS=0|1`, per-side head-to-head selectors. Match bench, training
+target and search. Main/default play stays unchanged during the experiment; no live
+configuration is changed. Add pure-support regression tests and retain on-menu,
+training/evaluation and bench/search parity fixtures. Run the required release suite
+and all six builds remotely, nice 10, at most eight build workers alongside the one
+input-preparation process. Do not evaluate against the inconsistent original C file.
+
+**Predeclared gates before any new correction result:**
+
+1. Require the private C reconstruction to pass buffered/direct full release hashes.
+   New disabled binaries must replay the frozen 1M and 3M references exactly on their
+   original reference seeds (all estimates, CIs, counts and miss rate; normalize only
+   the added disabled option in the tracking description). Stop on a replay failure.
+2. Primary target is the frozen **3M** attack. Discovery seed **271831**, 100,000 duplicate
+   deals/seat/arm, all six seats; same archived weights in both arms. Also evaluate the
+   frozen 1M C attack and iteration-6 adaptive 1M attacker at that seed. Require the
+   primary candidate upper 95% bound below baseline lower bound, with no significant
+   regression for either other attack. A regression is candidate lower bound above
+   baseline upper bound, even if both estimates lose. Use the same comparisons on
+   reserved confirmation seed **314161** and the same fixed sample size. Failed or
+   inconclusive primary improvement means revert; do not tune sample counts afterward.
+3. Only after those gates: sombra, all six probes, `ctl_quickstart`, `ctl_tag` at 20,004
+   hands per arm with identical deals; strict on-menu probability/trajectory checks;
+   paired 20k-deal weak/strong LBR using the verified private C in both arms. Rerun the
+   old-leak positive control on the verified input and stop if it no longer finds it.
+4. Train a fresh attacker against this candidate: 1M iterations, 15 GB, adversarial menu,
+   every seat, seed **8**, 11 workers. Save exact native weights. Evaluate seed **161804**,
+   100k deals/seat, require exact candidate reload, then evaluate the same frozen policy
+   against baseline; repeat both arms on independent seed **271832**, 100k deals/seat.
+   Any significant defender regression rejects the candidate. This finite learner still
+   has the separately documented store-full fallback mismatch; a negative score alone
+   does not establish robustness.
+5. Confirm retained target effects on SHARINGAN-2 with the frozen 1M and 3M attacks and
+   the new attacker; repeat relevant external controls. Before promotion, reproduce
+   the documented SHARINGAN-2 versus C normal-strength head-to-head (4M deals, 3+3,
+   baseline both disabled versus candidate S2 enabled / C disabled), same seeds and
+   verified models. Pure on-menu trajectories should be identical; investigate any
+   discrepancy. Keep only a significant primary improvement with no significant
+   regression elsewhere. Otherwise record the honest result and revert.
+
+All intervals are 95%; a poker estimate is positive for the attacker. Commands and
+immutable binary identities will be recorded as each gate is launched. The correction
+is unproven and uncommitted; neither code reuse nor the old correction's gains count
+as evidence for this formula.
+
+**Implementation and validation started:** eight-file candidate source archive SHA-256
+`64939b96766d513caf7765f678f8870163dc3cfc3d8a87f528d31674ec3266e6`, tracked patch
+`e9881081d10e9cfba1b7c2a22af5cd305a8dc282e474cf55f45e8cc2f7624d37`, based on
+`77f01c4`. Archived under `hardening-08/` with per-file hashes. Source replaces the old
+linear transfer with the formula above and includes exact bit-preservation tests for
+pure fold, pure call, zero passive mass, and pure passive plus raise mixtures.
+`sharingan-passive-odds-tests-v1.sh` (PID 864108) runs the six-package release suite
+(required five plus pluribus), then all six builds, nice 10, eight build/Rayon workers
+on CPUs 0–7. The separate input-copy process uses one additional nice-10 worker; total
+compute stays below the original host's 22-thread allowance. Native-model control test
+uses `ODDS_TEST_MODEL`, `ODDS_TEST_BUCKETS`, `ODDS_TEST_OUT` and remains explicitly ignored
+in the model-free suite until the verified private C is ready. No new correction score
+has been measured yet.
+
+**Frozen queue prepared:** `hardening-08/sharingan-odds-frozen-v1.py` waits for the
+validation marker, private-C buffered/direct verification, and the 3M native archive's
+buffered/direct hash agreement. Before evaluation it also verifies source/binary hashes,
+rehashes the original 1M and old adaptive 1M archives through buffered and direct I/O,
+and records those identities. It replays both original 3M seeds (271828 and 314159),
+not just the first, plus the 1M reference seed 271829. Reference JSON files are copied
+unchanged from the previous records. Exact replay gates cover all pooled/per-seat/raw
+estimates, CIs, counts, miss rate and the tracking description with only the disabled
+`passive_odds` field removed. Discovery/holdout use the three frozen policies in turn,
+baseline then candidate, one inference target at a time. Each command uses 11 workers
+on CPUs 0–10, inheriting nice 10 from the driver; command/environment/model/learner/binary
+identities are saved separately. Significant raw-winnings regression also stops the
+queue. It stops after the two frozen stages; the broader, new-adaptive and final-model
+gates remain mandatory before retaining any code. No change to the declared sample sizes.
+
+**Release validation passed:** **156 tests / 32 suites**, zero failed, one explicitly
+ignored large-model fixture; all six requested builds passed. The ignored fixture is
+not claimed as passed and remains queued for the verified C input. Exact commands,
+from `~/fix/sharingan`, with `CARGO_BUILD_JOBS=8 RAYON_NUM_THREADS=8`:
+
+```sh
+nice -n 10 taskset -c 0-7 cargo test --release -j 8 \
+  -p nlhe -p bench -p search -p sharingan-arena -p exploit -p pluribus \
+  -- --test-threads=8
+nice -n 10 taskset -c 0-7 cargo build --release -j 8 \
+  -p sharingan-arena -p bench -p exploit -p search -p sharingan-serve -p pluribus
+```
+
+Immutable `hardening-08/` executable SHA-256 values:
+
+* `exploit-odds`: `b9d8e27aa0489060b3b261733f88fd4a4670e21980574da8a795a1db8e4d7437`.
+* `arena-odds`: `43a141acf05e71fd8dc64c966b9fc85700bd63022682c690a52b1d2b0fbdb6f7`.
+* `pluribus-odds`: `4df0fc7c0b8e81a11dff0554ceac7cc72a95f9c14dcf8a5f278fd819245b26db`.
+
+Before any evaluation, replace the still-waiting v1 queue (PID 873373) with immutable
+`sharingan-odds-frozen-v2.py` (PID **877423**). Authoritative process/log/output checks
+confirmed v1 was only waiting for the private model and had started no evaluation;
+its termination and reason are recorded in `frozen-v1-retired.json`. V2 adds a necessary
+input-stability guard: after both full-file hashes pass, read the previously suspect
+64-KiB logical region 24 times through native direct `dd` (4-KiB and 64-KiB blocks),
+and 12 times buffered. Every digest must equal the verified public block digest
+`62b40adda8eadade3d02d51d05f6acde89f8eb768bf92f80f081b3b6f2fcf0d1`,
+with unchanged file metadata. Record every read in `private-c-read-stability.json` and
+stop on any mismatch. The metric, seeds, sample counts and statistical gates are
+unchanged, and no new correction result has been observed.
+
+
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
 | test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |
