@@ -60,6 +60,12 @@ Compare the pooled estimate as well as the reported seats, and identify explorat
 seat selection. These are still lower-bound attacks, not proofs of unexploitable play.
 Run target models sequentially on workers that cannot cache both at once.
 
+For localisation, add `--audit-handoffs` to a frozen evaluation. It reconstructs each
+target's deterministic shadow and partitions raw payoff by the first target turn that
+uses a shadow fallback. The groups are observational, not causal effects or AIVAT
+estimates; missing-infoset-only fallback is not detected. Verify unchanged match estimates,
+hand/payoff totals and target diagnostic reason counts before interpreting attribution.
+
 External-bot controls must also be valid runs: inspect `forfeit_hands`, `crashed_lanes`,
 `timeouts`, and per-lane decision counts before interpreting scores. Equal scores from
 crashed bots do not establish unchanged on-menu play. Use function-only offline fixtures;

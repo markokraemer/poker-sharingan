@@ -200,7 +200,7 @@ A/B, the positive controls reproduce, and the final reverted-source validation p
 143 tests and all five requested package builds. Archive infrastructure has exact
 round-trip test evidence; the failed cache optimization is excluded. No defending-policy EV improvement is
 claimed; independent deal seeds, final SHARINGAN-2 confirmation, causal localisation, and
-any defending-policy fix remain open. The validated harness changes are ready for the authorized main-branch commit/push. The defending decision logic and model
+any defending-policy fix remain open. The validated harness changes were committed and pushed to main as `1c51b24`. The defending decision logic and model
 weights are unchanged (the sole `bench::bp` change is diagnostic serialization), so this
 iteration does not claim a new head-to-head strength result. The 4M-deal SHARINGAN-2 vs
 C@2e10 measurement is prior evidence, not a rerun for this harness-only change; an actual
@@ -253,6 +253,37 @@ Commands from `~/fix`, inherited `nice -n 10`:
   --learner-sizing adversarial --eval-deals 100000 --seed 2 --eval-seed 314159 \
   --load-learner hardening-02/learner-3m.bin --out hardening-02/holdout-3m.json
 ```
+
+**Frozen 1M confirmation completed.** Training seed 1, 1M iterations / 15 GB, new evaluation
+seed 271829, 100k deals per seat: attacker **+419.5 ± 95.4 mbb/game**, raw +467.0 ± 114.1.
+Training took 3,438.7 seconds; 273,057,930 infosets, 1,875,000,000 slots, store full,
+10.32% evaluation miss rate. The native archive is about 12 GB. Loading it with training
+skipped reproduces **every pooled/per-seat/raw estimate exactly**, including uncertainty
+and sample counts. This is model-scale archive fidelity evidence, beyond the toy fixture.
+
+The *same frozen strategy* on independent seed 314160 (100k deals per seat) wins
+**+495.3 ± 95.4**, raw +466.2 ± 114.0. Pool only these two evaluations of the same archive:
+**+457.4 ± 67.4 mbb/game**, raw +466.6 ± 80.6, 200,000 independent duplicate-deal clusters
+per seat (1.2M actual hands). The pooled variance includes both within-run sample variance
+and between-run mean terms; artifact `hardening-02/pooled-1m-confirm.json`. Do not pool
+the earlier +499 policy, which came from a different stochastic training run. These fresh
+deal results corroborate profitable exploitation; they do not measure variance over
+independent training seeds. Final SHARINGAN-2 confirmation remains pending.
+
+**Initial standard LBR.** Seed 3 / 200 deals: strong **+688.4 ± 1,547.8**, weak **+239.5 ±
+1,565.7 mbb/game**. Both are inconclusive, not evidence of profitable LBR. Ignore the
+one-deal untrained-ABR placeholder and its meaningless zero sample-variance interval in
+that JSON. A 20,000-deal strong/weak LBR run on fresh seed 5 is now live with eight
+workers, at nice priority 10, alongside the 11-worker 3M run (and, briefly, the one-worker
+audit). Command: the earlier LBR command with `--seed 5 --lbr-deals 20000`; wrapped in
+`/usr/bin/time -p`. Output `hardening-05/lbr-20k.json`, log `hardening-05/lbr-20k.log`,
+immutable driver `hardening-02/lbr-20k.sh` (PID 685702). Its result is pending.
+
+**Storage observation.** By 894,576 iterations (29.8% of 3M), the 35 GB learner store
+was full at 671,173,511 infosets and approximately 4.38G slots. The larger budget delays
+saturation but does not remove it; remaining training still updates visited infosets, with
+the previously documented unvisited-learner fallback mismatch. Raw elapsed times include
+the recorded test pauses and are not a clean speed comparison.
 
 The held-out frozen evaluation remains queued behind training. Logs and artifacts stay
 in `~/fix/hardening-02/`; the immutable queue script is
@@ -336,6 +367,102 @@ source validation finish, run the original archive executable on C@2e10 with `--
 the LBR result. Output `hardening-02/lbr-200.json`, now sequenced after frozen 1M confirmation and
 holdout in `hardening-02/frozen-confirm.sh` (PID 639829). Model jobs remain sequential across target
 models; these jobs use C@2e10 only.
+
+### Hardening iteration 4 — localise frozen-attacker profit (2026-11-04, kept)
+
+**Hypothesis.** The remaining profitable attack may primarily exploit shadow hand-offs,
+or may profit elsewhere in translation/blueprint play. The corrected learner's larger
+profit and smaller hand-off frequency do not decide this. Attribute observational raw
+payoffs by first actual target decision with an out-of-sync shadow, its street, and attacker
+seat, before choosing a causal defending-policy A/B.
+
+**Candidate (diagnostic only).** Optional `--audit-handoffs` wraps the sole attacker and
+replays completed public histories through one shadow for each target, preserving each
+seat's own-action translation. Only a target's actual turn with nonzero `sync_reason`
+counts. Aggregate one record per hand, grouped by the first such street and attacker seat;
+also report decision counts by street/reason. No cards or individual hand records are
+exported. The diagnostic does not detect missing-infoset-only fallback, and rejects hidden
+random translation. Conditional raw payoff means are explicitly **observational**, not
+causal effects, AIVAT estimates, or independent-deal confidence intervals.
+
+**Tests / resource gate.** Two new tests pass: exact match-estimate parity and raw-payoff
+reconciliation (one record per actual hand, not per target/fork), with both passive and
+forced raise-war fixtures; and rejection of random translation. The full required release suite passed **145 tests / 27 suites**, zero failed or ignored;
+all five requested packages built successfully, under `nice -n 10`, eight build/Rayon
+workers and one test thread. Only the 3M experiment (PID 602317) is temporarily suspended; the saved
+1M confirmation keeps training on its immutable binary. Validation script `hardening-02/audit-tests.sh` (PID 651250) completed, and its EXIT
+trap resumed the 3M process, confirmed running afterward.
+
+**Model-scale measurement queued.** After validation and the existing frozen 1M confirmation,
+replay, holdout and initial LBR sequence finish, run from `~/fix`:
+
+```sh
+./hardening-04/exploit-audit --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --threads 1 \
+  --learner-sizing adversarial --eval-deals 100000 --seed 1 --eval-seed 271829 \
+  --load-learner hardening-02/learner-1m-confirm.bin --audit-handoffs \
+  --out hardening-04/audit-1m.json
+```
+
+The immutable `hardening-02/audit-run-v3.sh` queue (PID 658249) waits for validation,
+then observes either the actual 8-worker LBR child (which follows the holdout) or completion
+of the confirmation sequence. It checks validation/replay success markers and holdout
+output, then runs at nice priority 10. Require *exact* overall/per-seat/raw evaluation
+equality with the unwrapped frozen reference, 600,000 recorded hands, reconciliation of
+raw payoff sums, and exact agreement of reconstructed reason counts with the target's own
+diagnostic counters. Failure stops attribution. One audit worker + 8 LBR workers + 11
+3M learner workers stays within the CPU budget; no target-model switch.
+**Model-scale verification passed.** Exact evaluation parity, 600,000 recorded hands,
+raw-payoff reconciliation and *all* target reason-count reconciliations pass. The audit
+counts 8,895 shadow-fallback decisions, all explicit reason 4. Output
+`hardening-04/audit-verified.json` is the validated aggregate, with no individual histories
+or cards exported. Discovery evaluation seed 271829 is used for attribution; reserve
+314160 for defending-policy confirmation after choosing the candidate.
+
+| first actual shadow-fallback decision | hands | conditional raw mbb/game | contribution to overall raw mbb/game |
+|---|---:|---:|---:|
+| preflop | 2,381 | −13,054.6 | −51.8 |
+| flop | 75 | −19,482.5 | −2.4 |
+| turn | 383 | +15,889.0 | +10.1 |
+| river | 103 | +25,047.7 | +4.3 |
+| no shadow-fallback decision | 597,058 | +509.3 | +506.8 |
+
+Only 2,942/600,000 hands (0.4903%) expose a target shadow fallback. Those hands contribute
+**−39.8** raw mbb/game in aggregate; the no-handoff group contributes **+506.8**, summing
+to **+467.0** raw overall. These conditional groups have no claimed confidence intervals
+or causal interpretation. They do not prove raise-cap handling is safe, and they exclude
+missing-infoset-only fallback. They show this frozen attack's net profit is overwhelmingly
+in hands without a shadow hand-off, rather than in the originally suspected fallback.
+
+**Decision: keep the opt-in diagnostic**, supported by unchanged decisions/estimates and
+exact target-counter reconciliation. No defending-policy improvement is claimed. Next
+hypothesis: residual off-menu translation distorts actual versus shadow call prices.
+Test a parameter-free, opt-in correction of fold/call probability mass for price mismatch,
+leaving raise mass and equal-price/on-menu decisions unchanged. This is a hypothesis for
+a causal A/B, not an attributed cause or an accepted fix.
+
+**Additional test capacity (2026-11-04).** Read-only Platinum inventory/context checks
+found an already-running 16-CPU / 64-GB primary with headroom and the same Rust 1.99.1
+compiler. No machine was created or resized. To reduce future pauses of the 3M run,
+prepare a separate `/work/sharingan-hardening-1c51-audit` source snapshot for model-free
+release tests. Copy only Rust sources, Cargo manifests/lockfile, schema migrations and
+root notices/readme (190 files, 512,079-byte archive); no `.git`, environment files,
+credentials, model files, website, or `docs/research/`. Archive SHA-256:
+`6a2c0bb63c4eeb41e597cfd96be076170431c3f6b6c950a95fe44e5021ec3180`.
+
+Validation runs asynchronously (launcher PID 1863862; heavy child processes confirmed
+nice 10 and affinity CPUs 0–3). Use `taskset -c 0-3`, `env -i`, a dedicated Cargo cache,
+target directory and TMPDIR, `RAYON_NUM_THREADS=4`, `CARGO_BUILD_JOBS=4`, the same required
+five-package `cargo test --release -j 4 ... -- --test-threads=1`, then the requested
+five-package release build. Logs: `/work/sharingan-hardening-1c51-audit/validation.log`;
+success marker `validation.ok`. Validation completed: **145 tests / 27 suites**, zero
+failed or ignored, and all five requested package builds passed. The source-only test
+worker is now available for future checks without suspending model training.
+Training remains on the original worker within its 22-worker budget. Runtime binaries for
+that worker continue to be built there: the Platinum image has glibc 2.43 and the arena
+worker glibc 2.39, so cross-host binary portability is not assumed. This adds test capacity
+without changing live services or the training jobs.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
