@@ -13,7 +13,9 @@ read-only reads of the provided C file returned different bytes at the same offs
 with unchanged inode, size, mtime and ctime. The public copy and one direct read agree;
 other reads return zero pages in that key-index region. Earlier C estimates below
 are historical original-host measurements; their scope remains provisional until a
-verified independent copy reproduces them. No model, RAID configuration or live service
+verified independent copy reproduces them. The frozen 1M attack has since reproduced
+exactly on the independent public C copy (+419.5 ± 95.4); the 3M and LBR figures still
+await independent confirmation. No model, RAID configuration or live service
 has been modified. See iteration 7 below. This is an input-integrity concern, separate
 from the fixed translation bug.
 
@@ -998,10 +1000,48 @@ Exact probe commands and captured per-read JSON are retained in
 checks are on the isolated worker under `/work/sharingan-model-validation/`.
 The first probe's good original-host block and public block are byte-identical;
 keep small distinct read samples as evidence, never patch the original model.
-The complete original-host part/section audit continues read-only. No new C matches
-are authorized by this observation. Finish and verify the independent public models,
-rehash the transferred learner, then require a frozen replay before interpreting new
-measurements. No defending-policy fix is kept in this iteration so far.
+The complete original-host part/section audit finished read-only: all four other LFS
+parts match, and the full digest remains `acf73d86...`; section hashes are preserved
+in `hardening-06/c-part-audit.json`. No new matches use that original C file.
+
+**Independent inputs:** on the extra worker, all public C parts and its full digest now
+match `2a4484f6...`. SHARINGAN-2 was fully rehashed after the reboot and again matches
+`0f57b296...`; both copied native/compressed learner archives pass post-reboot rehashing.
+Use the restored-main executable, SHA-256
+`f3b5eaa4fbec93237bdf2ad75996ff42032e46d0d39b461cb9acee83715c4e77`.
+Task-owned `public-replay-v1.py` (PID 68612) first requires those verification markers,
+then evaluates the frozen 1M learner against public C, 100k duplicate deals per seat,
+seed 271829, all six seats, medium target / adversarial learner, eight workers. Require
+**exact** pooled/per-seat/raw estimates, CIs, counts, miss rate and track options versus
+the original `reference-1m-original.json`. Any mismatch stops the driver for investigation.
+**The public-C gate passed exactly:** +419.45226595696886 ± 95.36833763196319 mbb/game,
+raw +466.9714500000008 ± 114.10739423294837; all pooled/per-seat estimates, confidence
+intervals, counts, miss rate and track options match the original reference. This
+confirms that frozen 1M attack on a fully verified independent public C model, despite
+the original-host read anomaly. It does not retroactively validate every old training
+traversal or the stronger 3M attack. `public-c-replay-gate.json` has all checks true.
+Baseline SHARINGAN-2 evaluations of the same frozen policy have now started, seeds
+271829 and 314160, again 100k deals per seat each. No playing-policy A/B or
+promotion is implied. Commands, clean environment, target SHA-256 and boot ID are recorded
+per evaluation; no simultaneous inference on two models. The already nice-10 driver
+launches its child through `nice -n 10`, giving the child effective nice 19; eight CPUs
+4–11 are reserved for that evaluation, within the worker's 16-CPU capacity.
+
+**Private original-host input reconstruction (not a deployment):** task-owned
+`sharingan-prepare-inputs-v1.sh` first runs `sharingan-reconstruct-c-v1.py`, nice 10 /
+idle I/O. Create a fresh private incoming file under `~/fix/models/`, copy the original
+file read-only, and replace only the known 20,480-byte key region in the *new copy*
+with the byte-identical good/public block captured above. Require full-file buffered
+**and** direct-I/O SHA-256 to equal the public release before atomically naming it
+`~/fix/models/sharingan-1-verified.plcp`. If either check fails, retain evidence and stop;
+never patch the original /srv file. Record old/new-region digests, source metadata,
+full-copy digest and both verification results. This is reconstruction of a verified
+experimental input, not a new poker strategy or permission to repair live storage.
+Behind that success, prepare the frozen 3M archive for independent confirmation using
+`sharingan-prepare-3m-transfer-v1.py`: single-thread zstd, source SHA-256 during compression,
+an independent full direct-I/O native rehash, zstd integrity test and compressed SHA-256.
+The native archive is 29,581,123,222 bytes; never transfer if its two source hashes differ.
+No defending-policy fix is kept in this iteration so far.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
