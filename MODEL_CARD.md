@@ -119,6 +119,7 @@ All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100),
 | C@4.77e10 vs C@2e10 (3+3) | +3.8 +- 1.0 |
 | A@2e10 vs C@2e10 (3+3) | -4.0 +- 1.3 |
 | trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (the exploiter loses: too short a run to find a leak; a sanity check, not an exploitability measure) |
+| live exploit "sombra" (bets below the menu, read as checks; Nov 2026) vs C@2e10 blueprint | +5,231 +- 494 before the fix; **-420 +- 162** after (`keep_sync` translation, see docs/RESULTS.md) |
 | search (turn+river) vs 5 x C@2e10 | +87 +- 27 |
 | search (turn+river) vs rule bots chart6 / loose / tight | +59 / +108 / +66 |
 | Open Poker live, final config (with search), 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |

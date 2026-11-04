@@ -388,6 +388,13 @@ pub struct TrackOpts {
     /// 10x-pot "all-in" makes the shadow all-in while the real players still have chips and
     /// the shadow loses the real game. `f64::INFINITY` = no restriction (legacy).
     pub allin_snap: f64,
+    /// Translate with one-step lookahead: if the nearest abstract action would leave the
+    /// shadow out of step with the real game (other player to act, other street, other seats
+    /// all-in or folded, terminal mismatch), take the nearest abstract action that keeps it in
+    /// step instead; if none does, hand off explicitly (reason 4) so the policy plays its
+    /// fallback. Without it a bet read as a check could close the street in the shadow but not
+    /// at the table, and the policy check/called the rest of the hand (exploited live, Nov 2026).
+    pub keep_sync: bool,
 }
 
 impl TrackOpts {
@@ -397,6 +404,15 @@ impl TrackOpts {
         below: BelowMenu::Check,
         shadow: false,
         allin_snap: f64::INFINITY,
+        keep_sync: false,
+    };
+    /// The tracking used before the Nov 2026 desync fix (shadow on, small bets read as checks).
+    pub const PRE_SYNC_FIX: TrackOpts = TrackOpts {
+        translation: Translation::Deterministic,
+        below: BelowMenu::Check,
+        shadow: true,
+        allin_snap: 0.5,
+        keep_sync: false,
     };
 }
 
@@ -404,9 +420,10 @@ impl Default for TrackOpts {
     fn default() -> Self {
         TrackOpts {
             translation: Translation::Deterministic,
-            below: BelowMenu::Check,
+            below: BelowMenu::Smallest,
             shadow: true,
             allin_snap: 0.5,
+            keep_sync: true,
         }
     }
 }
@@ -488,7 +505,8 @@ impl Shadow {
         }
     }
     /// Why the shadow lost the real game: 0 = in sync, 1 = shadow terminal, 2 = different
-    /// player to act, 3 = unrepresentable fold, 5 = different street.
+    /// player to act, 3 = unrepresentable fold, 4 = no abstract action keeps it in step,
+    /// 5 = different street.
     pub fn desync_reason(&self) -> u8 {
         self.reason
     }
@@ -655,7 +673,26 @@ impl Shadow {
             return;
         }
         actions(&self.state, &mut list);
-        let (i, exact) = self.translate(real_pre, &list, a, own, rng);
+        let (mut i, mut exact) = self.translate(real_pre, &list, a, own, rng);
+        if self.opts.keep_sync {
+            let mut real_post = *real_pre;
+            real_post.apply(a);
+            match self.keep_in_step(real_pre, &real_post, &list, a, i) {
+                Some(j) if j != i => {
+                    i = j;
+                    exact = false;
+                }
+                Some(_) => {}
+                None => {
+                    // Nothing in the abstract tree follows this action (e.g. a raise past the
+                    // tree's raise cap that is not an all-in): stop here instead of tracking a
+                    // phantom all-in; the policy plays its fallback for the rest of the hand.
+                    self.desync = true;
+                    self.reason = 4;
+                    return;
+                }
+            }
+        }
         // A fold the shadow cannot represent (it faces no bet there): cannot follow.
         if a == Action::Fold && !exact {
             self.desync = true;
@@ -666,6 +703,44 @@ impl Shadow {
         self.hist.push(i);
         self.state.apply(list.get(i));
 
+    }
+
+    /// `i` if applying entry `i` keeps the shadow in step with `real_post`; else the in-step
+    /// entry nearest in pot fraction to the real action (folds only map to folds); `None` if no
+    /// entry keeps it in step.
+    fn keep_in_step(&self, real_pre: &State, real_post: &State, list: &ActionList, a: Action, i: usize) -> Option<usize> {
+        let in_step = |j: usize| {
+            let mut s = self.state;
+            s.apply(list.get(j));
+            s.is_terminal() == real_post.is_terminal()
+                && (0..s.num_players()).all(|p| {
+                    s.is_all_in(p) == real_post.is_all_in(p) && s.is_folded(p) == real_post.is_folded(p)
+                })
+                && (s.is_terminal() || (s.to_act() == real_post.to_act() && s.street() == real_post.street()))
+        };
+        if in_step(i) {
+            return Some(i);
+        }
+        let x = match a {
+            Action::RaiseTo(t) => raise_fraction(real_pre, t),
+            _ => 0.0,
+        };
+        let mut best: Option<(usize, f64)> = None;
+        for j in 0..list.len() {
+            let aj = list.get(j);
+            if (aj == Action::Fold) != (a == Action::Fold) || !in_step(j) {
+                continue;
+            }
+            let xj = match aj {
+                Action::RaiseTo(to) => raise_fraction(&self.state, to),
+                _ => 0.0,
+            };
+            let d = (xj - x).abs();
+            if best.map_or(true, |b| d < b.1) {
+                best = Some((j, d));
+            }
+        }
+        best.map(|b| b.0)
     }
 
     /// Real action for abstract entry `i` of the node's `list`, to be played at `real`.
@@ -721,7 +796,94 @@ mod shadow_tests {
             below,
             shadow: true,
             allin_snap: snap,
+            keep_sync: false,
         }
+    }
+
+    /// Hands where the shadow loses the real game, out of `hands`, when every player picks a
+    /// random legal action and raises are any size (min-raises and tiny bets weighted up).
+    fn desync_rate(o: TrackOpts, hands: u32, seed: u64) -> f64 {
+        desync_rate_adv(o, hands, seed, false).0
+    }
+
+    /// As [`desync_rate`]; `followers`: only seat `hand % 6` picks free sizes, the other five
+    /// play abstract actions through the shadow (the leaderboard setting: one bot vs five
+    /// copies of the blueprint).
+    /// Returns (share of hands that lost the real game, how many of those drifted silently, i.e.
+    /// for any reason other than the explicit hand-off 4).
+    fn desync_rate_adv(o: TrackOpts, hands: u32, seed: u64, followers: bool) -> (f64, u32) {
+        let sizing = BetSizing::pluribus_blueprint();
+        let mut rng = Rng::new(seed);
+        let mut lost = 0;
+        let mut silent = 0;
+        for _ in 0..hands {
+            let mut real = State::new(&GameConfig::new(6));
+            let mut sh = Shadow::new(&real, o);
+            let mut bad = false;
+            let adv = (rng.below(6)) as usize;
+            while !real.is_terminal() {
+                if !sh.synced(&real) {
+                    silent += (sh.sync_reason(&real) != 4) as u32;
+                    bad = true;
+                    break;
+                }
+                let l = real.legal();
+                let r = rng.below(100);
+                let a = if followers && real.to_act() != Some(adv) {
+                    let mut list = ActionList::new();
+                    sh.actions(&real, &sizing, &mut list);
+                    let i = rng.below(list.len() as u32) as usize;
+                    sh.real_action(&real, &list, i)
+                } else if l.can_raise && r < 45 {
+                    let span = (l.max_raise_to - l.min_raise_to).max(0) as u32;
+                    let to = match rng.below(4) {
+                        0 => l.min_raise_to,
+                        1 => l.min_raise_to + rng.below(span / 20 + 1) as i32,
+                        2 => l.max_raise_to,
+                        _ => l.min_raise_to + rng.below(span + 1) as i32,
+                    };
+                    Action::RaiseTo(to)
+                } else if l.can_fold && r < 60 {
+                    Action::Fold
+                } else if l.can_check {
+                    Action::Check
+                } else {
+                    Action::Call
+                };
+                sh.observe(&real, &sizing, a, false, &mut rng);
+                real.apply(a);
+            }
+            lost += bad as u32;
+        }
+        (lost as f64 / hands as f64, silent)
+    }
+
+    #[test]
+    fn keep_sync_follows_adversarial_sizes() {
+        let (fixed, fixed_silent) = desync_rate_adv(TrackOpts::default(), 6000, 11, true);
+        let (old, old_silent) = desync_rate_adv(TrackOpts::PRE_SYNC_FIX, 6000, 11, true);
+        let all_fixed = desync_rate(TrackOpts::default(), 4000, 12);
+        let all_old = desync_rate(TrackOpts::PRE_SYNC_FIX, 4000, 12);
+        eprintln!("desync rate, 1 adversary vs 5 followers: fixed {fixed:.4}, pre-fix {old:.4}; all random: fixed {all_fixed:.4}, pre-fix {all_old:.4}");
+        assert!(old > 0.05 && old_silent > 100, "the generator must reproduce the old desyncs ({old}, {old_silent} silent)");
+        assert_eq!(fixed_silent, 0, "with keep_sync the shadow never drifts silently: it follows or hands off");
+        assert!(fixed < old, "fixed {fixed} vs pre-fix {old}");
+    }
+
+    #[test]
+    fn tiny_bet_is_a_bet_by_default() {
+        let sizing = BetSizing::pluribus_blueprint();
+        let real = flop_hu();
+        let mut rng = Rng::new(1);
+        let a = Action::RaiseTo(real.legal().min_raise_to);
+        let mut sh = Shadow::new(&real, TrackOpts::default());
+        sh.observe(&real, &sizing, a, false, &mut rng);
+        let mut after = real;
+        after.apply(a);
+        assert!(sh.synced(&after));
+        let mut l = ActionList::new();
+        sh.actions(&after, &sizing, &mut l);
+        assert_eq!(l.get(0), Action::Fold, "a min bet is still a bet: the target may fold to it");
     }
 
     /// Real `RaiseTo` for a bet of `f` x pot at the flop root.

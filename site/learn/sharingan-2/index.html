@@ -160,7 +160,7 @@
   <div class="l"></div>
   <div class="l"><p>Why report checkpoints at all? Because they show the training curve. A blueprint is only a snapshot of an iterative process, and each checkpoint is a point on that curve. The 2e10 checkpoint is already strong enough to be the leaderboard reference. The final model is better than it, but the step from 4.77e10 to 1.83e11 iterations is worth only about 2 mbb/game against the middle checkpoint.</p></div>
   <div class="l"></div>
-  <div class="l"><p>As a sanity check, we trained a short best response for 12M iterations against the model. It found no profitable exploit and loses. This is not a measure of exploitability. A stronger exploiter might do better.</p></div>
+  <div class="l"><p>In November 2026 a competition entry found a real leak: it bet less than the smallest size in the model's menu, the old translation read that as a check, and the model then lost track of the hand and called everything. Against the blueprint without search it won +5.2 big blinds per hand. The translation now never reads a bet as a check, keeps its view of the hand in step with the real game, and plays by hand strength if it ever cannot. The same exploit bot now loses 390 ± 156 mbb/game against SHARINGAN-2, and a set of adversarial bet-size probes loses across the board. That closes the leaks we know of; it does not prove there are none. No six-player bot can be proven unexploitable.</p></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"></div>

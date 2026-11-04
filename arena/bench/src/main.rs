@@ -82,7 +82,7 @@ fn track_opts(a: &Args) -> Result<nlhe::abstraction::TrackOpts, String> {
     if a.flag("legacy") {
         return Ok(TrackOpts::LEGACY);
     }
-    let mut o = TrackOpts::default();
+    let mut o = if a.flag("pre-sync-fix") { TrackOpts::PRE_SYNC_FIX } else { TrackOpts::default() };
     match a.get("translation", "det").as_str() {
         "det" => o.translation = Translation::Deterministic,
         "random" => o.translation = Translation::Random,

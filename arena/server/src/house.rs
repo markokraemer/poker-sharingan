@@ -42,7 +42,12 @@ impl HouseRegistry {
             blueprint_fp = Some(fingerprint(path)?);
             let b = bench::bp::bucketer_by_name(&cfg.buckets).ok_or(format!("unknown bucketer {}", cfg.buckets))?;
             let s = bench::bp::sizing_by_name(&cfg.sizing).ok_or(format!("unknown sizing {}", cfg.sizing))?;
-            let p = bench::compact::CompactPolicy::open(path, b, s)?;
+            let mut p = bench::compact::CompactPolicy::open(path, b, s)?;
+            // ARENA_TRACK=pre-sync-fix reproduces the translation used before the Nov 2026 fix
+            // (for A/B evaluation only).
+            if std::env::var("ARENA_TRACK").as_deref() == Ok("pre-sync-fix") {
+                p = p.with_opts(nlhe::abstraction::TrackOpts::PRE_SYNC_FIX);
+            }
             bots.insert("sharingan-1".into(), Arc::new(p));
         }
         Ok(HouseRegistry { bots, blueprint_fp })

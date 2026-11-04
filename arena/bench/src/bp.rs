@@ -90,6 +90,27 @@ pub fn sizing_by_name(name: &str) -> Option<BetSizing> {
             let late = [m(&[0.5, 1.0], true), m(&[1.0], true)];
             Some(BetSizing::new([&pre, &flop, &late, &late], [4, 3, 3, 3]))
         }
+        "adversarial" => {
+            // Attacker menu for exploitability tests against a `medium` target (never a target
+            // itself): tiny bets and near-min raises, sizes just past the target's pseudo-harmonic
+            // midpoints, overbets, and one more raise per street than the target's tree allows.
+            use nlhe::abstraction::Menu;
+            let m = Menu::new;
+            let pre = [
+                m(&[0.05, 0.15, 0.3, 0.45, 0.7, 1.0, 2.0], true),
+                m(&[0.05, 0.3, 0.6, 1.0, 2.0], true),
+                m(&[0.05, 0.5, 1.0], true),
+                m(&[0.05], true),
+                m(&[0.05], true),
+            ];
+            let post = [
+                m(&[0.05, 0.15, 0.25, 0.42, 0.7, 1.3, 2.5], true),
+                m(&[0.05, 0.4, 1.0], true),
+                m(&[0.05], true),
+                m(&[0.05], true),
+            ];
+            Some(BetSizing::new([&pre, &post, &post, &post], [5, 4, 4, 4]))
+        }
         _ => None,
     }
 }
@@ -286,7 +307,11 @@ impl Player for BpPlayer {
             if diag.why[why as usize].fetch_add(1, Relaxed) < 6 && std::env::var_os("PLURIBUS_DEBUG_DESYNC").is_some() {
                 eprintln!("DESYNC why={why}\n real  {:?}\n shadow {:?}\n hist {:?}", v.state, self.track, v.history);
             }
-            d.push(passive(v.state), 1.0);
+            if sh.opts.keep_sync {
+                d.push(fallback_action(v.state, v.board, hole), 1.0);
+            } else {
+                d.push(passive(v.state), 1.0);
+            }
             return d;
         }
         let mut list = ActionList::new();
@@ -315,7 +340,11 @@ impl Player for BpPlayer {
         if !found {
             sh.misses.fetch_add(1, Relaxed);
             diag.misses.fetch_add(1, Relaxed);
-            d.push(passive(v.state), 1.0);
+            if sh.opts.keep_sync {
+                d.push(fallback_action(v.state, v.board, hole), 1.0);
+            } else {
+                d.push(passive(v.state), 1.0);
+            }
             return d;
         }
         let tot: f32 = p[..n].iter().sum::<f32>().max(1e-12);
@@ -452,4 +481,74 @@ pub fn train_toy(players: usize, iters: u64, seed: u64) -> BlueprintPolicy {
         Arc::new(CoarseBucketer),
         BetSizing::tiny(),
     )
+}
+
+/// Equity of `hole` against `opps` random hands with the board completed at random (Monte Carlo,
+/// seeded by the cards so the same spot always gets the same number).
+fn mc_equity(hole: [Card; 2], board: &[Card], opps: usize, samples: u32) -> f64 {
+    let dead = cards::mask_of(&hole) | cards::mask_of(board);
+    let deck: Vec<Card> = cards::cards_in(cards::FULL_DECK & !dead).collect();
+    let mut rng = Rng::new(dead ^ 0x9E37_79B9_7F4A_7C15);
+    let need_board = 5 - board.len();
+    let need = need_board + 2 * opps;
+    let mut buf = deck.clone();
+    let mut share = 0.0;
+    for _ in 0..samples {
+        for k in 0..need {
+            let j = k + rng.below((buf.len() - k) as u32) as usize;
+            buf.swap(k, j);
+        }
+        let mut b = cards::mask_of(board);
+        for &c in &buf[..need_board] {
+            b |= cards::bit(c);
+        }
+        let me = cards::eval::evaluate(b | cards::mask_of(&hole));
+        let (mut best, mut ties) = (true, 1u32);
+        for o in 0..opps {
+            let h = &buf[need_board + 2 * o..need_board + 2 * o + 2];
+            let r = cards::eval::evaluate(b | cards::mask_of(h));
+            if r > me {
+                best = false;
+                break;
+            }
+            if r == me {
+                ties += 1;
+            }
+        }
+        if best {
+            share += 1.0 / ties as f64;
+        }
+    }
+    share / samples as f64
+}
+
+/// Play when the blueprint cannot be queried (the shadow lost the real game, or the infoset is
+/// missing): by hand strength against the players still in, never a blind check/call. Facing a
+/// bet it continues only with equity clearly above the price (betting ranges are stronger than
+/// random hands); strong hands bet or raise about pot.
+pub fn fallback_action(st: &State, board: &[Card], hole: [Card; 2]) -> Action {
+    let me = st.to_act().unwrap_or(0);
+    let opps = (0..st.num_players())
+        .filter(|&s| s != me && !st.is_folded(s))
+        .count()
+        .max(1);
+    let e = mc_equity(hole, board, opps, 400);
+    let l = st.legal();
+    let pot = st.pot() as f64;
+    let raise = |frac: f64| {
+        let to = st.cur_bet() + ((pot + l.call_amount as f64) * frac).round() as i32;
+        Action::RaiseTo(to.clamp(l.min_raise_to, l.max_raise_to))
+    };
+    if l.can_check {
+        return if l.can_raise && e > 0.70 { raise(0.75) } else { Action::Check };
+    }
+    let c = l.call_amount as f64;
+    let price = c / (pot + c);
+    if l.can_raise && e > 0.85 {
+        raise(1.0)
+    } else if e > price + 0.12 {
+        Action::Call
+    } else {
+        Action::Fold
+    }
 }

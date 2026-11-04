@@ -6,6 +6,47 @@ mbb/game = thousandths of a big blind per hand (1 mbb/game = 0.1 bb/100), 95% co
 
 SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it with search; the leaderboard's sharingan-1 track, `sharingan play --vs sharingan-1`
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
+## Action-translation leak and fix (Nov 2026)
+
+**The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
+
+1. bets less than the smallest abstract size. With `BelowMenu::Check` (the old default) the blueprint read that bet as a check, which closed the street in its shadow game but not at the table;
+2. once the shadow lost the real game, the policy fell back to check/call for the rest of the hand (`BpPlayer::dist`), with any cards;
+3. checked to the river against these calling stations and shoved when ahead.
+
+The caveat was documented below ("default `BelowMenu::Check` leaves ~desync after tiny bets ... `--below smallest` would avoid that but was not measured") and shipped anyway. The 12M-iteration exploiter above could not find it: its bets come from a menu with no tiny sizes, so it never triggers the desync. "No leak found" measured the wrong attack surface.
+
+**The fix** (`engine/nlhe/src/abstraction.rs`, `arena/bench/src/bp.rs`, `sharingan-1/search/src/bp.rs`; `TrackOpts::PRE_SYNC_FIX` keeps the old behaviour for A/B):
+
+* `BelowMenu::Smallest` by default: a bet is never read as a check.
+* `keep_sync`: each translated action is checked one step ahead. If it would leave the shadow out of step with the real game (other player to act, other street, different all-in or folded seats, terminal mismatch), the nearest abstract action that keeps it in step is used instead. If none exists (a non-all-in raise past the tree's raise cap), the shadow hands off explicitly instead of tracking a phantom all-in.
+* When the blueprint cannot be queried (hand-off, or a missing infoset), the policy plays by hand strength (Monte Carlo equity against the players still in, continuing only clearly above the price) instead of check/call.
+
+Unit test `keep_sync_follows_adversarial_sizes`: one adversary with free sizes vs five followers, 6,000 hands: the shadow loses the real game in 2.8% of hands (all explicit hand-offs at the raise cap, zero silent drifts) vs 6.7% before, all silent.
+
+**Measured** (local worker, 20,004 hands, duplicate + AIVAT, same deals for both columns; mbb/game for the attacking bot, 95% CI):
+
+| attacker | vs C@2e10 before | vs C@2e10 fixed | vs SHARINGAN-2 before | vs SHARINGAN-2 fixed |
+|---|---|---|---|---|
+| sombra (the live exploit, its own code) | +5,382 ± 514 | **−420 ± 162** | +5,314 ± 502 | **−390 ± 156** |
+| min-bet everything | −6,801 ± 478 | −5,983 ± 637 | −6,783 ± 479 | −5,933 ± 639 |
+| min-raise every time | −3,181 ± 356 | −8,938 ± 736 | −3,199 ± 363 | −8,950 ± 739 |
+| random sizes | −4,839 ± 405 | −5,745 ± 486 | −4,951 ± 404 | −5,651 ± 480 |
+| tiny bets, shove the river | −1,207 ± 584 | −1,802 ± 353 | −1,370 ± 586 | −1,784 ± 352 |
+| sizes at the translation midpoints | −4,520 ± 574 | −4,174 ± 573 | −4,538 ± 583 | −4,367 ± 585 |
+| overbets (3x pot) | −682 ± 194 | −662 ± 197 | −752 ± 195 | −710 ± 198 |
+| control: SDK tight-aggressive | −354 ± 118 | −466 ± 119 | −253 ± 116 | −382 ± 115 |
+| control: SDK quickstart | −218 ± 10 | −218 ± 10 | −227 ± 7 | −227 ± 7 |
+
+On-menu play is unchanged (the quickstart bot, which only uses on-menu sizes, gets identical results). Trained exploiter with an adversarial menu (`--learner-sizing adversarial`: tiny bets, near-min raises, midpoint sizes, overbets, one raise past the tree's cap), 1M iterations, 1 learner vs 5 copies of C@2e10, 20,000 evaluation deals per seat:
+
+| target | exploiter wins (mbb/game) |
+|---|---|
+| C@2e10, translation before the fix (positive control) | **+4,552 ± 256** (it finds the leak) |
+| C@2e10, fixed | **+162 ± 215** (not significant; upper end of the 95% CI ≈ +377) |
+
+The method finds the old leak at sombra's scale, and finds nothing significant after the fix. This bounds what this exploiter can find in 1M iterations; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), the most likely place for what remains.
+
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
 | test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |

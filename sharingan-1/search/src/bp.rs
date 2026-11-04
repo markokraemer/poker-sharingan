@@ -154,7 +154,13 @@ impl Blueprint {
                 return d;
             }
         }
-        d.push(real_passive(st), 1.0);
+        // Shadow lost the real game or the infoset is missing: play by hand strength (never a
+        // blind check/call, which an opponent can force and exploit; see TrackOpts::keep_sync).
+        if sh.opts().keep_sync {
+            d.push(bench::bp::fallback_action(st, board, hole), 1.0);
+        } else {
+            d.push(real_passive(st), 1.0);
+        }
         d
     }
 }
