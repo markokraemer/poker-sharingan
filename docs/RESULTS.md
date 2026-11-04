@@ -46,7 +46,7 @@ Unit test `keep_sync_follows_adversarial_sizes`: one adversary with free sizes v
 | C@2e10, translation before the fix (positive control) | **+4,552 ± 256** (it finds the leak) |
 | C@2e10, fixed | **+162 ± 215** (not significant; upper end of the 95% CI ≈ +377) |
 
-The original 20k-deal evaluation found the old leak at sombra's scale and no significant pooled profit after the fix. **Hardening iteration 1 below supersedes that finding: the original learner wins +293 ± 96, and a corrected training-target model wins +499 ± 94 mbb/game against fixed C@2e10 in larger evaluations.** The original result bounded what this exploiter found in 1M iterations and 20k evaluation deals; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), the most likely place for what remains.
+The original 20k-deal evaluation found the old leak at sombra's scale and no significant pooled profit after the fix. **Hardening iteration 1 below supersedes that finding: the original learner wins +293 ± 96, and a corrected training-target model wins +499 ± 94 mbb/game against fixed C@2e10 in larger evaluations. The saved 3M / 35-GB attacker in iteration 2 now wins +2,307 ± 75 over two independent-deal evaluations.** The original result bounded what this exploiter found in 1M iterations and 20k evaluation deals; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), an initial suspect that still requires attack-specific localisation.
 
 ### Hardening iteration 1 — training/evaluation fallback mismatch (2026-11-04, kept)
 
@@ -285,13 +285,52 @@ saturation but does not remove it; remaining training still updates visited info
 the previously documented unvisited-learner fallback mismatch. Raw elapsed times include
 the recorded test pauses and are not a clean speed comparison.
 
-The held-out frozen evaluation remains queued behind training. Logs and artifacts stay
-in `~/fix/hardening-02/`; the immutable queue script is
-`hardening-01/archive-train-v2.sh`. It propagates test/run failures and does not switch
-models. No SHARINGAN-2 job may start until all C@2e10 training/evaluation jobs finish.
-This run still retains the separate store-full learner-fallback mismatch noted in
-iteration 1; fix and measure that independently. No new attack result or retained
-poker-policy improvement is claimed yet.
+**3M attacker and independent-deal confirmation completed.** The saved 3M / 35-GB
+policy wins **+2,325.2 ± 106.5 mbb/game** on seed 271828, raw +2,387.2 ± 125.1.
+The *same frozen weights*, without further training, win **+2,288.3 ± 106.2** on seed
+314159, raw +2,331.5 ± 124.3. Each evaluation has 100,000 independent duplicate-deal
+clusters per seat, 600,000 actual hands. Pool only these two runs of this archive:
+**+2,306.7 ± 75.2**, raw **+2,359.3 ± 88.2**, 200,000 deal clusters/seat and 1.2M hands.
+Every seat is significantly profitable; no post-hoc seat selection is needed.
+
+| zero-based learner seat | pooled frozen 3M attack, mbb/game (95% CI) |
+|---|---|
+| 0 | +2,717.5 ± 153.6 |
+| 1 | +3,356.5 ± 162.0 |
+| 2 | +2,586.5 ± 134.0 |
+| 3 | +2,126.4 ± 125.4 |
+| 4 | +1,730.6 ± 119.9 |
+| 5 | +1,322.8 ± 120.1 |
+
+Training reports 24,855,210,370 traversal nodes, 671,173,511 infosets and
+4,375,000,000 used slots; store full, evaluation miss rate 4.608%. Reported 15,093.8
+training seconds include the earlier documented pauses, so do not use that elapsed time
+as a clean performance comparison. This changes training seed, iteration budget and
+memory versus the 1M study: it is a stronger measured attack, not an isolated causal
+claim about which training change supplied the gain. Do not pool different learned
+policies or treat fresh deal seeds as independent training replications.
+
+A disabled experimental build reloaded `learner-3m.bin` and reproduced **all pooled,
+per-seat and raw estimates, uncertainties, sample counts and learner miss rate exactly**
+on seed 271828 (`hardening-06/3m-replay-base.json`). Its price correction is explicitly
+false. This extends model-scale persistence validation to the larger archive. Exact
+reload command from `~/fix`, inherited nice 10:
+
+```sh
+./hardening-06/exploit-price --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --threads 11 \
+  --learner-sizing adversarial --load-learner hardening-02/learner-3m.bin \
+  --seed 2 --eval-deals 100000 --eval-seed 271828 \
+  --out hardening-06/3m-replay-base.json
+```
+
+**Decision: retain the measured attack bound and frozen weights.** No defending-policy
+improvement is claimed by this training experiment. Logs and artifacts stay in
+`~/fix/hardening-02/`; immutable queue `hardening-01/archive-train-v2.sh` propagated
+failures and kept C@2e10 throughout. Final SHARINGAN-2 confirmation and mechanism
+localisation remain open. This run retains the separate store-full learner-fallback
+mismatch noted in iteration 1; fix and measure that independently.
 
 **Earlier frozen confirmation queued.** To avoid waiting for the longer 3M run before
 causal defending-policy tests, queue another faithful 1M / 15 GB learner after the new

@@ -65,8 +65,9 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
 **Algorithms and engine**
 
 * **Action translation** is where a 6-max blueprint leaks. The naive translation let a paper-menu exploiter win +26k mbb/g
-  against B. A "shadow game" (track the abstract state separately from the real one) cut it to +700. With the `medium`
-  menu it is essentially closed (+3 ± 98).
+  against B. A "shadow game" (track the abstract state separately from the real one) cut it to +700. An early `medium`
+  menu test found +3 ± 98 with its limited attacker. Larger adversarial evaluations now find profitable deviations
+  against the fixed C@2e10 checkpoint; that early result did not establish a closed attack surface.
 * **UPDATE-STRATEGY** must skip σ=0 opponent lines and must not allocate. Fixing that gave a 2.3–4× speedup.
 * More perf fixes:
   * a contended atomic node counter → thread-local counters;
@@ -85,7 +86,8 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
 * **Exploiter caveat**: the ABR is limited by its learner's abstraction, storage and training/evaluation budgets.
   It supplies a lower-bound attack result, not a proof of unexploitable play. A negative or inconclusive result
   only describes the attacks tested. The larger adversarial evaluation in `docs/RESULTS.md` found
-  +457 ± 67 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen attacker; independent-training-seed and final-model confirmation remain open.
+  +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker.
+  Its saved strategy reproduces exactly on reload. Final-model confirmation remains open.
 
 **Memory, checkpoints and training ops**
 
