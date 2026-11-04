@@ -201,7 +201,7 @@ def _owner(args: argparse.Namespace) -> Optional[dict]:
     profile = (args.profile or saved.get("profile") or "").strip()
     if not contact or not profile:
         print("sharingan: every submit needs who is behind the bot (never shown publicly):\n"
-              "  --contact you@example.com           an email to reach you (competition prizes)\n"
+              "  --contact you@example.com           your email for submission support and abuse prevention\n"
               "  --profile https://x.com/you         your X, LinkedIn, GitHub or personal page\n"
               f"Pass them once; they are saved in {OWNER_FILE} (or set SHARINGAN_CONTACT / SHARINGAN_PROFILE).",
               file=sys.stderr)
@@ -675,11 +675,7 @@ def _submit(args: argparse.Namespace) -> int:
     try:
         job = api.request("POST", "/v1/jobs", body, token=token)
     except ApiException as e:
-        if e.code == "competition_closed":
-            print(f"sharingan: submit refused: {e.message}", file=sys.stderr)
-            print("sharingan: the sharingan-1 track takes no new public submits; ladder-v1 is still open (--track ladder-v1)", file=sys.stderr)
-        else:
-            print(f"sharingan: submit refused: {e.status} {e.code}: {e.message}", file=sys.stderr)
+        print(f"sharingan: submit refused: {e.status} {e.code}: {e.message}", file=sys.stderr)
         return 1
     except OSError as e:
         return _unreachable(args.server, e)
@@ -766,7 +762,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sm.add_argument("--lanes", type=int, default=0)
     sm.add_argument("--entry", default=None, help="entry file when BOT is a directory (default bot.py)")
     sm.add_argument("--requirements", default=None, help="requirements.txt inside the bot directory (installed in a short network window)")
-    sm.add_argument("--contact", default=os.environ.get("SHARINGAN_CONTACT"), help="required: your email, so the organizers can reach you (competition prizes); never shown publicly; saved after the first submit")
+    sm.add_argument("--contact", default=os.environ.get("SHARINGAN_CONTACT"), help="required: your email for submission support and abuse prevention; never shown publicly; saved after the first submit")
     sm.add_argument("--profile", default=os.environ.get("SHARINGAN_PROFILE"), help="required: link to your X, LinkedIn, GitHub or personal page (https://x.com/you); never shown publicly; saved after the first submit")
     sm.add_argument("--key", default=None, help="idempotency key (resubmitting the same key returns the same job)")
     sm.add_argument("--timeout", type=float, default=0)

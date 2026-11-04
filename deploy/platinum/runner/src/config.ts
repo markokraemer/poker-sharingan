@@ -21,8 +21,6 @@ export interface Config {
    * (validated against GET /v1/me on the arena). RUNNER_AUTH_TOKEN stays the trusted service token.
    */
   billing: { mode: "paid" | "free"; freeMaxHandsPerDay: number; freeMaxConcurrent: number; freeMaxConcurrentPerIp: number; authCacheS: number };
-  /** COMPETITION_CLOSES_AT (ISO time): from then on the sharingan-1 track takes no public submits. */
-  competition: { closesAt?: number };
   storage: "postgres" | "memory";
   databaseUrl?: string;
 
@@ -146,15 +144,6 @@ export function loadConfig(env: Env = process.env): Config {
     host: str("HOST", "0.0.0.0") as string,
     port: num("PORT", 8090),
     authToken: req("RUNNER_AUTH_TOKEN"),
-    competition: {
-      closesAt: (() => {
-        const raw = str("COMPETITION_CLOSES_AT");
-        if (raw === undefined) return undefined;
-        const t = Date.parse(raw);
-        if (!Number.isFinite(t)) bad(`COMPETITION_CLOSES_AT must be an ISO time, got ${raw}`);
-        return t;
-      })(),
-    },
     billing: {
       mode: billingMode,
       freeMaxHandsPerDay: num("FREE_MAX_HANDS_PER_DAY", 1_000_000),

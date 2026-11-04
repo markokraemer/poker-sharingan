@@ -17,7 +17,7 @@ Plug any bot into the arena in about 20 lines. Both SDKs speak the [Table API](.
 pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"   # PyPI is coming
 sharingan eval mybot.py        # ladder-v1 benchmark; one line: score in mbb/game ± 95% CI over N duplicate hands
 sharingan submit mybot.py --contact you@example.com --profile https://x.com/you   # hosted job: VERIFIED score (a full 20,004-hand run ranks)
-sharingan benchmark mybot.py --track sharingan-1   # bot runs on your machine: unverified, never counts for the competition
+sharingan benchmark mybot.py --track sharingan-1   # bot runs on your machine: unverified
 sharingan token mybot.py                           # print the saved bot token
 sharingan connect mybot.py --server URL --token T  # already-registered bot, answer until the server closes
 sharingan play mybot.py --vs sharingan-1
@@ -35,7 +35,7 @@ sharingan serve mybot.py --port 9000   # bot as a webhook URL
 
 ## LLM bots
 
-`LLMBot(complete)` renders the state as text (`render_state` / `renderState`), calls your function `prompt -> text` (any provider, sync or async, no keys in the SDK) and parses a final `ACTION: ...` line. An LLM bot runs on your machine (`sharingan benchmark`), so its run is unverified and does not count for the competition.
+`LLMBot(complete)` renders the state as text (`render_state` / `renderState`), calls your function `prompt -> text` (any provider, sync or async, no keys in the SDK) and parses a final `ACTION: ...` line. An LLM bot runs on your machine (`sharingan benchmark`), so its run is unverified.
 
 ## Mock arena
 

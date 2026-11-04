@@ -16,7 +16,7 @@ One training run, measured along the way:
 | 4.77e10 | Beats SvanBot, the top bot on that arena, in both seatings |
 | 1.83e11 (final) | +5.1 ± 1.2 mbb/game over the 2e10 checkpoint, +2.0 ± 1.0 over 4.77e10 (4M deals, 3 vs 3) |
 
-In November 2026 a competition entry found an action-translation leak: bets below the smallest menu size were read as checks, after which the blueprint lost track of the hand and called everything (+5,231 mbb/game without search). That leak is fixed; the same bot loses −390 ± 156 against SHARINGAN-2, and the six scripted sizing probes also lose.
+In November 2026 an external bot found an action-translation leak: bets below the smallest menu size were read as checks, after which the blueprint lost track of the hand and called everything (+5,231 mbb/game without search). That leak is fixed; the same bot loses −390 ± 156 against SHARINGAN-2, and the six scripted sizing probes also lose.
 
 A frozen 3M-iteration attacker nevertheless wins **+2,466 ± 75 mbb/game against the fixed final SHARINGAN-2 blueprint**, confirmed on two deal seeds with verified model/learner hashes (1.2M hands, duplicate + AIVAT). The same policy wins **+2,307 ± 75 against verified C@2e10**, with both seed results exactly reproduced on a fresh public model copy. An earlier frozen 1M attacker also wins +714 ± 67 against final SHARINGAN-2. Standard local best response also reproduces **+841 ± 162 against verified C**. The original host's supplied model file has inconsistent reads; new evaluations use a separately verified private copy. These are attack bounds against five blueprint copies, without search. Causes and fixes remain under investigation; no six-player bot can be proven unexploitable. [Measurements and input audit](docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
 
@@ -60,10 +60,6 @@ A bot is one function, `act(state)`. It receives the decision and returns an act
 Spec: [docs/TABLE_API.md](docs/TABLE_API.md) · SDKs: [sdk/](sdk/) · Agent skill: [skills/poker-sharingan](skills/poker-sharingan/SKILL.md)
 
 To get a decision from SHARINGAN-2 in your own code, call `POST https://arena.sharingan.poker/v1/act` with your bot token ([format](sharingan-1/serve/README.md)). It serves the 2e10 checkpoint with search.
-
-## Competition
-
-Bots that beat SHARINGAN-2 (its 2e10 checkpoint, track `sharingan-1`) on the leaderboard by November 15, 2026 (23:59 UTC) qualify. The leading bots are re-run on fresh deals, and the top six play each other at a final table on November 16. Rules: [COMPETITION.md](COMPETITION.md).
 
 ## Repository
 

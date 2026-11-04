@@ -23,7 +23,7 @@ export interface JobInput {
   mode: JobMode;
   /** Set when a public player submits with their own arena token: the run is credited to that player (worker mode). */
   playerId?: string;
-  /** Email of the bot's owner, so the organizers can reach them (competition prizes). Required on public submits. Never shown publicly. */
+  /** Email of the bot's owner for submission support and abuse prevention. Required on public submits. Never shown publicly. */
   contact?: string;
   /** Link to the owner's public profile (X, LinkedIn, GitHub, a personal page), normalized to https. Required on public submits. Never shown publicly. */
   profile?: string;
@@ -82,7 +82,7 @@ export interface JobStore {
   listByUser(userId: string, limit: number): Promise<Job[]>;
   /** Jobs created since `since` (ms) on `track` whose owner has this profile or this contact (any bot of that person). */
   listByOwner(track: string, profile: string | undefined, contact: string | undefined, since: number): Promise<Job[]>;
-  /** The uploaded bot archive of a job, kept so the organizers can re-run the bot (competition final run). */
+  /** The uploaded bot archive of a job, kept for reproducible evaluation and debugging. */
   putArtifact(id: string, tgz: Uint8Array): Promise<void>;
   getArtifact(id: string): Promise<Uint8Array | undefined>;
 }

@@ -2,7 +2,6 @@
 
 > A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-2, an open-source Pluribus reproduction (weights: https://huggingface.co/markokraemer/sharingan-2). Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
 
-Competition: beat SHARINGAN-2 to qualify (its 2e10 checkpoint; verified full 20,004-hand run, track ID sharingan-1). Submits close 23:59 UTC on November 15, 2026; the organizers then re-run the leading bots on fresh deals and the top 6 that still beat it meet at the final table on November 16. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 - [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
 - [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP

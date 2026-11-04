@@ -227,10 +227,6 @@ export class Service {
     }
     const track = str("track", 40);
     if (!TRACKS.has(track)) bad("unknown track");
-    // the qualifying window: after it the competition track takes no new public runs, so the board stays the final standing
-    if (requireOwner && track === "sharingan-1" && cfg.competition.closesAt !== undefined && Date.now() >= cfg.competition.closesAt) {
-      throw new ServiceError(403, "competition_closed", `the sharingan-1 track closed at ${new Date(cfg.competition.closesAt).toISOString()} (the competition's qualifying window); ladder-v1 is open`);
-    }
     const hands = req.hands === undefined ? cfg.limits.defaultHands : Number(req.hands);
     if (!Number.isInteger(hands) || hands < cfg.limits.minHands || hands > cfg.limits.maxHands) bad(`hands must be an integer in ${cfg.limits.minHands}..${cfg.limits.maxHands}`);
     let lanes: number | undefined;
@@ -279,7 +275,7 @@ export class Service {
   /** FREE mode: per-player quotas (rolling 24 h hands, concurrent jobs). Called under the submit lock. */
   private async checkFreeQuota(userId: string, hands: number, clientIp?: string, owner?: { track: string; profile?: string; contact?: string }): Promise<void> {
     const b = this.d.cfg.billing;
-    // The competition track counts per person too (profile or email, across all their bots): many bots are no way to draw
+    // The sharingan-1 track counts per person too (profile or email, across all their bots): many bots are no way to draw
     // more runs. Same allowance as one bot.
     if (owner && owner.track === "sharingan-1" && (owner.profile || owner.contact)) {
       const since = Date.now() - 24 * 3600_000;
@@ -384,7 +380,7 @@ export class Service {
     return { job, deduped: false };
   }
 
-  /** Keep the uploaded bot so the organizers can re-run it later (the final table plays exactly this upload). */
+  /** Keep the uploaded bot for reproducible evaluation and debugging. */
   private async keepArtifact(jobId: string, artifact: Uint8Array): Promise<boolean> {
     try { await this.d.store.putArtifact(jobId, artifact); return true; } catch (e) { this.d.log("artifact_store_failed", { job: jobId, error: String(e) }); return false; }
   }

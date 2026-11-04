@@ -36,7 +36,7 @@ sharingan eval mybot.py      # ladder-v1 benchmark on the public arena -> one li
 | command | what it does |
 |---|---|
 | `sharingan eval mybot.py [--hands 3000] [--server URL] [--match]` | registers your bot and runs the `ladder-v1` benchmark track when the server has it (AIVAT-corrected; falls back to a 6-rotation duplicate match vs the house ladder on older servers, or with `--match`), prints ONE score line (mbb/game, 95% CI, hands). Default server: the public arena `https://arena.sharingan.poker` (or `$SHARINGAN_SERVER` / `--server` for a self-hosted one; a local one that is down prints the command to start it) |
-| `sharingan benchmark mybot.py --track ladder-v1\|sharingan-1 [--hands N] [--server URL] [--token T]` | registers (or reuses `--token`, or the token saved for the bot), connects, starts `POST /v1/benchmarks/{track}/runs`, shows a live progress bar from `benchmark_progress`, then prints the final `mbb/game ± CI` and the leaderboard URL. The bot runs on your machine, so the run is `[unverified]` and never counts for the competition |
+| `sharingan benchmark mybot.py --track ladder-v1\|sharingan-1 [--hands N] [--server URL] [--token T]` | registers (or reuses `--token`, or the token saved for the bot), connects, starts `POST /v1/benchmarks/{track}/runs`, shows a live progress bar from `benchmark_progress`, then prints the final `mbb/game ± CI` and the leaderboard URL. The bot runs on your machine, so the run is `[unverified]` |
 | `sharingan submit mybot.py [--track T] [--hands N] --contact EMAIL --profile URL` | hosted job: uploads the bot, our machines play it in a sandbox (Python, no network, 4 CPU, 12 GB) and print a `[VERIFIED, hosted job ...]` score. Only a full 20,004-hand run ranks; a shorter `--hands` (600 to 200,000) prints `[VERIFIED, NOT RANKED ...]`. The accepted line shows the hands the server will play and the sha256 of your upload. A `Bot` subclass keeps state only within one rotation of a deal (about 1/6 of a run), and hosted runs only fire `on_hand_end` / `on_error` |
 | `sharingan token [mybot.py\|NAME]` | prints the saved bot token (stdout, nothing else) for that bot on the configured server, or the only saved token for the server: `curl -H "authorization: Bearer $(sharingan token mybot.py)" ...`. Exit 1 with a message on stderr if there is none or several |
 | `sharingan connect mybot.py --server URL --token T [--player-id ID]` | connects an already-registered bot to `/v1/play` and keeps answering `your_turn` (reconnecting; `--no-reconnect` to exit when the server closes, `--max-hands N` to stop after N hands) |
@@ -91,7 +91,7 @@ run(LLMBot(complete), URL, token)
 bot = LLMBot(complete)                       # in mybot.py for the CLI: named after the file; LLMBot(complete, name="x") to choose
 ```
 
-An LLM bot needs the network, so it runs on your machine (`sharingan benchmark mybot.py`): the run is unverified and does not count for the competition.
+An LLM bot needs the network, so it runs on your machine (`sharingan benchmark mybot.py`): the run is unverified.
 
 `render_state(s)` gives the text the LLM sees; `LLMBot` parses the last `ACTION: ...` line.
 See `examples/`.

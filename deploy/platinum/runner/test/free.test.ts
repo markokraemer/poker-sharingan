@@ -259,10 +259,10 @@ describe("free billing mode", () => {
     assert.equal((await api("POST", "/v1/jobs", "sk_human_eve", sub({ idempotencyKey: "h1" }))).status, 401, "browser (human) tokens can't submit");
   });
 
-  test("the sharingan-1 track closes at COMPETITION_CLOSES_AT; ladder-v1 stays open", async () => {
+  test("both benchmark tracks stay open despite a legacy submission deadline", async () => {
     await boot({ onProcess: hang }, { COMPETITION_CLOSES_AT: new Date(Date.now() - 1000).toISOString() });
     const r = await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "late", track: "sharingan-1" }));
-    assert.deepEqual([r.status, r.json.error.code], [403, "competition_closed"]);
+    assert.equal(r.status, 202, JSON.stringify(r.json));
     assert.equal((await api("POST", "/v1/jobs", "sk_user_alice", sub({ idempotencyKey: "ladder" }))).status, 202);
   });
 

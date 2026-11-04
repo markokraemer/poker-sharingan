@@ -404,16 +404,16 @@ def test_submit_short_verified_run_says_not_ranked_and_skips_the_link(tmp_path, 
     assert "not ranked" in cap.err
 
 
-def test_submit_unverified_job_is_labelled_and_a_closed_track_is_explained(tmp_path, fake_api, capsys):
+def test_submit_unverified_job_is_labelled_and_server_refusals_are_explained(tmp_path, fake_api, capsys):
     fake_api.job = {"verified": False}
     assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x"]) == 0
     assert "[unverified, hosted job job_9]" in capsys.readouterr().out
     from sharingan import cli
-    msg = "the sharingan-1 track closed at 2026-11-16T00:00:00.000Z (the competition's qualifying window); ladder-v1 is open"
-    fake_api.refuse = cli.ApiException(403, "competition_closed", msg)
+    msg = "submissions are temporarily unavailable"
+    fake_api.refuse = cli.ApiException(403, "temporarily_unavailable", msg)
     assert main(["submit", _bot(tmp_path), "--server", "http://x", "--quiet", "--token", "sk_x", "--track", "sharingan-1"]) == 1
     cap = capsys.readouterr()
-    assert cap.out == "" and msg in cap.err and "--track ladder-v1" in cap.err
+    assert cap.out == "" and "403 temporarily_unavailable" in cap.err and msg in cap.err
 
 
 def test_submit_reuses_the_saved_token_of_the_file_name(tmp_path, fake_api, capsys):
