@@ -22,12 +22,19 @@ read path or validate every historical run. No original model, RAID configuratio
 live service has been modified. See iteration 7 below. This is an input-integrity concern, separate
 from the fixed translation bug.
 
-**Strongest confirmed frozen attack so far:** the 3M / 35-GB policy wins
+**Strongest confirmed trained attack against final SHARINGAN-2:** the 3M / 35-GB policy wins
 **+2,465.9 ± 74.9 mbb/game against final SHARINGAN-2** on verified inputs,
 two deal seeds / 1.2M hands, duplicate + AIVAT, without search. Its confirmed C@2e10
 result is +2,306.7 ± 75.2. The mixed-passive-odds candidate remains uncommitted and is
 not part of these baselines. These are profitable deviations, not equilibrium-gap
 estimates or a comparison of normal playing strength.
+
+Separately, iteration 10's new near-all-in attacker profits against verified C:
+the actual API scores +14,283 ± 910 at 500/1,000 blinds, while the native canonical
+50/100 game scores +3,965 ± 788 on discovery deals. These are different target
+paths and correction schemes; no final-S2 near-all-in result is available.
+The measured mixed-odds candidate is not retained on main because its remaining
+final-model and normal-strength gates were unfinished when the user stopped the loop.
 
 **The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
 
@@ -1536,6 +1543,59 @@ copy on the Mac. The conditional original-host final queue is PID 965387, and Ma
 observer PID 13856 (script SHA c84d3fc49b742a4f3f02d2594e0a2e06af0afccfafab3e82dd986a1521a86da4).
 All source/model/policy gates above remain in force.
 
+**Completed measurements and wrap-up checkpoint (2026-11-04):** all values below
+are attacker mbb/game with 95% deal-cluster CIs. The frozen final-model A/B passed
+its three exact disabled-policy reference replays and both registered seeds:
+
+| final SHARINGAN-2 attack / seed | disabled | mixed passive odds |
+|---|---:|---:|
+| frozen 3M / 271831 | +2,543.1 ± 105.7 | +428.1 ± 100.0 |
+| frozen 3M / 314161 | +2,382.6 ± 106.9 | +251.6 ± 100.8 |
+| frozen 1M / 271831 | +715.3 ± 94.0 | −700.0 ± 90.0 |
+| frozen 1M / 314161 | +632.4 ± 95.2 | −796.2 ± 91.1 |
+
+Each row/arm uses 100,000 duplicate deals per seat / 600,000 hands. Both primary
+3M improvements have disjoint intervals; none of the four pairs has a significant
+raw or corrected defender regression. Artifacts discovery/holdout-gates.json and
+frozen-s2-gates.ok under the independent worker's hardening-08 directory.
+
+The fresh seed-8, 1M-iteration attacker also completed its input seal and exact
+reload. On C at evaluation seeds 161804 / 271832, disabled scores are
+−445.5 ± 62.2 / −478.5 ± 62.3, versus enabled −716.8 ± 61.5 / −748.6 ± 61.6.
+On verified original-host S2 the same frozen attacker scores
+−197.8 ± 60.4 / −232.1 ± 60.5 versus −514.8 ± 59.6 / −554.2 ± 59.6.
+Each is 100,000 duplicate deals per seat; all raw and corrected no-regression gates
+pass. C LBR weak: +330.0 ± 164.8 → +321.2 ± 164.7; strong:
++841.4 ± 161.7 → +727.2 ± 163.4, 20,000 duplicate clusters/configuration.
+Those LBR differences are inconclusive.
+
+Original-host S2 full buffered/direct hashes and all required exact reference
+replays passed. All nine final-model external A/B pairs completed without errors
+or significant defender regression at seed ab-20004 / 20,004 hands per arm:
+
+| external attacker | disabled S2 | mixed passive odds S2 |
+|---|---:|---:|
+| sombra | −390.4 ± 155.5 | −429.7 ± 153.7 |
+| quickstart offline | −555.4 ± 134.3 | −575.6 ± 134.4 |
+| tag | −382.1 ± 115.3 | −378.8 ± 114.9 |
+| bracket edges | −4,367.4 ± 584.7 | −4,395.3 ± 588.2 |
+| minimum bets | −5,933.4 ± 639.4 | −6,745.8 ± 640.7 |
+| minimum-raise wars | −8,949.7 ± 738.9 | −9,393.6 ± 745.2 |
+| overbets | −710.0 ± 197.7 | −723.5 ± 196.4 |
+| random sizes | −5,650.7 ± 479.7 | −6,324.9 ± 471.1 |
+| tiny bets / shove | −1,784.4 ± 352.3 | −1,862.1 ± 352.4 |
+
+The user then requested wrap-up. The owned final-host process group was stopped
+during the enabled final-model LBR arm; its completed baseline and all prior files
+remain under ~/fix/hardening-08, with user-wrap-up-checkpoint.json. The required
+final LBR pair and 4M-deal normal-strength gate are incomplete. Additional native
+near-all-in S2 validation in iteration 10 is also incomplete. **No iteration-8
+policy change is kept on main or committed.** Its exact source is preserved,
+uncommitted, in the sibling sharingan-passive-odds worktree on branch
+hardening/passive-odds, plus the immutable remote source archive/binaries.
+This is an unfinished experiment with substantial target improvements, not a
+validated strength improvement or a completed hardening goal.
+
 ### Hardening iteration 9 — guard terminal scaled-engine replay in the inference API (2026-11-04, preregistered)
 
 **Hypothesis and reproducer.** The API's real/scaled chip conversion can round a
@@ -1642,6 +1702,151 @@ validation.ok, both complete request-output files and all command/build/test log
 The arena/bench/exploit/search/pluribus policy sources are unchanged by this fix;
 the separate iteration-8 poker-policy candidate still requires its remaining measured
 gates. No service, model, deployment, live request or website was changed.
+
+### Hardening iteration 10 — test forced folds after API chip rounding (2026-11-04, preregistered)
+
+**Hypothesis.** Iteration 9 prevents the replay panic but intentionally retains the
+API's check/fold fallback. At 500/1,000 blinds and 100,000-chip stacks, a raise to 99,999
+can round to a scaled all-in. Callers retain a real chip although the scaled hand ends.
+An attacker may then win a very large pot by betting its last chip into targets that
+automatically fold. Test this on actual Core::decide before changing any policy.
+
+**Baseline finder:** a trusted Rust attacker raises to one chip below its legal maximum
+preflop whenever that non-all-in raise is legal, folds expensive preflop calls if it
+cannot make that raise, and shoves its remaining chips postflop. It uses no opponents'
+private cards. Play against five stateless API players, no search, all six attacker
+seats, **3,334 independent duplicate deals / 20,004 hands**, seed **2026110410**.
+Also run a same-seed, same-game control leaving **10** chips, exactly one scaled chip,
+instead of one. Require the one-chip attack's lower 95% bound above +1,000 mbb/game,
+positive API desync exposure, zero API errors and all returned actions legal. The
+10-chip control must have zero API desync exposure; report its score without assuming
+that its poker strategy loses.
+
+The target player calls the real Core with generated legal full-history requests and
+seeded API sampling. It does not substitute a policy reconstructed from rounded response
+probabilities. API targets are marked **non-exposing**, so AIVAT corrects chance nodes
+and the deterministic exposing attacker's actions, not API target decisions. Also report
+raw duplicate winnings and deal-cluster CIs. Disable API JSON logging; every hand is
+generated offline, with no live request, token or participant data. The baseline uses
+the clean main-based iteration-9 guarded source, all 187 Rust/Cargo hashes checked,
+and the same verified private C file already reproduced by the frozen/LBR references.
+One model per host; four nice-10 workers on CPUs 10–13 alongside the existing C LBR job.
+Artifacts go in ~/fix/hardening-10.
+
+Harness source SHA 30396229864ac8dc92ee3c9d12f26d77f7d9a91b3f5e75cf2bc411555bff4cf1;
+immutable driver sharingan-api-rounding-baseline-v1.py checks inputs, builds offline in
+the unwind profile, copies an immutable executable, and records all commands and hashes.
+The exact-grid control is a separate attack, not extra independent data to pool with the
+primary. Stop and investigate if the mechanics gates fail; do not promote a fix from
+the royal-flush point example alone.
+
+**Baseline outcome, before any policy repair:** the actual guarded API target loses
+**14,283.3 ± 910.5 mbb/game** to the one-chip attacker; raw duplicate winnings are
+**14,079.5 ± 873.6**. There are 114,814 target decisions, 3,442 desync fallbacks,
+zero API errors and zero illegal actions. The exact-grid ten-chip attacker also wins:
+**4,117.2 ± 771.4**, raw **4,269.5 ± 1,035.4**, over 115,705 target decisions with
+zero desync fallbacks, errors or illegal actions. Both use the registered 3,334 deal
+clusters / 20,004 hands. The exact-grid result is a separate profitable attack;
+neither its profit nor the difference between scores establishes a causal estimate
+of the rounding leak. These API scores correct chance and attacker decisions only.
+
+Driver sharingan-api-rounding-baseline-v1.py SHA
+016312718267ab5c6bad4e15bee134d88558820460447377248a62040e513f5a
+finished with baseline-gates.ok. Immutable executable SHA
+d9dac876495fe7a604d260d0b0c05b61f27bd7116c58d97bdea10980324aa518;
+outputs positive-left1.json and exact-grid-left10.json under ~/fix/hardening-10.
+No policy repair has yet been measured or retained.
+
+**Additional iteration-8 gate, registered before native results:** the profitable
+exact-grid API attack motivates testing the same trusted near-all-in strategy
+against native CompactPolicy. At canonical 50/100 blinds it leaves one chip,
+uses discovery seed 2026110410 and holdout 2026110411, and plays 3,334 duplicate
+deals / 20,004 hands per arm. Compare the immutable mixed-passive-odds candidate
+disabled/enabled, exposing native target probabilities for full AIVAT. Require no
+significant raw or corrected defender regression on either seed; retain all prior
+iteration-8 gates. Confirm on final SHARINGAN-2 before retaining that candidate.
+First require exact replays of both API baseline outputs and diagnostic counts
+using the extended harness; investigate any mismatch before interpreting native
+numbers. The harness source SHA is
+901583d20142a65904378da685b01ebb0b7489d1b349544df53560df10449f60.
+
+Placement amendment before native measurements: build the extended harness only
+on the original host (four nice-10 workers), then transfer the trusted executable
+to the existing private validation machine. Run C then SHARINGAN-2 sequentially
+there, with current-boot input hashes and the API replay gates, while the original
+host completes its final-model validation. Do not start another C inference job
+alongside that host's final-model stage. All sources, commands, hashes, outputs
+and gates must be preserved; this changes placement, not the registered samples.
+
+The validation machine's boot ID changed from 3d1e07ff-d2e7-415f-ac55-7c7013d92277
+to ac5b299f-d3a3-40e6-8a36-c065fbca06b4 before the additional native run. The v2
+input guard rejected the old-boot S2 certificate before hashing or inference;
+its traceback is retained, and it produced no new poker measurements. The v3
+driver must hash C in full, replay both original API results exactly, measure
+the registered native C pairs, then hash S2 in full and exactly replay the frozen
+1M reference (271829, 100,000 duplicate deals per seat) before its native pairs.
+Keep all sources/logs in separate v2/v3 directories. The extended executable
+SHA is 3a9c570e948c497102d28d2259402c26184aaed1ce450f1eed1c00aa3216bb97;
+the original-host compile-only stage opened no model and finished successfully.
+
+**Additional native C outcome:** v3 full C verification matched 2a4484f6… on boot
+ac5b299f…, and both original API baseline statistics and diagnostic reports replayed
+exactly. At canonical 50/100 blinds the native one-chip attacker scores
+**+3,964.7 ± 788.3 → +954.4 ± 740.0** at discovery seed 2026110410 and
+**+3,771.9 ± 806.3 → +253.3 ± 753.3** at holdout 2026110411, disabled →
+mixed-passive-odds candidate. Raw scores are +3,922.5 ± 1,069.5 →
++918.9 ± 1,045.5 and +3,757.1 ± 1,077.7 → +119.6 ± 1,042.2.
+Both corrected improvements have disjoint intervals and neither pair regresses
+under the raw check. The discovery candidate remains significantly profitable.
+These are 3,334 clusters / 20,004 hands per arm, with fully exposed native
+probabilities; do not pool or directly compare them with the unexposed API scores.
+
+Driver v3 SHA 7c3f17e6f19f15f28463470df20de7a48d43d3497ae88ffcfbf67fdd1abc570b
+and every argv/output are preserved under the validation worker's
+hardening-10-native-v3 directory. S2's full hash then passed, but a further machine
+restart interrupted the required frozen-reference replay (no result JSON or gate).
+The later boot is 489d7160-c395-4213-8dd6-3fbcc988dbf1. There are **no native S2
+near-all-in results**; do not reuse an old-boot certificate to resume inference.
+All old logs remain intact. No replacement run was started at wrap-up.
+
+The native measurement command is the immutable extended executable followed by
+MODEL BUCKETS OUT 3334 SEED 100 1 4 native false (disabled), or true (enabled),
+at the two registered seeds. API replay substitutes 1000 for the big blind,
+1 or 10 for chips left, api for the mode and false for the correction. The v3
+driver records absolute argv, explicit environments, input certificates and
+readback identities beside every result. A small archive of all v3 JSON, logs,
+source and completed markers is preserved at
+~/fix/hardening-10/native-v3-wrap-up-checkpoint.tar.gz, SHA
+7430e36ce5d77a39e0bee7c3a31fd8ce86d332d8c7a5209ba6091abba4ee56c5;
+the local copy is in the sibling checkpoints/wrap-2026-11-04 directory.
+
+The proposed real-state API fallback was prepared in the sibling
+sharingan-api-real-fallback worktree, branch hardening/api-real-fallback. Its source
+archive SHA is 4d787a7e6d4cdadea1bc74a859a029985ccf468ecf06144c2c5b13822e393682.
+It changes only the API's missing-distribution action/probability branch and
+extends the model-free royal-flush regression. **It has not been built, tested,
+measured, committed or deployed**, and is not part of main. Preserve it as an
+unverified candidate, with all registered A/B, controls and release gates still
+required. The autonomous loop is stopped at the user's wrap-up request.
+
+**Contingent smallest repair and planned gates:** if the positive control establishes
+the leak, replace only the API's missing-distribution check/fold branch with the existing
+bench fallback evaluated on the **real-chip state**, board and hero cards. A scaled
+action must not be mapped back to real chips twice. Return the actual deterministic
+fallback action with probability one when probabilities are requested. This remains an
+equity-versus-random heuristic, not a range-aware solution.
+
+Require significant primary A/B improvement with the same frozen attacker and discovery
+deals, then repeat both arms at reserved seed **2026110411**, the same 20,004 hands/arm.
+Report raw and corrected CIs; reject a significant raw or corrected regression. Keep
+the 10-chip control identical. Add frozen attackers leaving 2, 5 and 6 chips as adaptive
+boundary checks on both seeds, and require no significant defender regression. Run
+the actual existing sombra/probes/quickstart/tag controls through a validated SDK bridge,
+20,004 hands/arm, and confirm the primary effect on verified final SHARINGAN-2.
+Sombra remains restricted to ubuntu on the original host. Canonical 50/100-blind
+requests must preserve states, seeded actions and probabilities exactly. Run required
+release tests/builds, including the mandatory model-free API regressions. Keep this
+experiment isolated from iteration 8; do not commit a strategy change before its gates.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
