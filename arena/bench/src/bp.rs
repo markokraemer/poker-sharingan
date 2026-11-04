@@ -211,13 +211,14 @@ impl BlueprintPolicy {
             let n = d.lookups.load(Relaxed).max(1) as f64;
             let m = |x: &AtomicU64| x.load(Relaxed) as f64 / 1e6 / n;
             format!(
-                "{{\"decisions\":{},\"miss\":{:.4},\"desync\":{:.4},\"why\":[{},{},{},{}],\"p_fold\":{:.4},\"p_call\":{:.4},\"p_raise\":{:.4}}}",
+                "{{\"decisions\":{},\"miss\":{:.4},\"desync\":{:.4},\"why\":[{},{},{},{},{}],\"p_fold\":{:.4},\"p_call\":{:.4},\"p_raise\":{:.4}}}",
                 d.lookups.load(Relaxed),
                 d.misses.load(Relaxed) as f64 / n,
                 d.desync.load(Relaxed) as f64 / n,
                 d.why[1].load(Relaxed),
                 d.why[2].load(Relaxed),
                 d.why[3].load(Relaxed),
+                d.why[4].load(Relaxed),
                 d.why[5].load(Relaxed),
                 m(&d.fold),
                 m(&d.call),

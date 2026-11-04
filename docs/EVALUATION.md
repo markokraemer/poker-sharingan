@@ -33,6 +33,38 @@ Run with `--aivat full|cards|off` in `bench`.
 * Toy-game verification (`research/cfr-lab`, `research/search-lab`): exact exploitability on Kuhn/Leduc to check the solvers.
 * `arena/referee`: spot-by-spot checks (PokerBench accuracy; exact heads-up river CFR+ EV loss).
 
+## Frozen attackers for policy A/B
+
+An attacker must keep the same learned strategy across policy arms. Re-training with the
+same seed is insufficient: parallel regret updates and store allocation are not bit-reproducible.
+The `exploit` CLI can preserve the native learner store and its configuration manifest:
+
+```sh
+nice -n 10 exploit --compact --target C.plcp --sizing medium --buckets data/buckets-200 \
+  --players 6 --learner-sizing adversarial --iters 3000000 --threads 11 --mem-gb 35 \
+  --seed 2 --eval-seed 271828 --eval-deals 100000 --save-learner attacker.bin --out train.json
+nice -n 10 exploit --compact --target C.plcp --sizing medium --buckets data/buckets-200 \
+  --players 6 --learner-sizing adversarial --threads 11 \
+  --eval-seed 314159 --eval-deals 100000 --load-learner attacker.bin --out holdout.json
+```
+
+`--load-learner` evaluates only; it does not resume training. Keep `attacker.bin` and
+`attacker.bin.json` together. Player count, learner menu, card-bucket path, and `--fine`
+must match the manifest. Keep `--extract` fixed when comparing the same policy. Native
+average counters are restored without probability quantisation. The manifest records
+training provenance; output records the evaluation seed and loaded-archive path.
+
+For a target-policy A/B, load the same archive against each target/configuration with the
+same `--eval-seed`. Use another seed for confirmation after choosing an attack or fix.
+Compare the pooled estimate as well as the reported seats, and identify exploratory
+seat selection. These are still lower-bound attacks, not proofs of unexploitable play.
+Run target models sequentially on workers that cannot cache both at once.
+
+External-bot controls must also be valid runs: inspect `forfeit_hands`, `crashed_lanes`,
+`timeouts`, and per-lane decision counts before interpreting scores. Equal scores from
+crashed bots do not establish unchanged on-menu play. Use function-only offline fixtures;
+do not import live-client setup as an evaluation bot.
+
 ## Rule bots and external bots
 
 * `chart6`, `chart6-loose`, `chart6-tight`, `tag`, `lag`, `nit`, `station`, `maniac` (`bench::builtin`, `bench::chart`): deterministic rule-based opponents, so AIVAT can treat them as known strategies.

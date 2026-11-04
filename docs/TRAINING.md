@@ -82,8 +82,10 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
 * **Flop search leaks EV against off-model opponents** (rule bots): −120 mbb/g vs the blueprint. Turn/river-only search recovers most of it and keeps the full gain vs blueprint-like play.
   * Belief "tremble" didn't help (ε=0.05 no change, 0.2 worse).
   * The trade-off: flop search buys robustness against odd bet sizes (probe −10.9k vs −7.5k).
-* **Exploiter caveat**: the ABR is bounded by its learner's abstraction and 12M iterations. "Unexploitable" means
-  unexploitable *by this exploiter*.
+* **Exploiter caveat**: the ABR is limited by its learner's abstraction, storage and training/evaluation budgets.
+  It supplies a lower-bound attack result, not a proof of unexploitable play. A negative or inconclusive result
+  only describes the attacks tested. The larger adversarial evaluation in `docs/RESULTS.md` found
+  +499 ± 94 mbb/game against fixed C@2e10 with corrected target modelling; independent-seed and final-model confirmation remain open.
 
 **Memory, checkpoints and training ops**
 

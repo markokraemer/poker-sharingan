@@ -36,16 +36,306 @@ Unit test `keep_sync_follows_adversarial_sizes`: one adversary with free sizes v
 | sizes at the translation midpoints | −4,520 ± 574 | −4,174 ± 573 | −4,538 ± 583 | −4,367 ± 585 |
 | overbets (3x pot) | −682 ± 194 | −662 ± 197 | −752 ± 195 | −710 ± 198 |
 | control: SDK tight-aggressive | −354 ± 118 | −466 ± 119 | −253 ± 116 | −382 ± 115 |
-| control: SDK quickstart | −218 ± 10 | −218 ± 10 | −227 ± 7 | −227 ± 7 |
+| control: SDK quickstart (old live-client file) | invalid (forfeits) | invalid (forfeits) | invalid (forfeits) | invalid (forfeits) |
+| control: SDK quickstart (offline function, iteration 2) | −354 ± 100 | −596 ± 135 | pending | pending |
 
-On-menu play is unchanged (the quickstart bot, which only uses on-menu sizes, gets identical results). Trained exploiter with an adversarial menu (`--learner-sizing adversarial`: tiny bets, near-min raises, midpoint sizes, overbets, one raise past the tree's cap), 1M iterations, 1 learner vs 5 copies of C@2e10, 20,000 evaluation deals per seat:
+**Control correction (iteration 1).** The original quickstart results were almost entirely forfeits (19,758/20,004 on C@2e10; 19,749/20,004 on SHARINGAN-2; all eight lanes crashed before hello), so they do **not** prove unchanged on-menu play. They are withdrawn; a valid function-only C@2e10 rerun is listed separately, with final-model confirmation pending. The SDK quickstart's 3bb raise can be off-menu or clamp to an off-menu minimum; a strict on-menu control requires a separate fixture. Trained exploiter with an adversarial menu (`--learner-sizing adversarial`: tiny bets, near-min raises, midpoint sizes, overbets, one raise past the tree's cap), 1M iterations, 1 learner vs 5 copies of C@2e10, 20,000 evaluation deals per seat:
 
 | target | exploiter wins (mbb/game) |
 |---|---|
 | C@2e10, translation before the fix (positive control) | **+4,552 ± 256** (it finds the leak) |
 | C@2e10, fixed | **+162 ± 215** (not significant; upper end of the 95% CI ≈ +377) |
 
-The method finds the old leak at sombra's scale, and finds nothing significant after the fix. This bounds what this exploiter can find in 1M iterations; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), the most likely place for what remains.
+The original 20k-deal evaluation found the old leak at sombra's scale and no significant pooled profit after the fix. **Hardening iteration 1 below supersedes that finding: the original learner wins +293 ± 96, and a corrected training-target model wins +499 ± 94 mbb/game against fixed C@2e10 in larger evaluations.** The original result bounded what this exploiter found in 1M iterations and 20k evaluation deals; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), the most likely place for what remains.
+
+### Hardening iteration 1 — training/evaluation fallback mismatch (2026-11-04, kept)
+
+**Hypothesis.** The adversarial learner understates attacks on the fixed bot because its
+training target still plays check/call after a shadow hand-off or missing infoset, whereas
+its evaluation opponent uses `bench::bp::fallback_action`. Longer training against that
+surrogate need not improve attacks against the actual fixed bot. The saved 1M result also
+filled its 15 GB learner store; seat-specific positives are exploratory, not a new pooled
+profit claim.
+
+**Candidate (uncommitted; no playing-policy change).** Use the evaluation policy's exact
+strength-based fallback in `Exploiter::target_real_action`,
+including actual private cards and only the currently visible board, whenever `keep_sync`
+is enabled. Preserve check/call for the pre-fix positive control. Regression fixtures compare
+training actions with `BlueprintPolicy` actions on missing infosets and explicit reason-4
+hand-offs. Include reason 4 in the diagnostic `why` array (now reasons 1 through 5 in order).
+
+**Worker and commands.** All compute is under `nice -n 10` on the existing worker, in
+`~/fix`; the live services and model files are untouched. Preserve the pre-change executable
+as `~/fix/hardening-01/exploit-before`. Launch jobs with `setsid nohup`, logs and JSON in
+`~/fix/hardening-01/`. Baseline command from `~/fix`:
+
+```sh
+nice -n 10 ./hardening-01/exploit-before --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 \
+  --iters 1000000 --threads 11 --mem-gb 15 --learner-sizing adversarial \
+  --eval-deals 100000 --seed 1 --out hardening-01/before.json
+```
+
+Required regression command, from `~/fix/sharingan` (8 build workers / 8 Rayon threads,
+concurrent with the 11-thread baseline):
+
+```sh
+nice -n 10 env RAYON_NUM_THREADS=8 CARGO_BUILD_JOBS=8 \
+  /home/ubuntu/.cargo/bin/cargo test --release -j 8 \
+  -p nlhe -p bench -p search -p sharingan-arena -p exploit -- --test-threads=8
+```
+
+The baseline filled the learner store by 250k iterations (256,866,628 infosets,
+1.87G slots), well before the 1M budget. This is an observed limitation, not a reason to
+increase the memory in only one arm of the initial comparison.
+
+Queued behind the release suite: rerun the new parity tests with `cargo test --release
+-j 8 -p exploit --lib -- --test-threads=1 --nocapture`, build the requested five packages,
+then run the candidate with the baseline flags above (output `after.json`). A 10k-iteration,
+1 GB, 20k-deal pilot runs first. A candidate-binary pre-fix positive control follows
+(`--pre-sync-fix`, 1M iterations, 15 GB, 20k evaluation deals); the queue stops if that
+control's lower 95% bound is below +1,000 mbb/game. All stages propagate command failures.
+The queue uses 11 learner workers and at most 8 build workers alongside the baseline;
+it does not start until the existing release tests exit. Logs include `parity.log`,
+`build.log`, `pilot.log`, `after.log`, `positive-control.log`, and `next.log`.
+
+**Tests.** The required five-package release suite passed: 142 tests across 27 suites,
+zero failed or ignored. The subsequent focused tests passed too, including the diagnostic
+assertion. In 16 missing-infoset fixtures and 16 forced raise-cap fixtures, the old
+check/call surrogate disagrees with the evaluated fixed target in 28/32 cases (16/16
+missing, 12/16 hand-off); the corrected training target disagrees in 0/32. These are
+deterministic implementation fixtures, not independent sampled games; no poker confidence
+interval or real-game mismatch frequency can be inferred from them. Pre-fix target parity
+is preserved in all 16 fixtures.
+All 16 explicit hand-offs appear under reason 4 in the report.
+
+**Pilot (plumbing only).** Candidate 10k iterations / 1 GB / 20k evaluation deals per
+seat: attacker −5,344.6 ± 201.5 mbb/game; training 42.4 seconds; store full; learner
+miss rate 46.8%. This deliberately undersized pilot is not evidence of robustness or
+an A/B improvement. The corrected report attributes every observed desync to reason 4
+(385 on-menu-classified decisions and 673 after-off-menu decisions); no silent drift
+reason is reported. The matched 1M candidate run started after this pilot.
+
+**Additional validation queued.** Once the baseline process exits successfully, rerun
+`bash ab.sh sombra/bot.py h01-sombra`, then `bash ab.sh "$bot" "h01-$tag"` for all
+`probes/probe_*.py`, `ctl_quickstart.py`, and `ctl_tag.py`. This uses the same
+`ab-20004` deal seed and 20,004 hands per arm as the original results, eight lanes,
+on C@2e10 only while the candidate learner runs on that model. The before/fixed
+playing policies are unchanged by this harness candidate; these reruns check reproducibility
+and the old-leak positive control. Output prefix `res-h01-`, log
+`hardening-01/probes.log`. SHARINGAN-2 jobs must wait until all C@2e10 jobs finish.
+
+**Probe/control rerun audit.** Sombra's pre-fix positive control reproduced +5,381.8 ±
+513.9; fixed −419.6 ± 161.6. All six probe results and
+tag reproduce the original table at the displayed precision; their fixed-arm JSON reports
+zero forfeits, crashed lanes, and timeouts. The old quickstart file is a live-client example
+with registration/join calls at import time, not an offline bot. It must not run again in
+these experiments. The discarded-stderr harness logs do not establish whether its external
+requests succeeded; do not query or change the live database to investigate. The new
+function-only `arena/exploit/bots/ctl_quickstart.py` comes from the SDK README, contains no
+client setup, and is queued under tag `h01-quickstart-offline` after the archive test job
+frees worker capacity. The queue validates zero forfeits/crashes/timeouts and positive
+decision count in both arms before treating it as a control.
+
+**Next isolated hypothesis.** After the learner store fills, `traverse` samples uniform
+unseen learner actions while `ExploiterPlayer::dist` uses check/call. This second
+training/evaluation mismatch is present in both current arms; do not fold its correction
+into this A/B. Test it separately after the target-fallback comparison.
+
+**Baseline evaluation completed.** Unmodified harness, 1M training iterations, 15 GB,
+100,000 evaluation deals per seat: attacker **+293.3 ± 95.7 mbb/game** (raw +268.7 ±
+115.0), a significant pooled profit against fixed C@2e10. Training took 1,386.5 seconds;
+learner miss rate 10.65%, store full. This reproduces the earlier +161.7 ± 214.6 estimate
+within its uncertainty and resolves a positive result with more evaluation deals. Parallel
+training is not bit-reproducible despite per-iteration RNG seeds; this is a fresh training
+run, not a re-evaluation of preserved old weights.
+
+| zero-based learner seat | baseline attacker mbb/game, 95% CI |
+|---|---|
+| 0 | +21.5 ± 208.8 |
+| 1 | +797.6 ± 227.2 |
+| 2 | +797.5 ± 169.8 |
+| 3 | +578.6 ± 161.2 |
+| 4 | +72.6 ± 157.6 |
+| 5 | −507.8 ± 161.7 |
+
+The pooled result was evaluated on the fixed bot, even though its learner trained against
+the mismatched fallback. It establishes an attack result, not its mechanism; the hand-off
+hypothesis still needs a causal A/B. The completed positive-control rerun below reproduces the old leak. The seed overlaps
+the earlier exploratory evaluation; independent-seed confirmation and final SHARINGAN-2
+confirmation remain open. Executable SHA-256: baseline
+`3c7739e665cfb1ea6632bd71bf11fd7239d45c33d9e4fc79f1a127da75fb8385`, candidate
+`7fc70a6406238b15c012f599021dd92d4ee17cf8a4a78641f6eb5e3c4bea789f`.
+
+**Corrected target-model result.** Same 1M training budget, 15 GB, training/deal seed,
+all seats, and 100,000 evaluation deals per seat: attacker **+499.4 ± 94.0 mbb/game**
+(raw +527.5 ± 112.7). The pooled 95% intervals do not overlap: baseline [197.6, 389.0],
+corrected [405.4, 593.4]. This is a measured improvement in attack strength from training
+against the actual fixed fallback; it does not strengthen the defending poker policy.
+Training took 3,245.8 seconds, versus baseline 1,386.5; learner store full at 273,120,186
+infosets, miss rate 10.44%, 7,312,456,064 traversal nodes. The evaluation reports only
+explicit reason-4 hand-offs (2,821 on-menu-classified and 6,051 after-off-menu decisions),
+with a 0.96% after-off-menu hand-off fraction under this attack. A lower hand-off fraction
+does not imply lower exploitation: this attack wins more.
+
+| zero-based learner seat | corrected attacker mbb/game, 95% CI |
+|---|---|
+| 0 | +259.2 ± 208.1 |
+| 1 | +886.8 ± 224.8 |
+| 2 | +848.4 ± 165.3 |
+| 3 | +722.4 ± 157.5 |
+| 4 | +297.6 ± 155.8 |
+| 5 | −18.0 ± 157.4 |
+
+**Positive control completed.** Candidate executable, pre-fix target, 1M iterations / 15 GB /
+20k evaluation deals per seat: attacker **+4,421.5 ± 254.9 mbb/game** (raw +4,379.5 ±
+295.8); training 1,738.7 seconds, store full. Its interval [4,166.5, 4,676.4] overlaps the
+original +4,552.1 ± 255.8 interval [4,296.3, 4,807.9]. Both find the old leak at the
+expected scale. The independent sombra rerun also reproduces the old leak and loses
+against the fixed target, as recorded above.
+
+**Decision: kept.** Target-model correction qualifies on the prespecified attack-strength
+A/B, the positive controls reproduce, and the final reverted-source validation passed
+143 tests and all five requested package builds. Archive infrastructure has exact
+round-trip test evidence; the failed cache optimization is excluded. No defending-policy EV improvement is
+claimed; independent deal seeds, final SHARINGAN-2 confirmation, causal localisation, and
+any defending-policy fix remain open. The validated harness changes are ready for the authorized main-branch commit/push. The defending decision logic and model
+weights are unchanged (the sole `bench::bp` change is diagnostic serialization), so this
+iteration does not claim a new head-to-head strength result. The 4M-deal SHARINGAN-2 vs
+C@2e10 measurement is prior evidence, not a rerun for this harness-only change; an actual
+defending-policy change must still pass the requested normal-strength A/B.
+
+### Hardening iteration 2 — freeze the attacker and expand training (2026-11-04, in progress)
+
+**Hypothesis.** A stronger lower-bound attack needs a larger learner store and 3M+
+iterations; causal policy comparisons also need the *same learned strategy* in each arm.
+The CLI previously discarded the learner on exit, preventing later fixed-attacker A/B
+or final-model confirmation without another stochastic training run.
+
+**Candidate infrastructure (no playing-policy change).** `--save-learner FILE` stores native
+PLBP4 regrets/average counters without quantising probabilities, plus a `.json` manifest
+recording players, learner menu, bucket configuration and training provenance.
+`--load-learner FILE` skips training and restores the exact learner policy. Incompatible
+player counts, menus, bucket paths or refinements are rejected before model loading.
+Target model and target translation options may change for A/B; keep extraction mode fixed
+when comparing the same attack. `--eval-seed` separates evaluation deals from training.
+Archives require a fresh path and do not overwrite an existing archive. The original
+candidate executable and iteration-1 jobs remain unchanged.
+
+**Tests.** The five-package release suite passed again: **143 tests across 27 suites,
+zero failed or ignored**. The final focused library run passed all three tests too.
+A CLI round-trip fixture trains a small learner, saves it, reloads it with a
+nonzero requested iteration budget, and requires identical per-seat/pooled AIVAT and raw
+estimates and miss rates, zero new training iterations/nodes, and unchanged training
+provenance. It also exercises rejection of four incompatible abstraction configurations.
+The full suite used one test thread and eight Rayon/build workers. These checks prove
+archive fidelity on the fixture, not poker strength.
+
+**Validation gate and training started.** The repaired function-only quickstart completed
+20,004 hands per arm with zero forfeits, crashed lanes or timeouts: pre-fix −354.4 ± 99.5,
+fixed −596.4 ± 135.2 mbb/game (attacker perspective). This is a valid SDK-bot control,
+not a strictly on-menu control; the fixed target wins more against it. Following the full
+suite, build and final focused tests, the **3M / 35 GB run started**, all six seats,
+training seed 2. First progress: 4,096 iterations in 33 seconds, store not full.
+Commands from `~/fix`, inherited `nice -n 10`:
+
+```sh
+./hardening-02/exploit-archive --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 \
+  --iters 3000000 --threads 11 --mem-gb 35 --learner-sizing adversarial \
+  --eval-deals 100000 --seed 2 --eval-seed 271828 \
+  --save-learner hardening-02/learner-3m.bin --out hardening-02/train-3m.json
+./hardening-02/exploit-archive --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --threads 11 \
+  --learner-sizing adversarial --eval-deals 100000 --seed 2 --eval-seed 314159 \
+  --load-learner hardening-02/learner-3m.bin --out hardening-02/holdout-3m.json
+```
+
+The held-out frozen evaluation remains queued behind training. Logs and artifacts stay
+in `~/fix/hardening-02/`; the immutable queue script is
+`hardening-01/archive-train-v2.sh`. It propagates test/run failures and does not switch
+models. No SHARINGAN-2 job may start until all C@2e10 training/evaluation jobs finish.
+This run still retains the separate store-full learner-fallback mismatch noted in
+iteration 1; fix and measure that independently. No new attack result or retained
+poker-policy improvement is claimed yet.
+
+**Earlier frozen confirmation queued.** To avoid waiting for the longer 3M run before
+causal defending-policy tests, queue another faithful 1M / 15 GB learner after the new
+pre-fix positive control, while the 3M run continues. Use the same training seed 1 but
+fresh evaluation seed 271829; save `hardening-02/learner-1m-confirm.bin`. This is a fresh
+stochastic training run, not restoration of the discarded +499 policy weights. Reload
+that archive on the same 100k-deal evaluation and require exact pooled/per-seat/raw
+estimates before trusting persistence at model scale. Then evaluate the same frozen
+strategy with seed 314160, 100k deals per seat. Commands are the 3M/archive commands above
+with `--iters 1000000 --mem-gb 15 --seed 1 --eval-seed 271829`, corresponding `1m-confirm`
+paths, then `--load-learner` for replay and holdout. Independent *training*-seed confirmation
+still belongs to the seed-2 3M run. Immutable queue `hardening-02/frozen-confirm-v2.sh`
+(PID 640691) propagates failures and checks the new positive control plus reverted-source
+validation before starting. It also requires the new positive-control 95% interval to
+overlap the original +4,552 ± 256 result; a weaker unrelated positive profit is not enough.
+The initial LBR job follows these evaluations in that queue;
+it replaces the previously waiting `lbr-queued-v4.sh` job. No target-model switch or
+extra concurrent training workers are introduced.
+
+### Hardening iteration 3 — per-deal fallback equity cache (2026-11-04, reverted)
+
+**Hypothesis / candidate.** Correctly modelling the fixed fallback is expensive because
+counterfactual branches repeatedly compute deterministic 400-sample equity. Factor card
+equity from the price-dependent decision, and cache it locally to one sampled deal by
+acting seat, street and live-opponent count. Existing training binaries remain unchanged.
+
+**Commands and scheduling.** Use `hardening-02/cache-now.sh` under `nice -n 10`.
+Temporarily SIGSTOP only experimental 3M PID 602317 (last pre-suspension progress
+174,576 iterations / 1,008 seconds), retaining its state; the corrected 1M run continues.
+An EXIT trap SIGCONT's the experimental process on failure or completion. Run the required
+five-package release suite with eight build/Rayon workers and one test thread, the focused
+`cargo test --release -j 8 -p exploit --lib cached_fallback -- --test-threads=1 --nocapture`,
+then build `hardening-03/exploit-cached`. The suite passed **144 tests / 27 suites**, with
+zero failed or ignored. The focused fixture compared 231 states across 2–6 players and
+all streets/opponent counts. It passed but did not establish end-to-end equivalence.
+
+Alternate old/new executable order for seeds 11–15 using identical flags:
+
+```sh
+EXE --compact --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --iters 1000 \
+  --threads 1 --mem-gb 1 --learner-sizing adversarial --eval-deals 200 --seed SEED
+```
+
+Require exact evaluation estimates and learner infoset/slot/node counts, miss rate and
+store-full status. **The first seed failed this gate.** Seed 11: original 9,238,698 nodes /
+2,251,181 infosets / 58.64 seconds; candidate 9,240,789 nodes / 2,251,423 infosets / 28.31
+seconds. Pooled evaluation −4,326.0 ± 1,894.2 vs −4,379.8 ± 1,895.9. These are tiny
+training/evaluation smoke runs, not useful attack bounds; the apparent speed ratio is
+**discarded** because behaviour differed. Stop the benchmark parent and its active child;
+do not complete the planned five-run timing analysis or infer a performance improvement.
+
+**Investigation.** `hardening-03/investigate.sh` repeats each executable on the same
+seed/flags. The original's evaluation and training counts repeat exactly; the candidate's
+do not. The root cause is unresolved. Unit-level equality was insufficient and does not
+overrule the end-to-end failure. The experimental 3M process resumed, then was suspended
+again solely to validate the reverted source within the CPU budget; all suspensions are
+preserved in its raw elapsed time and make its logged aggregate it/s unsuitable for speed
+comparisons.
+
+**Decision: reverted.** Remove the per-deal cache and fallback factoring in full; retain
+only iteration 1's diagnostic reason-4 fix in `bench::bp`. Keep failed logs/JSON under
+`~/fix/hardening-03/`. `hardening-03/reverted-tests.sh` (PID 627043) reruns the required
+release suite and all five requested package builds on the reverted source, with an EXIT
+trap resuming PID 602317. The reverted suite passed **143 tests / 27 suites**, zero failed
+or ignored; all five requested package builds passed too. The EXIT trap resumed PID
+602317, confirmed running afterward. No cache change is retained or committed.
+
+**Standard LBR queued separately.** After the new iteration-1 positive control and reverted
+source validation finish, run the original archive executable on C@2e10 with `--iters 0
+--threads 8 --mem-gb 0.001 --learner-sizing adversarial --eval-deals 1 --seed 3
+--lbr-deals 200`. Inspect uncertainty before scaling; the one-deal ABR placeholder is not
+the LBR result. Output `hardening-02/lbr-200.json`, now sequenced after frozen 1M confirmation and
+holdout in `hardening-02/frozen-confirm.sh` (PID 639829). Model jobs remain sequential across target
+models; these jobs use C@2e10 only.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
