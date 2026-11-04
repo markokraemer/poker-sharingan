@@ -12,12 +12,13 @@ and the browser play page use the released C@2e10 blueprint without search. The 
 `/srv` file are paused. Repeated
 read-only reads of the provided C file returned different bytes at the same offset,
 with unchanged inode, size, mtime and ctime. The public copy and one direct read agree;
-other reads return zero pages in that key-index region. Earlier C estimates below
-are historical original-host measurements; their scope remains provisional until a
-verified independent copy reproduces them. The frozen 1M attack has since reproduced
-exactly on the independent public C copy (+419.5 ± 95.4); the 3M and LBR figures still
-await independent confirmation. No model, RAID configuration or live service
-has been modified. See iteration 7 below. This is an input-integrity concern, separate
+other reads return zero pages in that key-index region. Historical C estimates below
+remain qualified unless reproduced on verified inputs. The frozen 1M attack reproduced
+exactly on the independent public C copy (+419.5 ± 95.4). Both original frozen 3M seeds
+also reproduce exactly on a freshly downloaded private public C copy, confirming their
+pooled +2,306.7 ± 75.2; LBR confirmation remains pending. This does not clear the original
+read path or validate every historical run. No original model, RAID configuration or
+live service has been modified. See iteration 7 below. This is an input-integrity concern, separate
 from the fixed translation bug.
 
 **The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
@@ -1048,7 +1049,8 @@ independent observations. Pooled per-seat mbb/game (seat labels 0 through 5) are
 Those seat-level intervals are descriptive, without multiple-comparison adjustment.
 Artifacts `public-s2-frozen1m-discovery.json`, `public-s2-frozen1m-holdout.json`,
 `pooled-s2-frozen1m.json`; evaluation runtimes 351.6 and 167.0 seconds, excluding archive
-loading. The stronger saved 3M attack still awaits confirmation on verified inputs. No playing-policy A/B or
+loading. The stronger saved 3M attack's final-model confirmation remains pending; its
+C reference seeds are now reproduced on verified input, as recorded below. No playing-policy A/B or
 promotion is implied. Commands, clean environment, target SHA-256 and boot ID are recorded
 per evaluation; no simultaneous inference on two models. The already nice-10 driver
 launches its child through `nice -n 10`, giving the child effective nice 19; eight CPUs
@@ -1111,8 +1113,8 @@ Prepare the independently checked 3M attacker for a later SHARINGAN-2 baseline c
 while C inputs are restored. A task-owned Mac watcher (`sharingan-relay-3m-v1.py`, PID
 65621) waits on the live source producer and its native buffered/direct/compressed
 verification marker. It then relays only the compressed learner through a bounded
-Mac temporary directory, checking available space and byte length. No model file is
-copied to the Mac and no model/build/training job runs there. Full compressed/native
+Mac temporary directory, checking available space and byte length. No full C or SHARINGAN-2 blueprint file is
+copied to the Mac and no build/training job runs there. Full compressed/native
 SHA-256 checks on the destination remain required; a completed relay is not yet an
 accepted match input. The independent compute worker is asleep until this data is ready.
 Twelve small probes of the failed incoming copy (eight native direct reads with
@@ -1124,6 +1126,64 @@ The current broader queue is immutable `sharingan-odds-broad-v2.py` (PID **89154
 waiting on frozen v3 and the fresh-download proof. Its earlier v1 process is terminal
 with no evaluations started. Only the input dependency and proof path changed; all
 external/LBR/new-adaptive commands, gates and sample sizes stay as declared above.
+
+**Fresh public C accepted; frozen references reproduced:** the download completed in
+4,564.3 seconds. All five pinned LFS parts passed their individual hashes, and the
+assembled 124,681,168,783-byte file passed buffered **and O_DIRECT** full-file SHA-256
+2a4484f6fabf61470a67c941552f5a97c6f6474e14ea010ef94a41d7b5861300.
+The only C input for new experiments is now
+/home/ubuntu/fix/models/sharingan-1-verified.plcp; the rejected incoming file remains
+preserved. All 36 additional region reads matched 62b40add…, with unchanged metadata.
+Native learner buffered/direct hashes also agree: frozen 1M 169ef576…, frozen 3M
+1706c51f4ce63cc8052d1886765fed69bfec9461c1e03ac97207e82a4e0cf951,
+and iteration-6 adaptive 1M 7ca03101…. The iteration-8 disabled binary exactly
+reproduced the complete original 1M reference (271829) and **both** original 3M references
+(271828, 314159), including raw/per-seat/pooled estimates, CIs, counts, miss rate and
+normalized tracking options. All three replay gate JSONs are true. Thus the frozen
+3M bound **+2,306.7 ± 75.2** is confirmed on canonical input; other unrepeated historical
+experiments are not thereby validated. LBR is being rerun separately.
+
+**3M transfer and resumed worker:** independent preparation passed native buffered/direct
+agreement, zstd integrity and compressed SHA-256. Native size 29,581,123,222 bytes,
+compressed size 14,006,459,630 bytes, compressed digest
+bb87d61c316d75a29efc278cd92f65c596b1b51e51b7463450fcf30dd9ee4b20;
+source metadata digest 618c579487924e801cd02d3ba028bed8f5d07f424032f1f7bffdf0086643292d.
+The first Mac relay inherited an extra nice increment (20); it was stopped while its
+partial bytes were preserved, then resumed at effective nice 10. That resumed rsync
+terminated with **ENOSPC, exit 10**, because its temporary copy needed more free local
+space. This is a transfer failure, not an SSH timeout or poker result.
+
+Replace it with task-owned sharingan-bounded-relay-3m-v3.py (Mac PID 19316), retaining
+the original prefix. The destination checks the 5,201,821,216-byte prefix against the
+source hash, appends/fsyncs/checkpoints it, then acknowledges it before its own Mac copy
+is removed. Continue with a two-slot pipeline of **512-MiB** chunks: source hash, local
+temporary byte count, destination hash/append/fsync/checkpoint, then removal of only
+the acknowledged task-owned chunk. Each destination job has a PID and immutable log;
+an observation timeout does not trigger a duplicate append. Full compressed SHA,
+native decoded SHA and native readback must still pass before use. No full blueprint
+is placed on the Mac; credentials stay there and are never forwarded.
+
+The task-owned extra worker was subsequently found running under a new boot ID
+3d1e07ff-d2e7-415f-ac55-7c7013d92277; the cause of resumption is unknown.
+Do not reuse an old boot's certificate. Its complete SHARINGAN-2 rehash passed
+0f57b296… in 849.3 seconds, then the frozen 1M seed-271829 evaluation with six
+workers exactly reproduced the prior public-S2 result, miss rate and tracking options.
+No work on the primary worker or any live arena service was changed.
+
+**Stronger final-model baseline preregistration:** immutable
+s2-frozen3m-v3.py (SHA bb342375f3b14238741b9ccbc937a349c691021fcbcbd4e079047a4b2818ffc1,
+PID 202409) waits for the completed compressed transfer on the extra worker. It then
+requires full compressed/native/readback hashes and source metadata identity, relocating
+only the bucket path. Reuse only the current-boot full model proof and exact 1M replay
+certificate with unchanged file metadata. Run frozen 3M against final SHARINGAN-2
+using immutable main binary f3b5eaa4…, six workers on CPUs 4–9, effective nice 10:
+100,000 duplicate deals per seat at **271828**, then **314159**, training seed 2,
+--iters 0 --mem-gb 35 --learner-sizing adversarial --load-learner attackers/learner-3m.bin.
+Target is models/sharingan-2.plcp, buckets data/buckets-200, medium sizing, all six
+seats. Exact argv/environment and identities are saved per output. Pool only these
+two samples using deal-cluster variance, including between-sample mean differences.
+This is a stronger baseline measurement, independent of the uncommitted correction;
+no new S2 3M result has been observed at registration.
 
 ### Hardening iteration 8 — preserve pure decisions while repricing mixed passive odds (2026-11-04, preregistered)
 
@@ -1267,6 +1327,89 @@ significant AIVAT/raw defender regression. Final-model and normal-strength check
 still separate mandatory gates; this queue cannot promote code. Every command,
 constructed environment and output is recorded under `hardening-08/`.
 
+
+**Frozen C A/B completed (candidate still uncommitted):** both preregistered stages
+passed. Each row is 100,000 independent duplicate deals per seat/arm (600,000 hands),
+with the same frozen policy and deal seed in both arms; units are attacker mbb/game,
+95% CIs.
+
+| frozen attacker | seed | correction disabled | mixed-passive correction enabled |
+|---|---:|---:|---:|
+| 3M / 35 GB | 271831 | +2,355.9 ± 106.0 | +441.3 ± 100.6 |
+| 3M / 35 GB | 314161 | +2,191.4 ± 106.4 | +267.8 ± 101.1 |
+| original 1M | 271831 | +499.9 ± 94.9 | −787.3 ± 91.2 |
+| original 1M | 314161 | +408.1 ± 95.7 | −901.6 ± 91.9 |
+| iteration-6 adaptive 1M | 271831 | −1,342.5 ± 52.3 | −1,378.1 ± 52.4 |
+| iteration-6 adaptive 1M | 314161 | −1,349.2 ± 52.2 | −1,385.2 ± 52.3 |
+
+The primary 3M improvement has non-overlapping intervals on both seeds; it still finds
+significant profit. The older adaptive attacker finds neither significant improvement
+nor regression. All declared AIVAT/raw no-regression gates passed. Artifacts:
+discovery-gates.json, holdout-gates.json, frozen-gates.ok under hardening-08/.
+Exact command template (driver itself is already nice 10; do not add another increment):
+
+~~~sh
+taskset -c 0-10 hardening-08/exploit-odds --compact \
+  --target models/sharingan-1-verified.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --iters 0 \
+  --threads 11 --mem-gb 15 --learner-sizing adversarial \
+  --load-learner hardening-02/learner-3m.bin --seed 2 \
+  --eval-seed 271831 --eval-deals 100000 --no-passive-odds \
+  --out hardening-08/discovery-3m-base.json
+~~~
+
+The enabled arm substitutes --passive-odds; holdout substitutes 314161 and fresh
+output names. Original 1M uses its archived weights/training seed 1, old adaptive uses
+its archived weights/training seed 7. Every individual argv and constructed environment
+is in its *-command.json; identities match the binary/model/learners recorded above.
+
+**External gates and actual-model on-menu fixture passed:** the old-leak positive control
+is **+5,381.8 ± 513.9**, with its lower bound above the registered +1,000 threshold.
+Each external A/B is 20,004 hands, eight lanes, seed ab-20004, identical deal digests,
+zero forfeits, crashes, illegal actions or timeouts:
+
+| attacker/control | disabled | enabled |
+|---|---:|---:|
+| ctl_quickstart_offline | −596.4 ± 135.2 | −628.4 ± 136.7 |
+| ctl_tag | −465.6 ± 118.5 | −463.8 ± 118.3 |
+| sombra | −419.6 ± 161.6 | −434.3 ± 159.9 |
+| bracket edges | −4,173.8 ± 573.4 | −4,367.7 ± 577.8 |
+| minimum bet | −5,983.4 ± 637.3 | −6,802.6 ± 640.5 |
+| minimum-raise war | −8,937.9 ± 735.9 | −9,373.0 ± 742.5 |
+| overbet | −661.6 ± 197.2 | −672.2 ± 196.2 |
+| random size | −5,745.0 ± 485.7 | −6,333.8 ± 481.9 |
+| tiny shove | −1,801.8 ± 353.0 | −1,921.1 ± 352.0 |
+
+No pair has a significant defender regression. The offline quickstart control uses its
+recorded local version and is not interchangeable with an earlier differently configured
+quickstart estimate. The previously ignored native-model fixture was explicitly run:
+20,000 strict-menu replay hands, **362,440 bit-identical distribution queries**,
+then 100,000 duplicate deals/arm. Both arms are exactly
+−3,553.8642 ± 105.4662 for its deliberately weak uniform-menu control, including identical
+raw winnings −3,633.8323 ± 110.0033. This checks preservation, not playing strength.
+Artifacts external-gates.json, strict-control-c.json, and command/log files.
+The queue is now running clean-input paired LBR; fresh adaptive, final-S2 effects,
+external final-model checks and the 4M normal-strength gate all remain mandatory.
+**No policy change is kept or committed yet.**
+
+**Final-model frozen A/B queue preregistered:** s2-odds-frozen-v1.py,
+SHA 98ca8c754599fcf013ea968af918240d4a36015fff7ac5dcaef3a0a3c6bb6e2d,
+waits for the independently verified 3M final-model baseline above. Copy only the
+6,812,816-byte candidate executable to the task-owned extra worker; its readback SHA
+is b9d8e27a…, identical to the tested original-host binary. Check current-boot model
+certificate/file metadata, both native learner full hashes and relocated manifests,
+and bucket archive hash. Before A/B, the disabled candidate binary must exactly replay
+the public-S2 1M reference at 271829 and both newly measured 3M references at 271828 and
+314159 (all exploitation statistics, miss rate, normalized tracking options).
+Then test frozen 3M and 1M, each baseline followed by enabled candidate, at discovery
+**271831** and holdout **314161**, 100,000 duplicate deals per seat/arm, all six seats.
+Require a disjoint-CI primary 3M improvement on both seeds and no AIVAT/raw defender
+regression for either policy. Use six workers on CPUs 4–9 at inherited nice 10, explicit
+--no-passive-odds / --passive-odds, --iters 0, medium sizing, original training seed
+2 or 1 and unchanged archived weights. Exact argv/environment/identities go beside each
+fresh result under the worker's hardening-08 directory. This queue cannot promote code:
+the new adaptive attacker, relevant final-model external controls, and 4M head-to-head
+remain required. No final-model candidate A/B result has been observed.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 

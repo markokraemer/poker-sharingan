@@ -88,12 +88,11 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
 * **Exploiter caveat**: the ABR is limited by its learner's abstraction, storage and training/evaluation budgets.
   It supplies a lower-bound attack result, not a proof of unexploitable play. A negative or inconclusive result
   only describes the attacks tested. The larger adversarial evaluation in `docs/RESULTS.md` found
-  +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker. These original-host estimates are provisional while an inconsistent-model-read audit is resolved; see RESULTS iteration 7.
-  Its saved strategy reproduces exactly on reload. Separately, a frozen 1M attacker has now been
+  +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker. Both original seed results now reproduce exactly on a fresh public C copy that passed full buffered/direct release hashes; see RESULTS iterations 7–8.
+  This validates those frozen samples, without clearing the inconsistent original model read path. Separately, a frozen 1M attacker has now been
   independently confirmed at **+714 ± 67 against the final SHARINGAN-2 blueprint** (two seeds,
   1.2M hands, duplicate + AIVAT, verified model/learner hashes), and exactly replays +419 ± 95
-  against verified public C. The stronger 3M policy's independent/final-model confirmation
-  remains open.
+  against verified public C. The stronger 3M policy's final-model confirmation remains open.
 
 **Memory, checkpoints and training ops**
 
