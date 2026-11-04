@@ -1043,6 +1043,15 @@ an independent full direct-I/O native rehash, zstd integrity test and compressed
 The native archive is 29,581,123,222 bytes; never transfer if its two source hashes differ.
 No defending-policy fix is kept in this iteration so far.
 
+**Documentation correction:** `arena/bench/TRANSLATION.md` still called Check the default,
+recommended it using a pre-keep-sync B ablation, described check/call as the current
+hand-off fallback, and said search used legacy histories. Correct those statements
+against current `TrackOpts`, `Shadow`, bench/search fallback code, and the measured
+experiments. Preserve the B tables explicitly as historical results. `docs/TRAINING.md`
+now records that the 1.83e11 run finished on 2026-11-02. These edits change no executable
+code or model; the prior 148-test / six-build restored-main validation still applies.
+No new poker A/B claim is attached to documentation edits.
+
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
 | test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |

@@ -1,15 +1,23 @@
-# Off-menu action translation: the +26 bb/hand exploiter, root cause and fixes
+# Off-menu action translation: historical study and current tracking
+
+The B-model measurements below describe the earlier shadow-game fix. They predate the
+November 2026 tiny-bet exploit and `keep_sync` fix. Current defaults are
+`BelowMenu::Smallest`, deterministic translation, `keep_sync = true`, and a strength-based
+fallback. See [the current experiments](../../docs/RESULTS.md#action-translation-leak-and-fix-nov-2026),
+including the model-input audit and independently reproduced frozen attack. Historical
+`Check` results below do not justify restoring the old default.
 
 Question: why does a trained exploiter whose menu is richer than the blueprint's ("paper" learner vs
 blueprint B, sizing "local") win +26,224 +- 501 mbb/game, while the same-menu exploiter loses
 -205 +- 57? Genuine translation exploit, bug in the target's off-menu handling, or evaluation artefact?
 
-## Verdict
+## Historical B-study result
 
 **Mostly a bug in how the target policy handled off-menu actions (BlueprintPolicy/CompactPolicy
 history tracking), not the pseudo-harmonic mapping itself. Not an evaluation artefact.** After the
 fix the same exploiter wins +700 +- 149 (final B, 12M iterations), a 37x reduction. The remainder is
-the genuine translation weakness the paper itself describes (needs search).
+a residual attack against that historical configuration; its mechanism does not establish
+the cause of every later attack.
 
 * Not an artefact: raw (non-AIVAT) and AIVAT estimates agree (26,156 vs 26,224; 25,614 vs 25,625
   in the re-runs), the exploiter and target are the same objects in training and evaluation, and
@@ -35,7 +43,7 @@ the genuine translation weakness the paper itself describes (needs search).
   alone, with miss rates 20-100% after the bet. After the fix `bet=0.1` -7317, `bet=0.2` -7582,
   `bet=3` -7438, `bet=5` -8560: all at or below the station baseline.
 
-## Fixes (all backwards compatible; `TrackOpts::LEGACY` / `--legacy` reproduce the old behaviour)
+## Current tracking (updated 2026-11-04)
 
 `nlhe::abstraction`:
 * `Shadow`: the policy tracks a **shadow game** in which every off-menu raise is replaced by its
@@ -44,12 +52,17 @@ the genuine translation weakness the paper itself describes (needs search).
   back to a real action by pot fraction (`real_action`; abstract all-in = real all-in; clamped to
   the legal range). The policy's own actions are mapped back to the list entry they came from (no
   random re-translation). If the shadow cannot follow the real game (different actor/street, shadow
-  terminal, unrepresentable fold) it is flagged desynced and the policy plays check/call.
+  terminal, unrepresentable fold), it is flagged desynced. With the current default
+  `keep_sync`, the policy uses `bench::bp::fallback_action`, based on hand strength against
+  random opponent hands and the actual call price. This fallback is heuristic, not range-aware.
+* `keep_sync` checks each proposed translation one action ahead. It preserves terminal status,
+  actor/street and every seat's folded/all-in status. If necessary, it chooses the nearest
+  abstract action that stays in step. If none exists, such as a non-all-in raise past the tree's
+  cap, it hands off explicitly with reason 4. It does not guarantee correct pot prices or ranges.
 * `BelowMenu::{Check, Smallest}`: bets below the smallest abstract raise. `Check` = pseudo-harmonic
-  between "check/call" (size 0) and the smallest raise (the old rule, now consistent because the
-  shadow really treats it as a check). `Smallest` = always the smallest raise. **`Check` is the
-  default and the measured winner (see table): mapping tiny bets to the smallest raise lets the
-  exploiter buy folds with min-bets (+2,000 mbb vs +260).**
+  between "check/call" (size 0) and the smallest raise. That historical rule could lose the real
+  game after a tiny bet. `Smallest` = always the smallest raise, and **is the current default**.
+  The old B-table comparison was made before the current synchronization and fallback fixes.
 * `allin_snap` (default 0.5): a non-all-in raise maps to the abstract all-in only if it leaves
   at most 0.5 x pot behind; otherwise to the largest smaller size. (Mapping a 3x-pot bet to a
   10x-pot "all-in" made the shadow all-in while the real players still had chips.)
@@ -58,14 +71,16 @@ the genuine translation weakness the paper itself describes (needs search).
   the shadow (first attempt, random everywhere: +1,479 with 32% desync). Not AIVAT-exposable.
 * `bench::bp::BlueprintPolicy` / `CompactPolicy` use `Shadow` (shared `bp::Source` code); exploit
   `abr.rs` tracks the target with the same `Shadow` so training and evaluation see the same
-  target. Flags: `--legacy`, `--translation det|random`, `--below check|smallest`, `--allin-snap X`
-  (bench `match` and `pluribus exploit-compact`).
+  target. `TrackOpts::PRE_SYNC_FIX` / `--pre-sync-fix` reproduce the tiny-bet-vulnerable
+  configuration (shadow enabled, below-menu Check, no keep-sync). `TrackOpts::LEGACY` /
+  `--legacy` reproduce the still earlier real-state-list tracking. Other diagnostic selectors:
+  `--translation det|random`, `--below check|smallest`, `--allin-snap X`.
 * Diagnostics: `PolicyFactory::report()`; bench prints per-policy decisions split by
   on-menu / after-off-menu: miss rate, desync rate (+reasons), fold/call/raise mass.
 * Probes: `bench::probe` (`probe:pre=..,bet=..,raise=..,street=..`), `research/experiments/probes.sh`.
-* Tests: `nlhe::abstraction::shadow_tests` (6), `bench/tests/harness.rs::off_menu_bets_keep_the_policy_in_its_tree`.
+* Tests: `nlhe::abstraction::shadow_tests`, `bench/tests/harness.rs::off_menu_bets_keep_the_policy_in_its_tree`.
 
-## Numbers
+## Historical numbers (before the November keep-sync fix)
 
 Exploiter = trained best response, "paper" learner menu, 1 learner seat vs 5 frozen target copies, all
 seats, 20,000 eval deals, AIVAT (mbb/game, positive = target exploited).
@@ -87,7 +102,7 @@ Ablation on the earlier B (4.5e9 it), 4M exploiter iterations (legacy +25,625):
 | shadow, Smallest, snap 0, random | +1,944 +- 239 |
 | shadow, Smallest, snap 0.5 | +2,141 +- 235 |
 | shadow, Check, snap 0 | +256 +- 135 |
-| **shadow, Check, snap 0.5 (default)** | **+281 +- 136** |
+| **shadow, Check, snap 0.5 (then default)** | **+281 +- 136** |
 | shadow, Check, snap 2 | +460 +- 129 |
 | shadow, Check, snap 0.5, random everywhere | +1,479 +- 175 |
 | shadow, Check, snap 0.5, random between sizes only | +151 +- 125 |
@@ -120,21 +135,25 @@ blueprint, even the fixed one; the old blueprint was the worst (+2 bb/hand over 
 `bet=3`). Caveat: search is oddly weak vs the station here (-146), a property of that small test
 setup, not of translation.
 
-## Remaining risk
+## Current limitations and historical caveats
 
-* The residual is real: +700 mbb vs B (7 bb/100) from a 12M-iteration learner that is still
-  improving; richer learners / longer training will raise it. It is the paper's translation
-  weakness (size-dependent folding/calling). Random-between-sizes helped only marginally (12M: +619 vs +700; 4M:
-  +151 vs +281, inside noise).
-* Check mode still desyncs after tiny bets (about 40% of the target's decisions after a bet below
-  ~0.15 pot: the shadow treats it as a check, so players who already checked cannot be re-asked);
-  it falls back to check/call there. Cheap to exploit only for small stakes, but not zero.
-* Overbets > largest menu size are treated as the largest size (not as a shove); they are still
-  the likeliest remaining leak (blueprint-only). Search is the proper remedy.
-* `search` crate keeps its own blueprint history (`search::bp::Blueprint::translate`, real-state
-  lists), i.e. the legacy tracking: off-tree handling inside the search tree still has the
-  node-mismatch problem for earlier-round off-menu actions. Not changed here.
-* `LBR`/`h2h` numbers computed earlier against off-menu opponents with the legacy tracking
-  understate the blueprint's strength; re-run if they matter.
-* Probes are fish (never fold); they only show relative effects. The trained exploiter is the
-  real measurement.
+* The current fixed C blueprint still admits a profitable frozen attack: the 1M policy has
+  reproduced exactly at +419.5 ± 95.4 mbb/game on an independently verified public model.
+  Stronger original-host figures remain subject to the input audit. Final-model confirmation
+  and attack-specific causes are tracked in [RESULTS](../../docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
+* The historical B study found +700 from a 12M learner. Random translation between raises
+  gave +619 ± 134 versus +700 ± 149; that comparison did not establish an improvement.
+  Neither result measures the present default configuration.
+* In the historical Check/no-keep-sync configuration, tiny bets could desynchronize the
+  shadow and trigger check/call. Current defaults avoid ignoring the tiny bet and use an
+  explicit hand-off with a strength fallback when synchronization is impossible.
+* Off-menu pot sizes still differ between the real and shadow games. Whether sizes near
+  translation thresholds, overbets, or raise-cap hand-offs explain a particular attack must
+  be measured. A later price-mass correction was reverted after an adaptive regression.
+* Search now uses `search::bp::Blueprint` with `Shadow`, including the same tracking options
+  and strength fallback. The earlier warning that search used legacy real-state histories
+  is obsolete. Adversarial testing of the full search/API path remains separate work.
+* Historical off-menu LBR/head-to-head measurements made with old tracking do not describe
+  the fixed target. Use the command, model identity and tracking options recorded for each run.
+* The scripted sizing probes are weak opponents. Their losses do not bound what a trained
+  or adaptive attacker can earn. No six-player bot is proved unexploitable by these tests.

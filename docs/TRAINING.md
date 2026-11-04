@@ -44,8 +44,10 @@ Pass `--resume` (same `--out`, same sizing, same seed). The run directory must c
     --checkpoint-min 360 --seed 2019 --eval-min 60 --eval-deals 2000 --eval-threads 8 --resume
 ```
 
-Our best line (variant C) was stopped at 5.55e10 iterations at about 355k iterations/s and was still improving; reaching 1.83e11 iterations takes about
-130 more hours on one 64-core box and corresponds to roughly 8 days of total compute (the paper's budget). That run is in progress and becomes SHARINGAN-2.
+Variant C was stopped at 5.55e10 iterations at about 355k iterations/s and was still improving.
+The extended run reached 1.83e11 iterations and finished on 2026-11-02 as SHARINGAN-2.
+Its full training budget corresponds to roughly eight days of compute; measurements and
+checkpoint comparisons are recorded in [RESULTS.md](RESULTS.md).
 
 Changing `--iters` on resume rescales the schedule. That is harmless once every phase (LCFR, pruning, averaging) has passed.
 To keep a checkpoint, hard-link it (`ln -f blueprint.bin blueprint-<it>.bin`, same for `snapshots.sum`): saves are tmp+rename. Each snapshot fold is committed together with a
