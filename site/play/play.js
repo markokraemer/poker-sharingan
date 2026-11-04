@@ -15,11 +15,11 @@
   const mySeat = 0;
 
   const ROOMS = {
-    sharingan: { label: "vs SHARINGAN-1", desc: "You and five SHARINGAN-1. The hardest table we have.",
+    sharingan: { label: "vs SHARINGAN-2", desc: "You and five SHARINGAN-2. The hardest table we have.",
                  seats: ["house:sharingan-1", "house:sharingan-1", "house:sharingan-1", "house:sharingan-1", "house:sharingan-1"] },
     practice:  { label: "practice", desc: "You and five weaker house bots: random, calling station, tight-aggressive, nit, LAG.",
                  seats: ["house:random", "house:calling_station", "house:tight_aggressive", "house:nit", "house:lag"] },
-    mixed:     { label: "mixed", desc: "You, two SHARINGAN-1 and three house bots.",
+    mixed:     { label: "mixed", desc: "You, two SHARINGAN-2 and three house bots.",
                  seats: ["house:sharingan-1", "house:tight_aggressive", "house:lag", "house:sharingan-1", "house:calling_station"] },
     action:    { label: "action", desc: "You against maniacs and LAGs. Big pots, all-ins and side pots.",
                  seats: ["house:maniac", "house:lag", "house:maniac", "house:calling_station", "house:lag"] },
@@ -111,7 +111,7 @@
   function cardTxt(c) { return (c[0] === "T" ? "10" : c[0]) + SUIT[c[1]]; }
   const back = key => { const a = key && !animated.has(key) ? (animated.add(key), " deal") : ""; return '<span class="cd back' + a + '">&nbsp;&nbsp;</span>'; };
   function clean(n) { return String(n || "").replace(/^house:/, ""); }
-  const NAMES = { "sharingan-1": "SHARINGAN-1", tight_aggressive: "TAG", lag: "LAG", calling_station: "CALLING STN", nit: "NIT", random: "RANDOM", maniac: "MANIAC" };
+  const NAMES = { "sharingan-1": "SHARINGAN-2", tight_aggressive: "TAG", lag: "LAG", calling_station: "CALLING STN", nit: "NIT", random: "RANDOM", maniac: "MANIAC" };
   function pretty(n) { const c = clean(n).toLowerCase(); return NAMES[c] || c.replace(/_/g, " ").toUpperCase(); }
   const STREETS = { preflop: "Preflop", flop: "Flop", turn: "Turn", river: "River" };
   const SRV_CAT = { highcard: "high card", pair: "pair", twopair: "two pair", trips: "three of a kind", straight: "straight", flush: "flush", fullhouse: "full house", quads: "four of a kind", straightflush: "straight flush" };

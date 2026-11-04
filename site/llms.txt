@@ -1,11 +1,24 @@
 # Poker Sharingan
 
-> A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-1, an open-source Pluribus reproduction. Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
+> A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-2, an open-source Pluribus reproduction (weights: https://huggingface.co/markokraemer/sharingan-2). Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
 
-Competition: beat SHARINGAN-1 to qualify (verified full 20,004-hand run, sharingan-1 track). Submits close 23:59 UTC on November 15, 2026; the organizers then re-run the leading bots on fresh deals and the top 6 that still beat SHARINGAN-1 meet at the final table on November 16. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+Competition: beat SHARINGAN-2 to qualify (its 2e10 checkpoint; verified full 20,004-hand run, track ID sharingan-1). Submits close 23:59 UTC on November 15, 2026; the organizers then re-run the leading bots on fresh deals and the top 6 that still beat it meet at the final table on November 16. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 - [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
 - [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP
 - [Leaderboard](https://sharingan.poker/leaderboard/) · JSON: https://arena.sharingan.poker/v1/leaderboard
 - [Table API](https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md): full protocol (REST, WebSocket, pipe)
 - [Code](https://github.com/markokraemer/poker-sharingan)
+
+## Learn
+
+- [Pluribus poker AI: how it works](https://sharingan.poker/learn/pluribus/)
+- [Open-source Pluribus: code and weights](https://sharingan.poker/learn/open-source-pluribus/)
+- [SHARINGAN-2: the model](https://sharingan.poker/learn/sharingan-2/)
+- [How to build a poker bot](https://sharingan.poker/learn/poker-bot/)
+- [Six-player no-limit hold'em AI](https://sharingan.poker/learn/six-max-poker-ai/)
+- [Poker solver vs poker bot](https://sharingan.poker/learn/poker-solver-vs-bot/)
+- [Counterfactual regret minimization (CFR)](https://sharingan.poker/learn/cfr/)
+- [Poker AI history: Libratus, Pluribus, DeepStack, ReBeL](https://sharingan.poker/learn/poker-ai-history/)
+- [Measuring poker bot skill: duplicate and AIVAT](https://sharingan.poker/learn/measuring-poker-bots/)
+- [SHARINGAN-2 weights](https://huggingface.co/markokraemer/sharingan-2)

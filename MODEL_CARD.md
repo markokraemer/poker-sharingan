@@ -20,7 +20,9 @@ model-index:
 
 # SHARINGAN-1: the Poker Sharingan house bot
 
-SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poker) arena, the #1 open-source poker bot: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
+> This is the 2e10-iteration checkpoint of [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2): the same training run, stopped earlier. Use SHARINGAN-2 unless you need this exact checkpoint.
+
+SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poker) arena: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
 **trained strategy files** and the **card abstraction tables**. Code, training and evaluation tooling: https://github.com/markokraemer/poker-sharingan
 (Rust workspace, "library: custom": there is no `transformers`/`pytorch` loader; the weights are read by the Rust crates `blueprint` and `bench`).
 

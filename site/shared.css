@@ -30,3 +30,11 @@ a { color:inherit; }
   .kv { grid-template-columns:minmax(0,1fr); }
   .code { white-space:pre-wrap; word-break:break-word; }
 }
+.l > h1, .l > h2, .l > h3, .l > p { font:inherit; margin:0; }
+.l > p { display:block; max-width:80ch; }
+.l > h2 { text-transform:uppercase; }
+.l > ul { margin:0; padding-left:2ch; max-width:80ch; }
+.l > table { border-collapse:collapse; width:100%; }
+.l > table td, .l > table th { text-align:left; padding:0 2ch 0 0; vertical-align:top; }
+.l > table th { color:var(--muted); }
+@media (max-width:640px) { .l > table { display:block; overflow-x:auto; } }

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Build a Poker Bot | Poker Sharingan</title>
+<meta name="description" content="Build a poker bot in Python for six-player hold&#x27;em: rules-based vs equilibrium bots, a working act(state) example, luck-corrected testing and a leaderboard.">
+<link rel="canonical" href="https://sharingan.poker/learn/poker-bot/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poker Sharingan">
+<meta property="og:title" content="How to Build a Poker Bot">
+<meta property="og:description" content="Build a poker bot in Python for six-player hold&#x27;em: rules-based vs equilibrium bots, a working act(state) example, luck-corrected testing and a leaderboard.">
+<meta property="og:url" content="https://sharingan.poker/learn/poker-bot/">
+<meta property="og:image" content="https://sharingan.poker/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://sharingan.poker/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../../shared.css">
+<script type="application/ld+json">
+[
+ {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "How to Build a Poker Bot",
+  "description": "Build a poker bot in Python for six-player hold'em: rules-based vs equilibrium bots, a working act(state) example, luck-corrected testing and a leaderboard.",
+  "datePublished": "2026-11-04",
+  "dateModified": "2026-11-04",
+  "author": {
+   "@type": "Person",
+   "name": "Marko Kraemer",
+   "url": "https://github.com/markokraemer"
+  },
+  "publisher": {
+   "@type": "Organization",
+   "name": "Poker Sharingan",
+   "url": "https://sharingan.poker/"
+  },
+  "mainEntityOfPage": "https://sharingan.poker/learn/poker-bot/",
+  "image": "https://sharingan.poker/og.png"
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+   {
+    "@type": "ListItem",
+    "position": 1,
+    "name": "Home",
+    "item": "https://sharingan.poker/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 2,
+    "name": "Learn",
+    "item": "https://sharingan.poker/learn/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 3,
+    "name": "How to Build a Poker Bot",
+    "item": "https://sharingan.poker/learn/poker-bot/"
+   }
+  ]
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+   {
+    "@type": "Question",
+    "name": "How do I make a poker bot?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Write a function that takes the current game state and returns fold, check, call or raise. Start with hand-strength and pot-odds rules, test it against a reference bot with duplicate play, and improve from there. The example above is a complete starting point."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What language is best for a poker bot?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Python is the easiest start, and it is what the Poker Sharingan SDK uses. Training equilibrium strategies is compute-heavy, so that code is usually written in a fast language: the SHARINGAN-2 trainer is in Rust. The decision function a bot runs at the table can be Python."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "Is there an open source poker bot I can learn from?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Yes. Poker Sharingan is Apache-2.0 and includes a six-player engine, the CFR trainer, the search code and the SHARINGAN-2 weights. Several other projects publish heads-up bots, but few publish full-game six-player weights with head-to-head results."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "Can I use a poker bot on real-money sites?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "No. Real-money poker sites ban bots and can close accounts and withhold funds. Use bots for research and bot arenas, where they are welcome."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How do I know if my poker bot is any good?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Measure it with luck correction. Duplicate deals and AIVAT remove most of the noise, and a 95% confidence interval tells you whether a score is distinguishable from zero. Raw win rate over a few hundred hands tells you almost nothing."
+    }
+   }
+  ]
+ }
+]
+</script>
+</head>
+<body>
+<main class="doc"><article class="sheet">
+  <div class="l"></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="../../leaderboard/">Leaderboard</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><h1 class="up">How to Build a Poker Bot</h1></div>
+  <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><p>A poker bot is a program that chooses poker actions without a human. This guide shows how to build a poker bot in Python for six-player no-limit Texas hold'em: the two main ways to decide, a minimal example that runs, how to test it without fooling yourself, and how to get a verified score. It is written for research and bot arenas. Real-money poker sites ban bots, so do not use anything here at a real-money table.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>What a poker bot actually does</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Every time it is your turn, a poker bot receives a description of the spot and returns one action: fold, check, call or raise to some amount. That is the whole interface. A poker AI bot differs from a simple script only in how it makes that choice.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The spot includes your two hole cards, the board, the pot, the stacks, whose turn it is and every action so far in the hand. What the bot cannot see is the other players' cards. Poker is an imperfect-information game, which is why a poker bot cannot just calculate the best move the way a chess engine can.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>Two ways to decide: rules or equilibrium</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Almost every texas holdem bot falls into one of two families.</p></div>
+  <div class="l"></div>
+  <div class="l"><ul><li><b>Rules-based.</b> You write the strategy by hand: open with strong hands, fold weak ones, bet when you hit the board, call when the pot odds are good. It is quick to write and easy to debug. It is also predictable, and a good opponent can learn to exploit it.</li><li><b>Equilibrium-based.</b> A program computes a strategy offline by playing against itself millions of times, usually with counterfactual regret minimization (see <a href="../cfr/">CFR explained</a>). The result is a table of mixed strategies: in a given spot, raise 40% of the time and call 60%. Mixing is what makes the bot hard to exploit.</li></ul></div>
+  <div class="l"></div>
+  <div class="l"><p>Pluribus, the bot from <a href="https://doi.org/10.1126/science.aay2400">Brown and Sandholm (Science, 2019)</a>, is the best-known example of the second family for six players. It combined an offline strategy, called a blueprint, with search during play. The <a href="../pluribus/">Pluribus article</a> covers the details. For a first bot, start rules-based. You can always replace the decision logic later, because the interface stays the same.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>If you are unsure whether you want a bot or a solver, read <a href="../poker-solver-vs-bot/">Poker solver vs poker bot</a> first. A solver studies one spot offline. A bot plays whole hands in real time.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>A minimal poker bot in Python</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>The Poker Sharingan SDK needs Python 3.9 or newer. Install it and point it at the arena:</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"
+export SHARINGAN_SERVER=https://arena.sharingan.poker</span></div>
+  <div class="l"></div>
+  <div class="l"><p>A bot is one file with one function, <code>act(s)</code>. The argument <code>s</code> is the decision you have to make. This version scores the starting hand, raises with strong ones, and after the flop plays only if it paired a hole card with the board:</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="code"># mybot.py
+from sharingan import Action
+
+RANKS = "23456789TJQKA"   # cards are strings such as "As", "Td", "9h"
+
+def preflop_score(cards):
+    a, b = cards
+    ra, rb = RANKS.index(a[0]), RANKS.index(b[0])
+    score = max(ra, rb) + min(ra, rb)
+    if ra == rb: score += 12            # pair
+    if a[1] == b[1]: score += 2         # suited
+    if abs(ra - rb) &lt;= 2: score += 1    # connected
+    return score
+
+def raise_to(s, to):
+    r = s.legal.raise_
+    return Action.raise_to(min(max(to, r.min_to), r.max_to))   # keep it legal
+
+def act(s):
+    if s.street == "preflop":
+        score = preflop_score(s.hole_cards)
+        if score &gt;= 24 and s.legal.raise_:
+            return raise_to(s, 3 * s.big_blind)   # amounts are the total "to"
+        if score &gt;= 18 and s.pot_odds &lt; 0.25:
+            return Action.call()
+    else:
+        board_ranks = {c[0] for c in s.board}
+        paired = any(c[0] in board_ranks for c in s.hole_cards)
+        if paired and s.legal.raise_ and s.to_call == 0:
+            return raise_to(s, s.pot // 2)
+        if paired and s.pot_odds &lt; 0.35:
+            return Action.call()
+    return Action.check() if s.legal.check else Action.fold()</span></div>
+  <div class="l"></div>
+  <div class="l"><p>Amounts are always the total you are raising <em>to</em>, never the amount added. Illegal choices are corrected for you: folding when a check is free becomes a check, and raise sizes are clamped to the legal range. If your bot takes longer than 5 seconds, the server plays check or fold.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Other fields you will use are <code>s.pot</code>, <code>s.to_call</code>, <code>s.players</code> (stacks and status of each seat), <code>s.seat</code>, <code>s.button_seat</code> and <code>s.history</code>, the list of every action this hand. The <a href="../../docs/">docs page</a> has the full list. This bot is weak on purpose. It ignores position, bet sizing and opponents, and those are the places to improve it.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>Test it without fooling yourself</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>First, a smoke test. This plays a few hands against the SHARINGAN-2 blueprint and prints one line per hand, so you can see that nothing crashes:</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">sharingan play mybot.py --vs sharingan-1 --hands 12</span></div>
+  <div class="l"></div>
+  <div class="l"><p>Do not judge strength from a run like that. Poker variance is huge, and luck dominates results over thousands of hands. A bot that wins 200 hands in a row may be worse than one that loses them. Serious testing needs luck correction:</p></div>
+  <div class="l"></div>
+  <div class="l"><ul><li><b>Duplicate play.</b> The same deals are replayed with the seats rotated, so every bot gets every set of cards. Card luck cancels.</li><li><b>AIVAT.</b> A variance-reduction estimator by <a href="https://arxiv.org/abs/1612.06915">Burch and colleagues (AAAI 2018)</a> that subtracts the luck of the deal and of known opponent strategies without biasing the result.</li><li><b>Confidence intervals.</b> Report a 95% interval next to the score. If it contains zero, the bot is not yet distinguishable from break-even.</li></ul></div>
+  <div class="l"></div>
+  <div class="l"><p>Scores are in mbb/game, thousandths of a big blind per hand. One big blind per 100 hands is 10 mbb/game. <a href="../measuring-poker-bots/">Measuring poker bots</a> goes through the statistics in more depth.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>Submit to the leaderboard</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Hosted submission does the luck correction for you. The server runs your bot in an isolated sandbox (no network) on fresh secret deals, replays each deal from every seat, and signs the result:</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">sharingan submit mybot.py --contact you@example.com --profile https://github.com/you</span></div>
+  <div class="l"></div>
+  <div class="l"><p>By default that plays the <code>ladder-v1</code> track, a softer field of house bots. To play five copies of the SHARINGAN-2 blueprint (its 2e10 checkpoint), add <code>--track sharingan-1</code>. A full run is 20,004 hands, and a fast bot finishes in well under a minute. The result is a verified score with a 95% interval, shown on the <a href="../../leaderboard/">leaderboard</a>. The first submit registers the bot, named after the file, and saves a token locally so later runs update the same row. Shorter runs are for testing and never rank.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>If your bot needs the network, for example because it calls a language model, use <code>sharingan benchmark mybot.py --hands 1200</code>. It runs on your machine and is marked unverified, because the server cannot see the code that made the decisions.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>Play against SHARINGAN-2, or let an agent do it</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>To see what a strong opponent looks like, <a href="../../play/">play SHARINGAN-2 in your browser</a>. SHARINGAN-2 is an open reproduction of Pluribus: a six-player blueprint trained with Monte Carlo CFR and played with real-time search on the turn and river. Its weights are on <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a> and the code is on <a href="https://github.com/markokraemer/poker-sharingan">GitHub</a> under Apache-2.0, which makes it an open source poker bot you can read and run. See <a href="../sharingan-2/">the SHARINGAN-2 write-up</a> for training details and results.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>You can also hand the whole job to a coding agent. Give Claude Code, Codex or Cursor one prompt:</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="code">Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.</span></div>
+  <div class="l"></div>
+  <div class="l"><p>The file explains the SDK, the tests and the submit command, so the agent can write the bot, run it, and report the verified score. The same limits apply: this is for research and bot arenas, and real-money sites ban bots.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>FAQ</h2></div>
+  <div class="l"></div>
+  <div class="l"><h3>How do I make a poker bot?</h3></div>
+  <div class="l"><p class="muted">Write a function that takes the current game state and returns fold, check, call or raise. Start with hand-strength and pot-odds rules, test it against a reference bot with duplicate play, and improve from there. The example above is a complete starting point.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What language is best for a poker bot?</h3></div>
+  <div class="l"><p class="muted">Python is the easiest start, and it is what the Poker Sharingan SDK uses. Training equilibrium strategies is compute-heavy, so that code is usually written in a fast language: the SHARINGAN-2 trainer is in Rust. The decision function a bot runs at the table can be Python.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>Is there an open source poker bot I can learn from?</h3></div>
+  <div class="l"><p class="muted">Yes. Poker Sharingan is Apache-2.0 and includes a six-player engine, the CFR trainer, the search code and the SHARINGAN-2 weights. Several other projects publish heads-up bots, but few publish full-game six-player weights with head-to-head results.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>Can I use a poker bot on real-money sites?</h3></div>
+  <div class="l"><p class="muted">No. Real-money poker sites ban bots and can close accounts and withhold funds. Use bots for research and bot arenas, where they are welcome.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How do I know if my poker bot is any good?</h3></div>
+  <div class="l"><p class="muted">Measure it with luck correction. Duplicate deals and AIVAT remove most of the noise, and a 95% confidence interval tells you whether a score is distinguishable from zero. Raw win rate over a few hundred hands tells you almost nothing.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up muted">Related</div>
+  <div class="l"><nav class="nav"><a href="../pluribus/">Pluribus</a><a href="../six-max-poker-ai/">Six-max poker AI</a><a href="../measuring-poker-bots/">Measuring poker bots</a><a href="../sharingan-2/">SHARINGAN-2</a></nav></div>
+  <div class="l"></div>
+  <div class="l muted">Apache-2.0. For research and bot arenas; real-money sites ban bots.</div>
+</article></main>
+</body>
+</html>

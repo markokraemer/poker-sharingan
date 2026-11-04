@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SHARINGAN-2: Open Six-Player Poker AI | Poker Sharingan</title>
+<meta name="description" content="SHARINGAN-2 is an open-source six-player poker AI: blueprint plus turn and river search. Training run, results with CIs, how to use the weights, and its limits.">
+<link rel="canonical" href="https://sharingan.poker/learn/sharingan-2/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poker Sharingan">
+<meta property="og:title" content="SHARINGAN-2: Open Six-Player Poker AI">
+<meta property="og:description" content="SHARINGAN-2 is an open-source six-player poker AI: blueprint plus turn and river search. Training run, results with CIs, how to use the weights, and its limits.">
+<meta property="og:url" content="https://sharingan.poker/learn/sharingan-2/">
+<meta property="og:image" content="https://sharingan.poker/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://sharingan.poker/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../../shared.css">
+<script type="application/ld+json">
+[
+ {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "SHARINGAN-2: Open Six-Player Poker AI",
+  "description": "SHARINGAN-2 is an open-source six-player poker AI: blueprint plus turn and river search. Training run, results with CIs, how to use the weights, and its limits.",
+  "datePublished": "2026-11-04",
+  "dateModified": "2026-11-04",
+  "author": {
+   "@type": "Person",
+   "name": "Marko Kraemer",
+   "url": "https://github.com/markokraemer"
+  },
+  "publisher": {
+   "@type": "Organization",
+   "name": "Poker Sharingan",
+   "url": "https://sharingan.poker/"
+  },
+  "mainEntityOfPage": "https://sharingan.poker/learn/sharingan-2/",
+  "image": "https://sharingan.poker/og.png"
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+   {
+    "@type": "ListItem",
+    "position": 1,
+    "name": "Home",
+    "item": "https://sharingan.poker/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 2,
+    "name": "Learn",
+    "item": "https://sharingan.poker/learn/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 3,
+    "name": "SHARINGAN-2: Open Six-Player Poker AI",
+    "item": "https://sharingan.poker/learn/sharingan-2/"
+   }
+  ]
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+   {
+    "@type": "Question",
+    "name": "What is SHARINGAN-2?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "An open-source six-player no-limit hold'em AI: a blueprint trained with Monte Carlo CFR on CPUs, played with real-time search on the turn and river. Weights are on Hugging Face and code is on GitHub under Apache-2.0."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How was SHARINGAN-2 trained?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "In one run of 1.83e11 MCCFR iterations on rented CPU servers, using the medium bet-size menu. Earlier checkpoints at 2e10 and 4.77e10 iterations are the same model trained less."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How strong is SHARINGAN-2?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "It beats its own 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game (3 vs 3, 4M deals, duplicate with AIVAT, 95% CI). It has not played human professionals."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "Where can I download the SHARINGAN-2 weights?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "At huggingface.co/markokraemer/sharingan-2. The code is at github.com/markokraemer/poker-sharingan."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "Can I play against SHARINGAN-2?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Yes, in your browser at sharingan.poker/play/. You can also submit a Python bot and have it scored on the leaderboard."
+    }
+   }
+  ]
+ }
+]
+</script>
+</head>
+<body>
+<main class="doc"><article class="sheet">
+  <div class="l"></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="../../leaderboard/">Leaderboard</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><h1 class="up">SHARINGAN-2: Open Six-Player Poker AI</h1></div>
+  <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><p>SHARINGAN-2 is the open source poker AI model from Poker Sharingan: a six-player no-limit hold'em blueprint trained from scratch, played with real-time search on the turn and river. Weights and code are public. This page covers what the model is, how it was trained, its results with confidence intervals, how it plays, how to use it, and its limits.</p></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"></div>
+  <div class="l"><h2>What SHARINGAN-2 is</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>SHARINGAN-2 is a six-player poker AI. It is a strategy table (the blueprint) computed by self-play, combined with a search that refines decisions during the hand. It follows the method of <a href="../pluribus/">Pluribus</a> and is the model that ships with the <a href="../open-source-pluribus/">open-source Pluribus reproduction</a>.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The code is in Rust and licensed Apache-2.0 at <a href="https://github.com/markokraemer/poker-sharingan">github.com/markokraemer/poker-sharingan</a>. The weights are at <a href="https://huggingface.co/markokraemer/sharingan-2">huggingface.co/markokraemer/sharingan-2</a>. The model runs on CPUs. No GPU was used to train or play it.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"></div>
+  <div class="l"><h2>The training run</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>There was one training run, called run "C," which used the medium bet-size menu. It trained to the full budget of 1.83e11 MCCFR iterations and finished on 2026-11-02. Earlier checkpoints are not separate models. They are snapshots of the same run at 2e10 and 4.77e10 iterations, so they are the same model trained less.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The algorithm is external-sampling Monte Carlo CFR with Linear CFR discounting early on and negative-regret pruning. Pruning applies to 95% of iterations and never on the river. Regrets live in a lock-free hash store. Training used rented bare-metal CPU servers.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Why train on CPUs? MCCFR is a sampling method. Each iteration walks a small piece of the tree and updates a table in memory, which suits many cores and large RAM better than the dense matrix work GPUs are good at. This is the same choice the Pluribus authors made.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The game is abstracted. Preflop is lossless with 169 hand classes. Flop, turn and river use 200 buckets each, with imperfect recall and suit isomorphism. Off-tree bets are handled with a "shadow game" state, which cut exploitability by about 37 times compared with naive nearest-size translation. The <a href="../cfr/">CFR page</a> explains the algorithm family.</p></div>
+  <div class="l"></div>
+  <div class="l"><table><thead><tr><th>Checkpoint</th><th>Iterations</th><th>Notes</th></tr></thead><tbody><tr><td>Early</td><td>2e10</td><td>With search, +77.6 bb/100 over 2,329 live hands on a public bot arena. Leaderboard track ID <code>sharingan-1</code>.</td></tr><tr><td>Middle</td><td>4.77e10</td><td>Beat SvanBot, the top bot on that arena, in both seatings.</td></tr><tr><td>Final (SHARINGAN-2)</td><td>1.83e11</td><td>Full budget; the model released.</td></tr></tbody></table></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"></div>
+  <div class="l"><h2>Results</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Head-to-head results use 3 vs 3 seating over 4M deals, with duplicate deals and AIVAT luck correction, at 95% confidence. The unit is mbb/game, thousandths of a big blind per hand. <a href="../measuring-poker-bots/">This page</a> explains the method.</p></div>
+  <div class="l"></div>
+  <div class="l"><table><thead><tr><th>Match</th><th>mbb/game (95% CI)</th></tr></thead><tbody><tr><td>SHARINGAN-2 vs 2e10 checkpoint</td><td>+5.09 &plusmn; 1.16</td></tr><tr><td>SHARINGAN-2 vs 4.77e10 checkpoint</td><td>+1.97 &plusmn; 0.97</td></tr></tbody></table></div>
+  <div class="l"><p>More training helped, with diminishing returns: the gain over the 4.77e10 checkpoint is smaller than the gain over the 2e10 one. The live-arena numbers in the table above are from short runs and carry wide uncertainty.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Why report checkpoints at all? Because they show the training curve. A blueprint is only a snapshot of an iterative process, and each checkpoint is a point on that curve. The 2e10 checkpoint is already strong enough to be the leaderboard reference. The final model is better than it, but the step from 4.77e10 to 1.83e11 iterations is worth only about 2 mbb/game against the middle checkpoint.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>As a sanity check, we trained a short best response for 12M iterations against the model. It found no profitable exploit and loses. This is not a measure of exploitability. A stronger exploiter might do better.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"></div>
+  <div class="l"><h2>How it plays: blueprint plus turn and river search</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Preflop and flop actions come from the blueprint. On the turn and river, the model runs a nested, unsafe, depth-limited Monte Carlo Linear CFR search with 200,000 iterations. It keeps Bayesian beliefs over the 1,326 possible hole-card pairs each opponent could hold, and at the leaves each player picks among four continuation strategies. A time budget applies, and if the search runs out of time the model falls back to the blueprint action.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>"Unsafe" means the search does not guarantee the result is no worse than the blueprint. It is a practical trade, the same kind of one Pluribus made. The <a href="../pluribus/">Pluribus page</a> describes the original design in detail.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Search is also what makes the model respond to the specific hand. The blueprint is the same for every table, but the search starts from the current pot, stacks, board and action history, and it weights the opponent's possible holdings by how they have played so far. A bet that would be rare with a weak hand shifts those beliefs toward strong ones, and the search adjusts.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The search is nested. When an opponent's action inside the subgame takes the hand to a new decision, the search can re-solve from there. This keeps the cost bounded while allowing the strategy to react to unusual lines. The time budget protects against slow turns, so the model always returns an action.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"></div>
+  <div class="l"><h2>How to use the weights</h2></div>
+  <div class="l"></div>
+  <div class="l"><ul><li><strong>Play against it.</strong> Open the <a href="../../play/">browser table</a>. No install.</li><li><strong>Download.</strong> Get the files from <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a>, for example with <code>huggingface-cli download markokraemer/sharingan-2</code>, and clone the GitHub repo for the code. The <a href="../../docs/">docs</a> have build and run steps.</li><li><strong>Test your bot.</strong> Write <code>act(state)</code> in Python and run <code>sharingan submit mybot.py</code>. A hosted run plays 20,004 hands and returns a verified score. The <a href="../../leaderboard/">leaderboard</a> reference opponent is the 2e10 checkpoint blueprint without search.</li><li><strong>Use an agent.</strong> Tell your coding agent: "Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard."</li></ul></div>
+  <div class="l"><p>For guidance on building a bot, see <a href="../poker-bot/">poker bot</a>, and for how solvers differ from bots, <a href="../poker-solver-vs-bot/">poker solver vs bot</a>.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"></div>
+  <div class="l"><h2>Limits</h2></div>
+  <div class="l"></div>
+  <div class="l"><ul><li>SHARINGAN-2 has not played professional human players. Its results are against bots and earlier checkpoints.</li><li>The best-response test was short. We do not claim the model is unexploitable or superhuman.</li><li>It is a six-player model on a specific abstraction and bet menu. Other stack depths, rules or formats are out of scope.</li><li>Search covers only the turn and river. Preflop and flop rely on the blueprint.</li><li>Bots are for research and bot arenas. Real-money poker sites ban bots.</li></ul></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>FAQ</h2></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is SHARINGAN-2?</h3></div>
+  <div class="l"><p class="muted">An open-source six-player no-limit hold&#x27;em AI: a blueprint trained with Monte Carlo CFR on CPUs, played with real-time search on the turn and river. Weights are on Hugging Face and code is on GitHub under Apache-2.0.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How was SHARINGAN-2 trained?</h3></div>
+  <div class="l"><p class="muted">In one run of 1.83e11 MCCFR iterations on rented CPU servers, using the medium bet-size menu. Earlier checkpoints at 2e10 and 4.77e10 iterations are the same model trained less.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How strong is SHARINGAN-2?</h3></div>
+  <div class="l"><p class="muted">It beats its own 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game (3 vs 3, 4M deals, duplicate with AIVAT, 95% CI). It has not played human professionals.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>Where can I download the SHARINGAN-2 weights?</h3></div>
+  <div class="l"><p class="muted">At huggingface.co/markokraemer/sharingan-2. The code is at github.com/markokraemer/poker-sharingan.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>Can I play against SHARINGAN-2?</h3></div>
+  <div class="l"><p class="muted">Yes, in your browser at sharingan.poker/play/. You can also submit a Python bot and have it scored on the leaderboard.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up muted">Related</div>
+  <div class="l"><nav class="nav"><a href="../pluribus/">Pluribus</a><a href="../open-source-pluribus/">Open-source Pluribus</a><a href="../six-max-poker-ai/">Six-max poker AI</a><a href="../measuring-poker-bots/">Measuring poker bots</a></nav></div>
+  <div class="l"></div>
+  <div class="l muted">Apache-2.0. For research and bot arenas; real-money sites ban bots.</div>
+</article></main>
+</body>
+</html>

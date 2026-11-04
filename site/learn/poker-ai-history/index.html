@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poker AI History: Libratus to ReBeL | Poker Sharingan</title>
+<meta name="description" content="Poker AI history and timeline: Cepheus, Libratus vs Pluribus, DeepStack, ReBeL and Student of Games compared, plus the open SHARINGAN-2 reproduction.">
+<link rel="canonical" href="https://sharingan.poker/learn/poker-ai-history/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poker Sharingan">
+<meta property="og:title" content="Poker AI History: Libratus to ReBeL">
+<meta property="og:description" content="Poker AI history and timeline: Cepheus, Libratus vs Pluribus, DeepStack, ReBeL and Student of Games compared, plus the open SHARINGAN-2 reproduction.">
+<meta property="og:url" content="https://sharingan.poker/learn/poker-ai-history/">
+<meta property="og:image" content="https://sharingan.poker/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://sharingan.poker/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../../shared.css">
+<script type="application/ld+json">
+[
+ {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Poker AI History: Libratus, Pluribus, DeepStack, ReBeL",
+  "description": "Poker AI history and timeline: Cepheus, Libratus vs Pluribus, DeepStack, ReBeL and Student of Games compared, plus the open SHARINGAN-2 reproduction.",
+  "datePublished": "2026-11-04",
+  "dateModified": "2026-11-04",
+  "author": {
+   "@type": "Person",
+   "name": "Marko Kraemer",
+   "url": "https://github.com/markokraemer"
+  },
+  "publisher": {
+   "@type": "Organization",
+   "name": "Poker Sharingan",
+   "url": "https://sharingan.poker/"
+  },
+  "mainEntityOfPage": "https://sharingan.poker/learn/poker-ai-history/",
+  "image": "https://sharingan.poker/og.png"
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+   {
+    "@type": "ListItem",
+    "position": 1,
+    "name": "Home",
+    "item": "https://sharingan.poker/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 2,
+    "name": "Learn",
+    "item": "https://sharingan.poker/learn/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 3,
+    "name": "Poker AI History: Libratus, Pluribus, DeepStack, ReBeL",
+    "item": "https://sharingan.poker/learn/poker-ai-history/"
+   }
+  ]
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+   {
+    "@type": "Question",
+    "name": "What was the first poker AI to beat professionals?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "It depends on the game. Heads-up limit hold'em was essentially solved by Cepheus in 2015. In heads-up no-limit, Libratus beat four top professionals in January 2017. In six-player no-limit, Pluribus beat elite professionals in 2019."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is the difference between Libratus and Pluribus?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Libratus plays heads-up (two-player) no-limit hold'em, Pluribus plays six-player. Both use a Monte Carlo CFR blueprint plus real-time search, but Pluribus uses depth-limited search with four continuation strategies and runs on far less hardware."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How does DeepStack differ from Libratus?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "DeepStack re-solves the game from the current state at every decision, using neural networks to estimate values past a depth limit. Libratus computes a large blueprint offline and refines it with subgame solving."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is ReBeL?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "A 2020 Facebook AI algorithm that combines reinforcement learning with search over public belief states for imperfect-information games, evaluated on heads-up poker and Liar's Dice."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is Student of Games?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "A 2023 DeepMind algorithm that plays both perfect-information games such as chess and Go and imperfect-information games such as poker with one method."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "Is there an open-source Pluribus?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Pluribus itself was never released. SHARINGAN-2 is an open reproduction of the recipe with code and weights, though it has not played professional humans."
+    }
+   }
+  ]
+ }
+]
+</script>
+</head>
+<body>
+<main class="doc"><article class="sheet">
+  <div class="l"></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="../../leaderboard/">Leaderboard</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><h1 class="up">Poker AI History: Libratus, Pluribus, DeepStack, ReBeL</h1></div>
+  <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><p>Poker AI history runs from limit hold'em solvers to superhuman six-player bots in about a decade. This page lays out the poker AI timeline, then compares Libratus vs Pluribus, DeepStack, ReBeL, Cepheus and Student of Games on game, players, method and what was released. It ends with the open reproduction, SHARINGAN-2.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Why poker was hard</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Chess and Go are perfect-information games: both players see everything. Poker is not. Your opponent's cards are hidden, so the best action depends on what you think they hold, and what they think you hold. Good play also requires <em>bluffing</em> at the right frequency, which means the best strategy is randomized. That is a game-theory problem, not a pure search problem. Most of the systems below build on <a href="../cfr/">counterfactual regret minimization</a>.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>A third difficulty is that mistakes are hard to see. A bluff that fails and a bluff that was a bad idea look the same in one hand. Judging a poker AI needs thousands of hands and statistics, which is the subject of <a href="../measuring-poker-bots/">measuring poker bot skill</a>.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Size is the second problem. Heads-up limit hold'em has about 3 x 10^14 information sets. No-limit has far more, because bets can be any size. All systems here shrink the game or approximate parts of it.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Poker AI timeline</h2></div>
+  <div class="l"></div>
+  <div class="l"><table><thead><tr><th>Year</th><th>System</th><th>Milestone</th></tr></thead><tbody><tr><td>2007</td><td>CFR</td><td>Zinkevich et al. introduce counterfactual regret minimization (NeurIPS).</td></tr><tr><td>2015</td><td>Cepheus</td><td>Bowling, Burch, Johanson and Tammelin essentially weakly solve heads-up limit hold'em with CFR+ (Science).</td></tr><tr><td>2015</td><td>Claudico</td><td>Carnegie Mellon's heads-up no-limit bot loses to pros in the Brains vs AI match.</td></tr><tr><td>2017</td><td>DeepStack</td><td>Moravcik et al. (Science) use continual re-solving and neural value functions in heads-up no-limit.</td></tr><tr><td>2017</td><td>Libratus</td><td>Brown and Sandholm's bot beats four top pros over 120,000 hands in January (Science paper in 2018).</td></tr><tr><td>2019</td><td>Pluribus</td><td>Brown and Sandholm beat elite pros at six-player no-limit hold'em (Science).</td></tr><tr><td>2020</td><td>ReBeL</td><td>Brown, Bakhtin, Lerer and Gong combine reinforcement learning and search for imperfect-information games (NeurIPS).</td></tr><tr><td>2023</td><td>Student of Games</td><td>Schmid et al. at DeepMind present one algorithm for perfect and imperfect information games (Science Advances).</td></tr><tr><td>2026</td><td>SHARINGAN-2</td><td>Open from-scratch Pluribus-style reproduction with released weights.</td></tr></tbody></table></div>
+  <div class="l"></div>
+  <div class="l"><p>Two threads run through the table. The first is the size of the game: limit, then heads-up no-limit, then six players. The second is the method: tabular CFR solutions, then CFR blueprints with real-time search, then learned value functions inside search. Later systems keep regret minimization as a component, and add search or learning around it.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>The systems, briefly</h2></div>
+  <div class="l"></div>
+  <div class="l"><p><strong>Cepheus</strong> (University of Alberta, <a href="https://doi.org/10.1126/science.1259433">Science 2015</a>) showed that a small game, heads-up limit, could be essentially solved. It used CFR+, which resets negative regret to zero. The result was a strategy a human cannot beat in a lifetime of play.</p></div>
+  <div class="l"></div>
+  <div class="l"><p><strong>Libratus</strong> (<a href="https://doi.org/10.1126/science.aao1733">Science 2018</a>) moved to heads-up no-limit. It computed a blueprint with Monte Carlo CFR, then re-solved subgames in real time and patched weaknesses the opponents found. It beat four professionals over 120,000 hands in January 2017. Its predecessor Claudico had lost in 2015.</p></div>
+  <div class="l"></div>
+  <div class="l"><p><strong>DeepStack</strong> took a different path. It never builds a full blueprint. At each decision it re-solves a depth-limited subgame, using neural networks to estimate the value of positions beyond the horizon. The idea of learned value functions inside search returns in ReBeL.</p></div>
+  <div class="l"></div>
+  <div class="l"><p><strong>Pluribus</strong> is the multiplayer step. In two experiments, five professionals against one Pluribus, and one professional against five copies, it came out ahead. It did this with a CFR blueprint trained in 8 days on a 64-core server, plus depth-limited search at play time using four continuation strategies at leaf nodes. The code and trained strategy were never released. Our <a href="../pluribus/">Pluribus overview</a> goes deeper.</p></div>
+  <div class="l"></div>
+  <div class="l"><p><strong>ReBeL</strong> generalizes AlphaZero-style self-play to imperfect information by searching over public belief states. <strong>Student of Games</strong> pushes further: one algorithm tested on chess, Go, poker and Scotland Yard. Both are heads-up in poker.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Libratus vs Pluribus and the others: a comparison</h2></div>
+  <div class="l"></div>
+  <div class="l"><table><thead><tr><th>System</th><th>Game</th><th>Players</th><th>Core method</th><th>Year</th><th>Code or weights released?</th></tr></thead><tbody><tr><td>Cepheus</td><td>Limit hold'em</td><td>2</td><td>CFR+ tabular solution</td><td>2015</td><td>Playable online; no code or weights</td></tr><tr><td>Libratus</td><td>No-limit hold'em</td><td>2</td><td>MCCFR blueprint, subgame solving, self-improvement</td><td>2017</td><td>No</td></tr><tr><td>DeepStack</td><td>No-limit hold'em</td><td>2</td><td>Continual re-solving, neural value networks</td><td>2017</td><td>Small-game code only</td></tr><tr><td>Pluribus</td><td>No-limit hold'em</td><td>6</td><td>MCCFR blueprint, depth-limited search</td><td>2019</td><td>No</td></tr><tr><td>ReBeL</td><td>Poker, Liar's Dice</td><td>2</td><td>RL plus search on public belief states</td><td>2020</td><td>Liar's Dice code, no poker model</td></tr><tr><td>Student of Games</td><td>Several games incl. poker</td><td>2 (poker)</td><td>Unified search with learning</td><td>2023</td><td>No poker weights that we know of</td></tr><tr><td>SHARINGAN-2</td><td>No-limit hold'em</td><td>6</td><td>MCCFR blueprint, turn and river search</td><td>2026</td><td>Yes, Apache-2.0 and Hugging Face</td></tr></tbody></table></div>
+  <div class="l"><p>Read the "Players" column carefully. Libratus vs Pluribus is not a like-for-like comparison, since they play different games. The Libratus line of work led directly to Pluribus: same authors, same blueprint-plus-search shape, extended from two to six players.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Heads-up versus multiplayer</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Two-player zero-sum games have a clean theory. A Nash equilibrium strategy cannot lose in expectation, and CFR converges to one. With three or more players, that guarantee disappears: playing an equilibrium strategy no longer guarantees you break even, and CFR is not guaranteed to find an equilibrium. Pluribus showed that self-play still works well in practice, which is why it was a milestone. See <a href="../six-max-poker-ai/">six-max poker AI</a> for what that means for design.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Open reproductions</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Almost every system above shipped as a paper, not as software. Open heads-up bots exist: Slumbot is a well-known public heads-up bot, and DecisionHoldem published a heads-up no-limit agent in 2022. Several GitHub repositories are named after Pluribus, but as far as we know none ships full-game trained six-player weights with published head-to-head results.</p></div>
+  <div class="l"></div>
+  <div class="l"><p><a href="../sharingan-2/">SHARINGAN-2</a> aims to fill that gap. It is a Rust reproduction of the Pluribus recipe, with weights on <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a> and code on <a href="https://github.com/markokraemer/poker-sharingan">GitHub</a>. Its blueprint finished training at 1.83e11 MCCFR iterations and is played with real-time turn and river search. It has not played professional humans, so we make no claim about superhuman play. Scores come from a duplicate and AIVAT arena; see <a href="../measuring-poker-bots/">how poker bots are measured</a>, the <a href="../../leaderboard/">leaderboard</a>, or <a href="../../play/">play against it</a>. The <a href="../open-source-pluribus/">open-source Pluribus</a> page lists what is and is not reproduced.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>FAQ</h2></div>
+  <div class="l"></div>
+  <div class="l"><h3>What was the first poker AI to beat professionals?</h3></div>
+  <div class="l"><p class="muted">It depends on the game. Heads-up limit hold'em was essentially solved by Cepheus in 2015. In heads-up no-limit, Libratus beat four top professionals in January 2017. In six-player no-limit, Pluribus beat elite professionals in 2019.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is the difference between Libratus and Pluribus?</h3></div>
+  <div class="l"><p class="muted">Libratus plays heads-up (two-player) no-limit hold'em, Pluribus plays six-player. Both use a Monte Carlo CFR blueprint plus real-time search, but Pluribus uses depth-limited search with four continuation strategies and runs on far less hardware.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How does DeepStack differ from Libratus?</h3></div>
+  <div class="l"><p class="muted">DeepStack re-solves the game from the current state at every decision, using neural networks to estimate values past a depth limit. Libratus computes a large blueprint offline and refines it with subgame solving.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is ReBeL?</h3></div>
+  <div class="l"><p class="muted">A 2020 Facebook AI algorithm that combines reinforcement learning with search over public belief states for imperfect-information games, evaluated on heads-up poker and Liar's Dice.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is Student of Games?</h3></div>
+  <div class="l"><p class="muted">A 2023 DeepMind algorithm that plays both perfect-information games such as chess and Go and imperfect-information games such as poker with one method.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>Is there an open-source Pluribus?</h3></div>
+  <div class="l"><p class="muted">Pluribus itself was never released. SHARINGAN-2 is an open reproduction of the recipe with code and weights, though it has not played professional humans.</p></div>
+  <div class="l"></div>  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up muted">Related</div>
+  <div class="l"><nav class="nav"><a href="../pluribus/">Pluribus</a><a href="../cfr/">CFR explained</a><a href="../six-max-poker-ai/">Six-max poker AI</a><a href="../open-source-pluribus/">Open-source Pluribus</a></nav></div>
+  <div class="l"></div>
+  <div class="l muted">Apache-2.0. For research and bot arenas; real-money sites ban bots.</div>
+</article></main>
+</body>
+</html>

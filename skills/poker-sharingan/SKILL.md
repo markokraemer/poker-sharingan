@@ -8,7 +8,7 @@ description: Build a six-player no-limit hold'em poker bot, score it with luck-c
 Arena: `https://arena.sharingan.poker` · Leaderboard: https://sharingan.poker/leaderboard · Free, no account.
 Six-max no-limit hold'em, blinds 50/100, 100 bb stacks. Scores are **mbb/game** (1000 mbb = 1 big blind) with a 95% confidence interval.
 
-**Competition:** beat SHARINGAN-1 to qualify, that is, score above 0 mbb/game against it (SHARINGAN-1 against itself is 0; its reference row shows that within noise). The leaderboard (verified full-run score vs SHARINGAN-1) takes submits until 23:59 UTC on November 15, 2026. The organizers then re-run the leading bots on fresh deals (200,004 hands each); the 6 with the highest re-run scores above 0 meet at the final table on November 16 and play each other. To enter, submit with `--track sharingan-1 --contact <email> --profile <X/LinkedIn/GitHub link>` (section 4) and keep the token. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
+**Competition:** beat SHARINGAN-2 (its 2e10 checkpoint, blueprint only; track ID `sharingan-1`) to qualify, that is, score above 0 mbb/game against it (it scores 0 against itself; its reference row shows that within noise). The leaderboard (verified full-run score on that track) takes submits until 23:59 UTC on November 15, 2026. The organizers then re-run the leading bots on fresh deals (200,004 hands each); the 6 with the highest re-run scores above 0 meet at the final table on November 16 and play each other. To enter, submit with `--track sharingan-1 --contact <email> --profile <X/LinkedIn/GitHub link>` (section 4) and keep the token. Rules and terms: https://github.com/markokraemer/poker-sharingan/blob/main/COMPETITION.md
 
 ## 1. Install (Python 3.9+)
 
@@ -49,13 +49,13 @@ Actions: `Action.fold()`, `Action.check()`, `Action.call()`, `Action.raise_to(n)
 ## 3. Try it (seconds, not ranked)
 
 ```bash
-sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: your chips won or lost (SHARINGAN-1's blueprint, as on the leaderboard)
+sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: your chips won or lost (the SHARINGAN-2 2e10 blueprint, as on the leaderboard)
 ```
 
 ## 4. Submit: verified score on the leaderboard
 
 ```bash
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # competition entry: vs 5 copies of SHARINGAN-1 (blueprint, no search)
+sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # competition entry: vs 5 copies of SHARINGAN-2 (2e10 checkpoint, blueprint, no search)
 sharingan submit mybot.py                                                 # ladder-v1, a softer field (not part of the competition); contact/profile are saved after the first submit
 ```
 
@@ -95,9 +95,9 @@ curl -s "https://arena.sharingan.poker/v1/leaderboard?track=ladder-v1"     # JSO
 
 The answer is `{"track": ..., "min_hands": ..., "ranked_min_hands": 20004, "rows": [...]}`; each row has `rank`, `name`, `player_id`, `house` and per track `tracks.<track>.mbb_per_game` / `.ci95_mbb` / `.hands` / `.verified`. `house: true` rows are the reference bots (house bots on the same tracks). `ranked_min_hands` is the shortest verified run that ranks; `min_hands` (1,000) only applies to the separate match-play score, not to the tracks. `rank` puts verified rows above unverified ones, then orders by score. Without `?track=` rows are ranked like the site: sharingan-1, then ladder-v1.
 
-## 7. Ask SHARINGAN-1 directly (inference)
+## 7. Ask SHARINGAN-2 directly (inference)
 
-Use our bot inside your own code, sim or analysis: send a spot, get its action and probabilities. Any arena token works (10 decisions/s); after your first `submit` use yours. This endpoint plays SHARINGAN-1 with turn and river search; the leaderboard's sharingan-1 track plays its blueprint without search.
+Use our bot inside your own code, sim or analysis: send a spot, get its action and probabilities. Any arena token works (10 decisions/s); after your first `submit` use yours. This endpoint plays the 2e10 checkpoint of SHARINGAN-2 with turn and river search; the leaderboard's sharingan-1 track plays the same blueprint without search.
 
 ```bash
 export SHARINGAN_TOKEN=$(sharingan token mybot.py)

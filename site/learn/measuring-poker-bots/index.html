@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Measuring Poker Bots: Duplicate, AIVAT | Poker Sharingan</title>
+<meta name="description" content="How to measure poker bot skill: mbb/game vs bb/100, why variance hides win rate, duplicate poker, AIVAT, confidence intervals and how many hands you need.">
+<link rel="canonical" href="https://sharingan.poker/learn/measuring-poker-bots/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Poker Sharingan">
+<meta property="og:title" content="Measuring Poker Bots: Duplicate, AIVAT">
+<meta property="og:description" content="How to measure poker bot skill: mbb/game vs bb/100, why variance hides win rate, duplicate poker, AIVAT, confidence intervals and how many hands you need.">
+<meta property="og:url" content="https://sharingan.poker/learn/measuring-poker-bots/">
+<meta property="og:image" content="https://sharingan.poker/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://sharingan.poker/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<link rel="stylesheet" href="../../shared.css">
+<script type="application/ld+json">
+[
+ {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Measuring Poker Bot Skill: Duplicate and AIVAT",
+  "description": "How to measure poker bot skill: mbb/game vs bb/100, why variance hides win rate, duplicate poker, AIVAT, confidence intervals and how many hands you need.",
+  "datePublished": "2026-11-04",
+  "dateModified": "2026-11-04",
+  "author": {
+   "@type": "Person",
+   "name": "Marko Kraemer",
+   "url": "https://github.com/markokraemer"
+  },
+  "publisher": {
+   "@type": "Organization",
+   "name": "Poker Sharingan",
+   "url": "https://sharingan.poker/"
+  },
+  "mainEntityOfPage": "https://sharingan.poker/learn/measuring-poker-bots/",
+  "image": "https://sharingan.poker/og.png"
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+   {
+    "@type": "ListItem",
+    "position": 1,
+    "name": "Home",
+    "item": "https://sharingan.poker/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 2,
+    "name": "Learn",
+    "item": "https://sharingan.poker/learn/"
+   },
+   {
+    "@type": "ListItem",
+    "position": 3,
+    "name": "Measuring Poker Bot Skill: Duplicate and AIVAT",
+    "item": "https://sharingan.poker/learn/measuring-poker-bots/"
+   }
+  ]
+ },
+ {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+   {
+    "@type": "Question",
+    "name": "What is mbb/game?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Thousandths of a big blind won per hand. It is the standard unit in poker AI papers. 1 bb/100 equals 10 mbb/game."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How many hands do you need to measure a poker win rate?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "It depends on the edge and the noise. Poker has high variance, so raw win rates over thousands of hands are mostly luck. Detecting a few bb/100 can take hundreds of thousands of hands or more without variance reduction. Duplicate and AIVAT cut that substantially."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is duplicate poker?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "A format where the same deals are replayed with seats rotated, so every player or bot receives every set of cards. It cancels card luck when results are compared."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is AIVAT?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "A variance-reduction estimator from Burch et al. (AAAI 2018). It uses a value function to subtract luck from chance events and from known strategies. It is unbiased and gives much tighter confidence intervals for the same number of hands."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "What is the difference between bb/100 and mbb/game?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "They measure the same thing in different units. bb/100 is big blinds per 100 hands; mbb/game is thousandths of a big blind per hand. Multiply bb/100 by 10 to get mbb/game."
+    }
+   },
+   {
+    "@type": "Question",
+    "name": "How are bots scored on sharingan.poker?",
+    "acceptedAnswer": {
+     "@type": "Answer",
+     "text": "Six-player no-limit hold'em with duplicate deals and AIVAT correction. Hosted runs play 20,004 hands and give a verified, reproducible score, and the local harness can play millions of hands."
+    }
+   }
+  ]
+ }
+]
+</script>
+</head>
+<body>
+<main class="doc"><article class="sheet">
+  <div class="l"></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="../../leaderboard/">Leaderboard</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"></div>
+  <div class="l"><h1 class="up">Measuring Poker Bot Skill: Duplicate and AIVAT</h1></div>
+  <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><p>Poker variance is enormous, so a win rate measured over a few thousand hands says very little about skill. This page explains how to measure poker bot skill: the units (mbb/game and bb/100), why luck hides skill, how duplicate poker and AIVAT remove most of it, and how many hands you need to measure a win rate.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Units: mbb/game and bb/100</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Poker results are measured in big blinds (bb), so the stake level drops out. Two units dominate:</p></div>
+  <div class="l"><ul><li><strong>bb/100</strong>: big blinds won per 100 hands. Human players use this.</li><li><strong>mbb/game</strong>: thousandths of a big blind per hand. Poker AI papers use this.</li></ul></div>
+  <div class="l"></div>
+  <div class="l"><p>The conversion is 1 bb/100 = 10 mbb/game. Pluribus won about 48 mbb/game against five professionals, roughly 5 bb/100, and the authors reported it with statistical significance. That is a small number per hand, which is the point of the next section.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Why variance hides skill</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>In a single hand, the best hand wins regardless of how well anyone played. Cards dealt, board runouts and who happens to hold the nuts dominate any short sample. A strong player might win 5 bb/100 in the long run, but the standard deviation of a poker hand is on the order of several big blinds, and it shrinks only with the square root of the number of hands.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Do the arithmetic as a rough guide. If the per-hand standard deviation is around 8 bb (a stand-in; real values depend on the game and players), then after 10,000 hands the standard error is about 8 / sqrt(10,000) = 0.08 bb per hand, or 8 bb/100. A true 5 bb/100 edge is smaller than one standard error. You would need hundreds of thousands of hands to separate it from zero with confidence. This is why <a href="../pluribus/">Pluribus</a> needed variance reduction even with 10,000 hands.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The rule of thumb: required hands scale with the square of (standard deviation divided by the edge you want to detect). Halving the noise cuts the hands you need by four.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Duplicate poker</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Duplicate poker borrows from bridge. Instead of letting luck decide who gets strong cards, you replay the <strong>same deals</strong> with the seats rotated, so every bot gets every card set. A player who was lucky in one seating is unlucky in another, and the luck cancels when you compare totals.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Bots make this easy because a bot has no memory of a replayed deal. A human cannot play the same hand twice without remembering it. Duplicate removes the card-luck component, but not all variance. Opponents' strategies still react differently to different lines, so some noise remains.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>AIVAT</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>AIVAT is a variance-reduction estimator from Burch, Schmid, Moravcik, Morrill and Bowling (<a href="https://arxiv.org/abs/1612.06915">AAAI 2018, arXiv 1612.06915</a>). It uses a value function that estimates the expected result at each decision, then subtracts luck terms: chance events (the cards that came) and the actions of players whose strategies are known (such as your own bot). What remains is the part of the result that reflects decisions.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Importantly, AIVAT is <strong>unbiased</strong>: the corrected estimate has the same expected value as the raw result, only with much lower variance. The original paper reports a large reduction in the hands needed in heads-up no-limit. Pluribus's evaluation used it, and it is how a result of tens of mbb/game could be shown significant in thousands of hands.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Duplicate and AIVAT combine well. Duplicate cancels the deal; AIVAT handles what is left. The pair gives the tightest intervals for a given number of hands, with no bias.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Three sources of noise are worth separating. Card luck is what duplicate removes. Decision luck, such as an opponent's random action at a bluff-catch, is what AIVAT's known-strategy terms remove. Opponent-mix effects are not noise at all: they are real differences in how a bot fares against different fields, so they should be reported, not averaged away.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>Confidence intervals and how many hands you need</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>Report a result as an estimate with a 95% confidence interval, like +5.09 ± 1.16 mbb/game. The interval is roughly 1.96 standard errors either side. If it excludes zero, the difference is statistically significant at that level. If it does not, you have not shown a difference, however large the point estimate looks.</p></div>
+  <div class="l"></div>
+  <div class="l"><ul><li>Plan the sample size first. Pick the smallest edge you care about and estimate the standard error for your method.</li><li>Do not stop early because the number looks good. Stopping on a lucky run inflates false positives.</li><li>State the seating, the number of deals and whether duplicate and AIVAT were applied.</li><li>Treat the interval as a statement about this opponent pool. Skill against one opponent does not guarantee skill against another.</li></ul></div>
+  <div class="l"></div>
+  <div class="l"><p>Raw, uncorrected heads-up poker can need millions of hands to detect an edge of a few mbb/game. With duplicate and AIVAT, the same precision can come from a fraction of that. Local bot harnesses can play millions of hands cheaply, which is the practical answer to the question of how many hands to measure a win rate: as many as you can compute, with the luck correction on.</p></div>
+  <div class="l"></div>
+  <div class="l"><h2>How sharingan.poker scores bots</h2></div>
+  <div class="l"></div>
+  <div class="l"><p>The arena on <a href="../../leaderboard/">sharingan.poker</a> scores six-player no-limit hold'em bots with duplicate deals and AIVAT luck correction. A bot is one Python function, <code>act(state)</code>, submitted with <code>sharingan submit mybot.py</code>. Hosted runs play 20,004 hands and return a verified, reproducible score. The local harness plays millions of hands on your own machine.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>The leaderboard's reference opponent is the blueprint of the 2e10-iteration SHARINGAN-2 checkpoint, without search (track name <code>sharingan-1</code>). For our own comparisons we use the same methods. For example, the final <a href="../sharingan-2/">SHARINGAN-2</a> beats the 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game, in 3 vs 3 seating over 4M deals with duplicate and AIVAT and 95% intervals. Notice how small these edges are per hand, and how the intervals still resolve them.</p></div>
+  <div class="l"></div>
+  <div class="l"><p>Want to try it? See the <a href="../poker-bot/">poker bot guide</a>, or read how <a href="../cfr/">CFR</a> produces the strategies being measured and the <a href="../poker-ai-history/">poker AI history</a> for context. Bots are for research and bot arenas; real-money poker sites ban bots.</p></div>
+  <div class="l"></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h2>FAQ</h2></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is mbb/game?</h3></div>
+  <div class="l"><p class="muted">Thousandths of a big blind won per hand. It is the standard unit in poker AI papers. 1 bb/100 equals 10 mbb/game.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How many hands do you need to measure a poker win rate?</h3></div>
+  <div class="l"><p class="muted">It depends on the edge and the noise. Poker has high variance, so raw win rates over thousands of hands are mostly luck. Detecting a few bb/100 can take hundreds of thousands of hands or more without variance reduction. Duplicate and AIVAT cut that substantially.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is duplicate poker?</h3></div>
+  <div class="l"><p class="muted">A format where the same deals are replayed with seats rotated, so every player or bot receives every set of cards. It cancels card luck when results are compared.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is AIVAT?</h3></div>
+  <div class="l"><p class="muted">A variance-reduction estimator from Burch et al. (AAAI 2018). It uses a value function to subtract luck from chance events and from known strategies. It is unbiased and gives much tighter confidence intervals for the same number of hands.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>What is the difference between bb/100 and mbb/game?</h3></div>
+  <div class="l"><p class="muted">They measure the same thing in different units. bb/100 is big blinds per 100 hands; mbb/game is thousandths of a big blind per hand. Multiply bb/100 by 10 to get mbb/game.</p></div>
+  <div class="l"></div>
+  <div class="l"><h3>How are bots scored on sharingan.poker?</h3></div>
+  <div class="l"><p class="muted">Six-player no-limit hold'em with duplicate deals and AIVAT correction. Hosted runs play 20,004 hands and give a verified, reproducible score, and the local harness can play millions of hands.</p></div>
+  <div class="l"></div>  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l up muted">Related</div>
+  <div class="l"><nav class="nav"><a href="../pluribus/">Pluribus</a><a href="../cfr/">CFR explained</a><a href="../poker-ai-history/">Poker AI history</a><a href="../poker-bot/">Poker bot</a></nav></div>
+  <div class="l"></div>
+  <div class="l muted">Apache-2.0. For research and bot arenas; real-money sites ban bots.</div>
+</article></main>
+</body>
+</html>
