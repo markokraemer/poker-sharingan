@@ -89,7 +89,11 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
   It supplies a lower-bound attack result, not a proof of unexploitable play. A negative or inconclusive result
   only describes the attacks tested. The larger adversarial evaluation in `docs/RESULTS.md` found
   +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker. These original-host estimates are provisional while an inconsistent-model-read audit is resolved; see RESULTS iteration 7.
-  Its saved strategy reproduces exactly on reload. Final-model confirmation remains open.
+  Its saved strategy reproduces exactly on reload. Separately, a frozen 1M attacker has now been
+  independently confirmed at **+714 ± 67 against the final SHARINGAN-2 blueprint** (two seeds,
+  1.2M hands, duplicate + AIVAT, verified model/learner hashes), and exactly replays +419 ± 95
+  against verified public C. The stronger 3M policy's independent/final-model confirmation
+  remains open.
 
 **Memory, checkpoints and training ops**
 

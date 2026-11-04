@@ -8,7 +8,8 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
-**2026-11-04 model-integrity audit:** numerical C evaluations are paused. Repeated
+**2026-11-04 model-integrity audit:** numerical C evaluations using the original
+`/srv` file are paused. Repeated
 read-only reads of the provided C file returned different bytes at the same offset,
 with unchanged inode, size, mtime and ctime. The public copy and one direct read agree;
 other reads return zero pages in that key-index region. Earlier C estimates below
@@ -56,6 +57,12 @@ Unit test `keep_sync_follows_adversarial_sizes`: one adversary with free sizes v
 |---|---|
 | C@2e10, translation before the fix (positive control) | **+4,552 ± 256** (it finds the leak) |
 | C@2e10, fixed | **+162 ± 215** (not significant; upper end of the 95% CI ≈ +377) |
+
+**Verified final-model follow-up (iteration 7): the frozen 1M attacker wins
++714 ± 67 against SHARINGAN-2 over two independent-deal evaluations (1.2M hands),
+using fully verified model and learner files.** The same policy exactly reproduces
++419 ± 95 against an independent verified public C copy. Stronger original-host C
+figures remain qualified by the input audit above.
 
 The original 20k-deal evaluation found the old leak at sombra's scale and no significant pooled profit after the fix. **Hardening iteration 1 below supersedes that finding: the original learner wins +293 ± 96, and a corrected training-target model wins +499 ± 94 mbb/game against fixed C@2e10 in larger evaluations. The saved 3M / 35-GB attacker in iteration 2 now wins +2,307 ± 75 over two independent-deal evaluations.** The original result bounded what this exploiter found in 1M iterations and 20k evaluation deals; it is not a proof of unexploitability (none exists for 6-max). After off-menu actions the fixed target still hands off to its fallback in 2.2% of decisions (raise wars past the tree's cap), an initial suspect that still requires attack-specific localisation.
 
@@ -940,7 +947,7 @@ confirming its old process is gone; its single-writer lock and final SHA-256 gat
 required. Rehash the verified SHARINGAN-2 file and transferred learner before use after
 this interruption. No extra-worker match result has been accepted.
 
-### Hardening iteration 7 — shadow parity and C input integrity (2026-11-04, investigating)
+### Hardening iteration 7 — shadow parity, input integrity and verified S2 attack (2026-11-04)
 
 **Hypotheses.** The attack trainer shares one target shadow across all opponent seats;
 evaluation keeps a shadow per seat and labels only that seat's own actions as own.
@@ -1020,8 +1027,28 @@ intervals, counts, miss rate and track options match the original reference. Thi
 confirms that frozen 1M attack on a fully verified independent public C model, despite
 the original-host read anomaly. It does not retroactively validate every old training
 traversal or the stronger 3M attack. `public-c-replay-gate.json` has all checks true.
-Baseline SHARINGAN-2 evaluations of the same frozen policy have now started, seeds
-271829 and 314160, again 100k deals per seat each. No playing-policy A/B or
+Baseline SHARINGAN-2 evaluations of the same frozen policy then completed, seeds
+271829 and 314160, again 100k deals per seat each. No candidate defending policy is used.
+
+| SHARINGAN-2 evaluation seed | AIVAT mbb/game | raw mbb/game |
+|---|---|---|
+| 271829 | **+680.9 ± 94.1** | +680.4 ± 112.7 |
+| 314160 | **+747.5 ± 94.2** | +705.8 ± 112.4 |
+| pooled, same frozen policy | **+714.2 ± 66.6** | +693.1 ± 79.6 |
+
+This is a confirmed profitable deviation against five copies of the fixed **final
+SHARINGAN-2 blueprint without search**, using an attacker trained against C. The target
+and frozen learner passed their independent full-file hashes. It is not an equilibrium-gap
+estimate and says nothing by itself about search strength or normal head-to-head ranking.
+There are 200,000 independent duplicate-deal clusters, six attacker seats per cluster,
+**1,200,000 hands**. Pool the two fixed-policy samples using their within-sample sums
+of squares plus the between-seed mean term; never treat the six duplicate hands as six
+independent observations. Pooled per-seat mbb/game (seat labels 0 through 5) are
++601 ± 145, +1,432 ± 158, +942 ± 120, +581 ± 111, +550 ± 108, +178 ± 109.
+Those seat-level intervals are descriptive, without multiple-comparison adjustment.
+Artifacts `public-s2-frozen1m-discovery.json`, `public-s2-frozen1m-holdout.json`,
+`pooled-s2-frozen1m.json`; evaluation runtimes 351.6 and 167.0 seconds, excluding archive
+loading. The stronger saved 3M attack still awaits confirmation on verified inputs. No playing-policy A/B or
 promotion is implied. Commands, clean environment, target SHA-256 and boot ID are recorded
 per evaluation; no simultaneous inference on two models. The already nice-10 driver
 launches its child through `nice -n 10`, giving the child effective nice 19; eight CPUs
