@@ -16,7 +16,8 @@ other reads return zero pages in that key-index region. Historical C estimates b
 remain qualified unless reproduced on verified inputs. The frozen 1M attack reproduced
 exactly on the independent public C copy (+419.5 ± 95.4). Both original frozen 3M seeds
 also reproduce exactly on a freshly downloaded private public C copy, confirming their
-pooled +2,306.7 ± 75.2; LBR confirmation remains pending. This does not clear the original
+pooled +2,306.7 ± 75.2. The seed-5 LBR result also replays exactly on that copy
+(strong +841.4 ± 161.7, weak +330.0 ± 164.8). This does not clear the original
 read path or validate every historical run. No original model, RAID configuration or
 live service has been modified. See iteration 7 below. This is an input-integrity concern, separate
 from the fixed translation bug.
@@ -1439,6 +1440,15 @@ If all agree, record clean-lbr-baseline-replay.ok and resume only that owned par
 otherwise retain both results and hold the queue for investigation before any candidate
 score is trusted. No live process is signaled. This closes a missing reference check
 in the broader driver; its sample size, candidate code and other thresholds are unchanged.
+
+
+**Canonical LBR reference passed:** all three checks are exact: the complete weak/strong
+LBR object, the ignored-for-strength one-deal placeholder, and normalized tracking options.
+Strong remains **+841.4236 ± 161.7408**, weak **+330.0176 ± 164.7779**, each over 20,000
+duplicate-deal clusters (120,000 hands/configuration), raw winnings. This is a replay
+on verified input, not another independent seed or extra statistical sample; retain the
+original CIs. The verifier resumed the owned parent, and the candidate LBR arm is now
+running. Artifacts clean-lbr-baseline-replay.json/.ok and clean-lbr-replay-v1.log.
 
 **Remaining-profit localisation:** run the existing --audit-handoffs wrapper against the
 same frozen 3M attacker at 271831, 100,000 deals/seat in each arm. Four workers on CPUs

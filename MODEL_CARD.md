@@ -111,15 +111,17 @@ Hardware: 64-core / 576 GB bare-metal servers, about EUR 1.86/h each. The runs B
 
 ## Evaluation
 
-All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100), 95% CI. Full tables and caveats are in [docs/RESULTS.md](https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md).
+Unless noted otherwise: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100), 95% CI. Full tables and caveats are in [docs/RESULTS.md](https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md).
 
 | test | result |
 |---|---|
 | C@2e10 vs B-final (3+3, 4M deals/format) | +1.6 +- 1.3 |
 | C@4.77e10 vs C@2e10 (3+3) | +3.8 +- 1.0 |
 | A@2e10 vs C@2e10 (3+3) | -4.0 +- 1.3 |
-| trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (the exploiter loses: too short a run to find a leak; a sanity check, not an exploitability measure) |
+| trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (this limited attack loses; later adversarial-menu attacks below find profitable deviations) |
 | live exploit "sombra" (bets below the menu, read as checks; Nov 2026) vs C@2e10 blueprint | +5,231 +- 494 before the fix; **-420 +- 162** after (`keep_sync` translation, see docs/RESULTS.md) |
+| frozen adversarial-menu attacker (3M iters / 35 GB) vs fixed C@2e10 / final SHARINGAN-2, no search | **+2,307 +- 75 / +2,466 +- 75**, two deal seeds / 1.2M hands per target; verified model/learner inputs |
+| strong profile LBR vs fixed C@2e10 (raw duplicate winnings, no AIVAT) | **+841 +- 162**, 20k deals / 120k hands; exactly reproduced on a verified public model copy |
 | search (turn+river) vs 5 x C@2e10 | +87 +- 27 |
 | search (turn+river) vs rule bots chart6 / loose / tight | +59 / +108 / +66 |
 | Open Poker live, final config (with search), 2,329 hands | +77.6 bb/100, 95% CI [26, 129] (all-in adjusted) |
@@ -127,16 +129,16 @@ All numbers: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0.1 bb/100),
 
 ## Intended use
 
-Research on imperfect-information game solving, abstraction and real-time search; benchmarking other poker agents; studying near-equilibrium
-6-player play; playing against the bot locally or on arenas that explicitly allow bots.
+Research on imperfect-information game solving, abstraction and real-time search; benchmarking other poker agents; studying
+6-player strategy optimization; playing against the bot locally or on arenas that explicitly allow bots.
 
 ## Limitations and risks
 
 * **Not evaluated against strong humans** or against other top solvers; external references are one bot arena and one offline bot, both with caveats.
-* **Exploitability is only bounded from below** by one trained best response limited by its abstraction and 12M iterations. Search-augmented play was not tested for exploitability.
+* **Confirmed profitable deviations remain:** the strongest tested frozen attacker wins +2,307 +- 75 against C@2e10 and +2,466 +- 75 against final SHARINGAN-2 without search. These finite attacks supply lower bounds, not equilibrium-gap estimates or guarantees about other attacks. Search-augmented play was not tested for exploitability.
 * Trained for 100 bb stacks; very deep stacks need an external stack-reset guard (`--max-stack-bb`) or the strategy is out of distribution.
 * Off-menu bet sizes are handled by action translation; sizes far from the menu are the main exploitable surface in this class of agents.
-* A near-equilibrium bot is a weaker **exploiter** of weak opponents than adaptive bots; do not infer ladder performance from equilibrium strength.
+* Self-play performance and the ability to exploit weak opponents are different measurements; do not infer either from the other.
 * Files are very large and need correspondingly large disk/RAM; use B (28 GB) or a `--min-visits` pruned compact for constrained machines.
 * **Dual use:** a strong poker agent can be used to cheat on real-money sites, which prohibit bots. Do not use it for that.
 

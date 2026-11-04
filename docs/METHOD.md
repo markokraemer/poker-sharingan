@@ -26,8 +26,17 @@ A compact description of what is implemented and where, following Brown & Sandho
 
 ## 4. Action translation (`engine/nlhe`)
 
-Opponent bets that are not in our menu are mapped to the abstraction. Naive nearest-size translation is exploitable at the 10^4 mbb/game level in 6-max. We track an abstract "shadow game" state
-separately from the real game so subsequent decisions stay consistent with what the blueprint believes happened, which cut exploitability by ~37x (see RESULTS.md).
+Opponent bets that are not in our menu are mapped to the abstraction. We track an abstract
+"shadow game" separately from the real game. A historical B-menu probe measured about
+37x less attacker profit with shadow tracking; that was a finite attack result, not an
+exploitability guarantee. Current translation maps small bets to the smallest raise,
+checks one step ahead for synchronization, and explicitly hands off when no abstract
+action can follow the real hand. The fallback uses hand strength.
+
+Profitable deviations remain: the strongest confirmed frozen attack wins +2,307 ± 75
+mbb/game against fixed C@2e10 and +2,466 ± 75 against final SHARINGAN-2, without search.
+See [RESULTS.md](RESULTS.md#action-translation-leak-and-fix-nov-2026) for verified-input
+measurements, CIs and the still-uncommitted hardening experiments.
 
 ## 5. Real-time search (`sharingan-1/search`)
 
