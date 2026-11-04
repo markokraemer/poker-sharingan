@@ -1392,6 +1392,33 @@ The queue is now running clean-input paired LBR; fresh adaptive, final-S2 effect
 external final-model checks and the 4M normal-strength gate all remain mandatory.
 **No policy change is kept or committed yet.**
 
+**Remaining-profit localisation:** run the existing --audit-handoffs wrapper against the
+same frozen 3M attacker at 271831, 100,000 deals/seat in each arm. Four workers on CPUs
+10–13 at nice 10 share only the verified C target with the eight-worker LBR job.
+The wrapper must preserve every exploitation statistic, learner miss rate and target
+diagnostic, and its 600,000 hand/payoff totals and per-reason counts must reconcile.
+Treat payoff groups only as observational raw attribution; they exclude missing-infoset
+fallbacks and cannot establish causal loss or a CI. The first validator incorrectly
+aligned serialized reason counts (the target array starts at reason 1, the audit at 0).
+It stopped after measuring baseline despite all other checks passing. Preserve that
+failed validator/log. Version 2 aligns audit indices 1–5 with the complete target
+array, verifies the already measured baseline without rerunning it, then measures the
+enabled arm once. No policy or match data changes. Drivers/SHAs:
+sharingan-odds-handoff-audit-v1.py, 9b013bfbc1e20ed7069e6a22ef10a51543acab6f1bd75d4b46f450bf4c8f0fce,
+and sharingan-odds-handoff-audit-v2.py (PID 962202),
+68ee5229972bddef0dd95d277452115f3d637292def1026292a979a8291ce0c6.
+
+**Audit completed:** both corrected validators pass all six checks. Baseline handoffs
+occur in 4,670 / 600,000 hands (0.7783%); enabled handoffs in 4,692 (0.7820%).
+Their raw-payoff contributions, divided by *all* hands, are +9.12 and +9.19 mbb/game.
+The no-handoff groups contribute +2,366.99 and +458.81, respectively; the sums exactly
+reconcile to raw totals +2,376.11 ± 124.63 and +468.00 ± 122.15. The conditional groups
+have no independent-deal CIs here and membership changes between arms. This is evidence
+about where the observed payoff occurs, not a causal ablation of handoffs. Most observed
+profit, and most of this correction's observed change, occur without a shadow handoff.
+Artifacts audit-3m-{base,odds}.json and corresponding -gate-v2.json; no extra deal seeds
+or policy changes were selected from this diagnostic.
+
 **Final-model frozen A/B queue preregistered:** s2-odds-frozen-v1.py,
 SHA 98ca8c754599fcf013ea968af918240d4a36015fff7ac5dcaef3a0a3c6bb6e2d,
 waits for the independently verified 3M final-model baseline above. Copy only the
@@ -1410,6 +1437,79 @@ regression for either policy. Use six workers on CPUs 4–9 at inherited nice 10
 fresh result under the worker's hardening-08 directory. This queue cannot promote code:
 the new adaptive attacker, relevant final-model external controls, and 4M head-to-head
 remain required. No final-model candidate A/B result has been observed.
+
+**Original-host final gates preregistered:** sharingan-odds-final-host-v1.py,
+SHA 1e9ed9de8345c02174727bc11933c65964fc99d97f1db3a5dd24a91d1b86ec1c,
+requires the completed C broad/fresh-adaptive gate, completed diagnostic audit, and
+independent final-model frozen-gate proof. A Mac-only watcher relays only that small
+proof after checking it, never an SSH key. An independent frozen failure or a failed C
+gate stops the final queue. Before using the original-host S2 file, require its complete
+buffered and O_DIRECT hashes to equal 0f57b296… with unchanged metadata; then exactly
+reproduce both independent S2 1M samples and the independent 3M discovery sample using
+the disabled candidate binary. Any mismatch stops for input investigation.
+
+If those pass, test the newly trained seed-8 attacker on S2 against both arms at
+161804 and 271832, 100,000 duplicate deals/seat/arm, and reject any significant
+AIVAT/raw defender regression. Repeat the old-leak positive control, all nine external
+A/B pairs at 20,004 hands and seed ab-20004, the actual-model strict-menu fixture, and
+both 20k-deal weak/strong LBR arms at seed 5. The external runs remain solely under
+ubuntu on the original host with constructed environments, one native/bot worker per
+lane, no forwarded credentials and no live-service interaction.
+
+Only then run the existing three-format head-to-head harness with S2 as A and verified
+private C as B. Both arms use seed **1**, medium sizing, **4,000,000 deals per format**,
+12 workers on CPUs 0–11, nice 10, no --warm. Baseline explicitly disables both sides;
+candidate enables S2 only and keeps C disabled. A 200-deal mechanical smoke runs first;
+its noisy scores cannot tune the fixed 4M sample size. The baseline 3+3 interval must
+overlap the documented **+5.09 ± 1.16** before the candidate run starts, otherwise stop
+and investigate the reproduction. In every format reject a significant AIVAT or raw
+loss of S2 strength (account for the reversed first side in 1B versus 5A). Record
+all argv/environments, input proofs, output and gates under hardening-08. These are
+sequential private offline jobs; the prescribed head-to-head is the only job on that
+host that maps both models. Even all passing markers cannot deploy or commit policy
+code; default promotion still requires source review and revalidation.
+
+**Transfer accepted and final-model baseline started:** the bounded relay completed,
+and the destination's full compressed SHA matches bb87d61c…. Decoding, full native
+hash and separate native readback all match 1706c51f… at 29,581,123,222 bytes.
+The source manifest hash and relocated policy configuration passed. The predeclared
+3M final-model baseline is now evaluating its first seed; there was no full blueprint
+copy on the Mac. The conditional original-host final queue is PID 965387, and Mac proof
+observer PID 13856 (script SHA c84d3fc49b742a4f3f02d2594e0a2e06af0afccfafab3e82dd986a1521a86da4).
+All source/model/policy gates above remain in force.
+
+### Hardening iteration 9 — guard terminal scaled-engine replay in the inference API (2026-11-04, preregistered)
+
+**Hypothesis and reproducer.** The API's real/scaled chip conversion can round a
+non-all-in raise into a scaled all-in. Once all players call, the scaled hand can
+end while the real players each retain a chip. A later real event unconditionally
+calls to_scaled before the desync/terminal guard; that calls State::legal on a terminal
+state whose actor is 255. A task-owned external diagnostic, using a synthetic always-call
+blueprint source, reproduced a valid six-player request: 500/1,000 blinds, 100,000-chip
+stacks, button 5, seat 2 raises to 99,999, all five others call, then seat 0 puts its
+last chip in on flop Qh Jh Th with hero seat 1 holding Ah Kh. The real hand is ongoing;
+the scaled one is terminal. The diagnostic **panics** at the bounds check in
+nlhe/src/lib.rs:359. The equivalent 50/100-blind request calls correctly.
+No live API request was made. The isolated release binary aborts; a server built with
+unwinding catches decision panics, so this does not establish the live service's process
+behavior. Core dumps were disabled for the diagnostic. This is independent of model
+weights and the uncommitted passive-odds correction.
+
+**Smallest candidate and gates.** In a separate worktree based on current main, move
+scaled-action conversion inside the existing synchronized, correct-actor, nonterminal
+guard. Preserve the real action validation and existing legal fallback; do not change
+the unrelated poker-policy candidate. Add mandatory, model-free regressions for the
+continued real history, terminal scaled state, legal fallback and exact-scale control.
+Measure the same preconstructed legal request set against before/after replay: baseline
+panics versus guarded legal responses, using an unwind build to count each case safely;
+report binomial 95% intervals. Require zero new errors or panics on legal exact-scale
+controls and equality of their states/actions/probabilities. Run the requested release
+tests and builds remotely (including serve's model-free tests), bounded at four workers
+alongside the existing eight-worker C LBR job. This API-only guard cannot change the
+arena/bench/pluribus policies; no normal-strength gain is claimed. The existing API
+desync fallback remains check/fold, so eliminating this panic will not establish poker
+robustness for rounded-chip histories. Keep and push only after the registered checks
+pass; never deploy a server.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
