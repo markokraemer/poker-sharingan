@@ -21,6 +21,13 @@ read path or validate every historical run. No original model, RAID configuratio
 live service has been modified. See iteration 7 below. This is an input-integrity concern, separate
 from the fixed translation bug.
 
+**Strongest confirmed frozen attack so far:** the 3M / 35-GB policy wins
+**+2,465.9 ± 74.9 mbb/game against final SHARINGAN-2** on verified inputs,
+two deal seeds / 1.2M hands, duplicate + AIVAT, without search. Its confirmed C@2e10
+result is +2,306.7 ± 75.2. The mixed-passive-odds candidate remains uncommitted and is
+not part of these baselines. These are profitable deviations, not equilibrium-gap
+estimates or a comparison of normal playing strength.
+
 **The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
 
 1. bets less than the smallest abstract size. With `BelowMenu::Check` (the old default) the blueprint read that bet as a check, which closed the street in its shadow game but not at the table;
@@ -1049,8 +1056,8 @@ independent observations. Pooled per-seat mbb/game (seat labels 0 through 5) are
 Those seat-level intervals are descriptive, without multiple-comparison adjustment.
 Artifacts `public-s2-frozen1m-discovery.json`, `public-s2-frozen1m-holdout.json`,
 `pooled-s2-frozen1m.json`; evaluation runtimes 351.6 and 167.0 seconds, excluding archive
-loading. The stronger saved 3M attack's final-model confirmation remains pending; its
-C reference seeds are now reproduced on verified input, as recorded below. No playing-policy A/B or
+loading. The stronger saved 3M attack has since been confirmed on final SHARINGAN-2,
+as recorded below; its C reference seeds also reproduce on verified input. No playing-policy A/B or
 promotion is implied. Commands, clean environment, target SHA-256 and boot ID are recorded
 per evaluation; no simultaneous inference on two models. The already nice-10 driver
 launches its child through `nice -n 10`, giving the child effective nice 19; eight CPUs
@@ -1184,6 +1191,35 @@ seats. Exact argv/environment and identities are saved per output. Pool only the
 two samples using deal-cluster variance, including between-sample mean differences.
 This is a stronger baseline measurement, independent of the uncommitted correction;
 no new S2 3M result has been observed at registration.
+
+**Stronger final-model baseline confirmed:** both preregistered frozen 3M evaluations
+completed on independently verified SHARINGAN-2, with unchanged native weights.
+
+| deal seed | duplicate + AIVAT mbb/game | raw duplicate mbb/game |
+|---|---:|---:|
+| 271828 | +2,481.14 ± 105.95 | +2,495.55 ± 124.48 |
+| 314159 | +2,450.60 ± 106.02 | +2,478.06 ± 124.35 |
+| pooled frozen policy | **+2,465.87 ± 74.94** | **+2,486.81 ± 87.98** |
+
+There are 200,000 independent duplicate-deal clusters (100,000 per seed), six attacker
+seats and **1,200,000 hands**. Pool within-sample sums of squares plus the between-sample
+mean term, preserving deal-cluster variance. Per-seat pooled AIVAT mbb/game, seats 0–5:
++3,086 ± 152, +3,636 ± 160, +2,566 ± 132, +2,078 ± 125, +1,841 ± 119,
++1,588 ± 121 (descriptive intervals, no multiple-comparison adjustment).
+This is the strongest confirmed frozen attack tried so far against the final blueprint,
+trained against C, without search. It does not measure an equilibrium gap, search
+strength or normal head-to-head ranking, and does not promote a defending-policy fix.
+
+Model full SHA is 0f57b296…; native learner is 1706c51f…, compressed bb87d61c…,
+immutable main executable f3b5eaa4…. The relocated manifest SHA is
+37b4294706ba987d76d55123eb3b59621980f2f96611ae2b5686a894fb663774.
+Only its bucket path changed from the verified source manifest. Commands retain six
+workers, CPUs 4–9, effective nice 10, --iters 0 --seed 2, the specified eval seeds,
+medium sizing and adversarial frozen learner, 100,000 deals/seat.
+Artifacts public-s2-frozen3m-{discovery,holdout}.json, pooled-s2-frozen3m.json,
+s2-frozen3m-inputs.json; evaluation times 500.1 and 331.8 seconds, excluding archive
+loading. All data stayed on the task-owned compute worker. The separate final-model
+candidate queue now starts its disabled replays.
 
 ### Hardening iteration 8 — preserve pure decisions while repricing mixed passive odds (2026-11-04, preregistered)
 
@@ -1391,6 +1427,18 @@ Artifacts external-gates.json, strict-control-c.json, and command/log files.
 The queue is now running clean-input paired LBR; fresh adaptive, final-S2 effects,
 external final-model checks and the 4M normal-strength gate all remain mandatory.
 **No policy change is kept or committed yet.**
+
+**Additional LBR reference gate:** before the verified-input baseline finishes, stop
+only the owned broad-queue parent PID 891541; the existing eight-worker LBR child
+950127 keeps running. Nice-10 verifier sharingan-verify-clean-lbr-v1.py (PID 986714),
+SHA b8228af64dae0a61c1151ca59b7534996d1bf654160090acd0e7c7aa39198dc4,
+waits for that same child to finish, then compares the complete LBR result with the
+original seed-5 reference, plus the one-deal placeholder and normalized tracking options.
+The placeholder is checked only for replay, never interpreted as a strength estimate.
+If all agree, record clean-lbr-baseline-replay.ok and resume only that owned parent;
+otherwise retain both results and hold the queue for investigation before any candidate
+score is trusted. No live process is signaled. This closes a missing reference check
+in the broader driver; its sample size, candidate code and other thresholds are unchanged.
 
 **Remaining-profit localisation:** run the existing --audit-handoffs wrapper against the
 same frozen 3M attacker at 271831, 100,000 deals/seat in each arm. Four workers on CPUs

@@ -92,7 +92,7 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
   This validates those frozen samples, without clearing the inconsistent original model read path. Separately, a frozen 1M attacker has now been
   independently confirmed at **+714 ± 67 against the final SHARINGAN-2 blueprint** (two seeds,
   1.2M hands, duplicate + AIVAT, verified model/learner hashes), and exactly replays +419 ± 95
-  against verified public C. The stronger 3M policy's final-model confirmation remains open.
+  against verified public C. The stronger frozen 3M policy is now independently confirmed at **+2,466 ± 75 against final SHARINGAN-2**, also two seeds / 1.2M hands, with verified full model/native learner hashes.
 
 **Memory, checkpoints and training ops**
 
