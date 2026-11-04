@@ -277,7 +277,7 @@ that JSON. A 20,000-deal strong/weak LBR run on fresh seed 5 is now live with ei
 workers, at nice priority 10, alongside the 11-worker 3M run (and, briefly, the one-worker
 audit). Command: the earlier LBR command with `--seed 5 --lbr-deals 20000`; wrapped in
 `/usr/bin/time -p`. Output `hardening-05/lbr-20k.json`, log `hardening-05/lbr-20k.log`,
-immutable driver `hardening-02/lbr-20k.sh` (PID 685702). Its result is pending.
+immutable driver `hardening-02/lbr-20k.sh` (PID 685702). Completed; see iteration 5 below.
 
 **Storage observation.** By 894,576 iterations (29.8% of 3M), the 35 GB learner store
 was full at 671,173,511 infosets and approximately 4.38G slots. The larger budget delays
@@ -463,6 +463,34 @@ Training remains on the original worker within its 22-worker budget. Runtime bin
 that worker continue to be built there: the Platinum image has glibc 2.43 and the arena
 worker glibc 2.39, so cross-host binary portability is not assumed. This adds test capacity
 without changing live services or the training jobs.
+
+### Hardening iteration 5 — standard local best response (2026-11-04, measured)
+
+**Hypothesis.** A range-tracking local best response can expose a profitable deviation
+that the finite-store adversarial learner misses. No defending-policy change in this
+iteration. Run the standard strong and weak LBR configurations against fixed C@2e10,
+20,000 duplicate deals with the attacker in all six seats (120,000 hands per configuration).
+The implementation measures actual chip payoffs, averages the six seats within each deal,
+and forms its 95% CI over those 20,000 independent deal clusters. These are raw winnings,
+without AIVAT, against a five-copy policy profile; this is not a six-player equilibrium-gap
+bound. Strong and weak configurations use the same deal seed, so do not pool them.
+
+Exact command from `~/fix`, inherited nice 10, eight Rayon workers:
+
+```sh
+/usr/bin/time -p ./hardening-02/exploit-archive --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --iters 0 \
+  --threads 8 --mem-gb 0.001 --learner-sizing adversarial --eval-deals 1 \
+  --seed 5 --lbr-deals 20000 --out hardening-05/lbr-20k.json
+```
+
+**Results:** strong **+841.4 ± 161.7 mbb/game**; weak **+330.0 ± 164.8**. Both find
+significant profit against fixed C@2e10. This is a new attack bound, not an A/B improvement
+of the defender. The one-deal ABR placeholder in the JSON is irrelevant and its zero CI
+must not be interpreted. Runtime 1,938.9 seconds; log `hardening-05/lbr-20k.log`, immutable
+driver `hardening-02/lbr-20k.sh`. Standard LBR already exists in the repository; no new
+policy code to keep or revert. Independent-seed and SHARINGAN-2 confirmation remain open.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
