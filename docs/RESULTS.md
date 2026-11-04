@@ -1569,6 +1569,80 @@ desync fallback remains check/fold, so eliminating this panic will not establish
 robustness for rounded-chip histories. Keep and push only after the registered checks
 pass; never deploy a server.
 
+**Registered source and exact A/B sample:** worktree hardening/api-scaled-terminal,
+base 8d02c87891268c24184c4845800603eb891aad3c. Only serve/src/replay.rs changes:
+candidate SHA f128f45662fef62c3ce963959a3516f06386faa338fdd0efb3e04e52a08cc6b5,
+baseline b48eb51a66c51f5932cc3bd4a3c95943dfc7be018ff72e52f6bf6ba10ab70036,
+patch 385e05b91d48bd906bf5090c898b15fc77c6d13b4e4ee388bd8e1df1f66e874e.
+The source registration hashes all 187 Rust/Cargo inputs. A separate original-host
+base tree differs from the guarded tree only in that one source file.
+
+Harness SHA 06efe12b728dd5263823637fbb46de3eef620272a33baad63e611ae7799065c4:
+generator seed **2026110409**, **512** rounded-chip requests with random big blinds
+1,000–1,000,000, button rotations and hero positions, plus **512** legal exact-scale
+controls with blinds from {2,4,5,10,20,25,50,100}. Each has 100-BB stacks and the
+near-all-in/continued-flop construction above. Build identical harness source against
+clean base versus guarded serve, in the unwind profile; catch request panics to count
+them without ending the measurement process. Require all constructed rounding cases
+to expose the old panic, zero guarded panics/errors/illegal responses in both groups,
+and identical normalized control responses (action, probabilities, legality, source,
+reason, notes, street and model ID; timing/request ID excluded). The two crash-rate
+Wilson 95% intervals must not overlap. These are synthetic request-sample intervals,
+not a poker EV or exploitability estimate.
+
+Driver sharingan-api-terminal-validation-v1.py (PID 976836), SHA
+4065cc3f4cbb02adc58734ff3fc8d2ea7a6f0397b4414e65af24877a9e24d9cc,
+records every argv/environment, copied executable identity and output under
+~/fix/hardening-09. It uses nice 10, four build/Rayon workers on CPUs 10–13,
+offline Cargo, and its own target directory. After A/B it runs all requested release
+tests (also pluribus and serve) and all six builds on the clean main-based guarded
+source. Model-dependent serve fixtures may skip when their tiny model is absent;
+do not count those as exercised model tests. The four added unit regressions require
+no model and must execute. No source changes or new A/B numbers have informed this
+registration.
+
+**Outcome: kept as an API availability fix.** The registered before/after sample passed
+every gate:
+
+| request group | before | guarded replay |
+|---|---:|---:|
+| rounded-chip cases | 512 / 512 panics | 0 / 512 panics; 512 legal responses |
+| exact-scale controls | 0 / 512 panics | 0 / 512 panics; all normalized responses identical |
+
+The rounded-case panic-rate Wilson 95% intervals are **[99.2553%, 100%]** versus
+**[0%, 0.7447%]**, disjoint. These intervals describe the fixed seeded synthetic request
+sample, not a prevalence estimate over real users or a poker EV measurement.
+The guard has zero request errors and zero illegal answers in either group.
+Only serve/src/replay.rs differs between the clean before/after source trees, and all
+187 registered source hashes still match after validation. The implementation moves
+conversion into the existing guard; real-history validation and the existing legal
+fallback stay intact. This does not repair the fallback's poker weakness.
+
+The requested release tests plus pluribus/serve and all six builds passed. Cargo
+reports **179 passed / 37 suites, zero failed, zero ignored**. Of these, **17**
+model-dependent API integration cases returned early because the optional tiny blueprint
+was absent; those are not exercised model tests. The remaining **162** executed,
+including all four added mandatory, model-free replay/Core regressions. Exact commands
+use the registered clean environment and four workers on CPUs 10–13:
+
+~~~sh
+cargo test --release -j 4 --offline -p nlhe -p bench -p search \
+  -p sharingan-arena -p exploit -p pluribus -p sharingan-serve -- --test-threads=4
+cargo build --release -j 4 --offline -p sharingan-arena -p bench -p exploit \
+  -p search -p sharingan-serve -p pluribus
+~~~
+
+Both are run under the nice-10 driver's affinity with its separate target directory.
+The identical A/B harness was built with --profile serve --offline -j 4 and run
+as api-base / api-guard. Executable SHAs are
+1e2c16ec643a1ef1af79939b6fbbfd47b9c3a3b50c4c48545cb2a0cfdea3196b and
+2e3251215610d14c49fddde427550acab65588b1fa23dfc27c71ff035c73d13d.
+Artifacts api-ab-gates.json, source-differences.json, validation-summary.json,
+validation.ok, both complete request-output files and all command/build/test logs.
+The arena/bench/exploit/search/pluribus policy sources are unchanged by this fix;
+the separate iteration-8 poker-policy candidate still requires its remaining measured
+gates. No service, model, deployment, live request or website was changed.
+
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
 | test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |

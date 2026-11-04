@@ -421,9 +421,11 @@ impl Hand {
 
         // scaled twin
         let si = self.si(ri);
-        let sa = self.to_scaled(ra, &l);
         let step_r = self.real.apply(ra);
         let step_s = if self.desync.is_none() && self.scaled.to_act() == Some(si) && !self.scaled.is_terminal() {
+            // Rounding can end the scaled hand while real players still have chips.
+            // Converting an action queries its legal set, so guard that read too.
+            let sa = self.to_scaled(ra, &l);
             Some(self.push_scaled(si, sa))
         } else {
             self.desync.get_or_insert_with(|| format!("history[{i}]: scaled engine out of step"));
@@ -679,6 +681,116 @@ mod tests {
         // a 3x open (60 real chips) maps to 300 scaled and back
         let back = h.to_real(Action::RaiseTo(300));
         assert_eq!(back, Action::RaiseTo(60));
+    }
+
+    fn near_all_in_request(bb: i64, hero: usize) -> ActRequest {
+        let stack = 100 * bb;
+        let mut history = vec![json!({"seat": 2, "type": "raise", "to": stack - 1})];
+        for seat in [3, 4, 5, 0, 1] {
+            history.push(json!({"seat": seat, "type": "call", "to": stack - 1}));
+        }
+        history.push(json!({"seat": 0, "type": "all_in", "to": 1}));
+        for seat in 1..hero {
+            history.push(json!({"seat": seat, "type": "call", "to": 1}));
+        }
+        serde_json::from_value(json!({
+            "small_blind": bb / 2, "big_blind": bb, "button_seat": 5, "hero_seat": hero,
+            "hole_cards": ["Ah", "Kh"], "board": ["Qh", "Jh", "Th"],
+            "players": (0..6).map(|seat| json!({"seat": seat, "stack_start": stack})).collect::<Vec<_>>(),
+            "history": history
+        })).unwrap()
+    }
+
+    #[test]
+    fn real_history_continues_after_rounding_ends_scaled_hand() {
+        for bb in [1_000, 2_000, 10_000, 100_000] {
+            for hero in 1..6 {
+                let req = near_all_in_request(bb, hero);
+                let hand = Hand::replay(&req, None, 1).unwrap();
+                assert!(hand.scaled.is_terminal());
+                assert!(!hand.real.is_terminal());
+                assert_eq!(hand.real.to_act(), Some(hero));
+                assert!(hand.desync.is_some());
+                assert!(hand.player.is_none());
+                assert_eq!(hand.real.pot() as i64, 6 * (100 * bb - 1) + hero as i64);
+                assert_eq!(hand.hero_legal().call_amount, 1);
+                assert!(hand.is_legal(hand.passive()));
+            }
+        }
+    }
+
+    #[test]
+    fn exact_scale_near_all_in_history_stays_synchronized() {
+        for hero in 1..6 {
+            let hand = Hand::replay(&near_all_in_request(100, hero), None, 1).unwrap();
+            assert!(hand.desync.is_none());
+            assert_eq!(hand.real.to_act(), hand.scaled.to_act());
+            assert_eq!(hand.real.street(), hand.scaled.street());
+            assert_eq!(hand.real.pot(), hand.scaled.pot());
+            assert_eq!(hand.real.cur_bet(), hand.scaled.cur_bet());
+            for seat in 0..6 {
+                assert_eq!(hand.real.stack(seat), hand.scaled.stack(seat));
+                assert_eq!(hand.real.street_bet(seat), hand.scaled.street_bet(seat));
+            }
+            assert_eq!(hand.to_real(Action::Call), Action::Call);
+        }
+    }
+
+    #[test]
+    fn desync_does_not_skip_real_history_validation() {
+        let mut req = near_all_in_request(1_000, 2);
+        req.history.last_mut().unwrap().kind = "check".into();
+        assert_eq!(err(&req).code, "illegal_action");
+
+        let mut req = near_all_in_request(1_000, 2);
+        req.history.last_mut().unwrap().seat = 2;
+        assert_eq!(err(&req).code, "out_of_turn");
+    }
+
+    #[test]
+    fn api_returns_legal_fallback_after_scaled_hand_ends() {
+        use crate::config::Config;
+        use crate::decide::{Core, Meta};
+        use bench::bp::{sizing_by_name, CoarseBucketer, Source};
+        use search::bp::Blueprint;
+        use std::sync::Arc;
+
+        struct Calls;
+        impl Source for Calls {
+            fn probs(&self, _: u64, _: u32, out: &mut [f32]) -> bool {
+                out.fill(0.0);
+                let call = usize::from(out.len() > 1);
+                out[call] = 1.0;
+                true
+            }
+        }
+        let bp = Blueprint::from_source(
+            Arc::new(Calls), Arc::new(CoarseBucketer), sizing_by_name("medium").unwrap(),
+        );
+        let cfg = Config { search: false, search_threads: 1, ..Config::default() };
+        let meta = Meta {
+            path: "synthetic-call-source".into(), infosets: 0, file_bytes: 0,
+            src_infosets: 0, used_snapshots: false,
+        };
+        let core = Core::with_blueprint(&cfg, bp, meta).unwrap();
+        for bb in [100, 1_000] {
+            for hero in 1..6 {
+                let mut req = near_all_in_request(bb, hero);
+                req.options.seed = Some(1);
+                let response = core.decide(&req, format!("scaled-terminal-{bb}-{hero}")).unwrap();
+                let hand = Hand::replay(&req, None, 1).unwrap();
+                assert!(hand.is_legal(if bb == 100 { Action::Call } else { hand.passive() }));
+                if bb == 100 {
+                    assert_eq!(response.source, "blueprint");
+                    assert_eq!(response.action.kind, "call");
+                } else {
+                    assert_eq!(response.source, "fallback");
+                    assert_eq!(response.action.kind, "fold");
+                    assert!(response.fallback_reason.unwrap().starts_with("desync: "));
+                }
+                assert_eq!(response.legal.call.unwrap().added, 1);
+            }
+        }
     }
 
     #[test]
