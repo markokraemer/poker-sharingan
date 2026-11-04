@@ -531,6 +531,404 @@ must not be interpreted. Runtime 1,938.9 seconds; log `hardening-05/lbr-20k.log`
 driver `hardening-02/lbr-20k.sh`. Standard LBR already exists in the repository; no new
 policy code to keep or revert. Independent-seed and SHARINGAN-2 confirmation remain open.
 
+### Hardening iteration 6 — passive mass versus actual call price (2026-11-04, reverted)
+
+**Outcome: revert.** The correction defeats the old frozen attacks and improves strong
+LBR, but a freshly trained attacker scores significantly better against it than against
+the baseline on both independent deal seeds. That attacker still loses; nevertheless,
+this fails the predeclared no-significant-regression requirement. No playing-policy
+change from this experiment is retained or deployed. The detailed positive and negative
+measurements below are retained together.
+
+**Hypothesis.** The frozen attack's profit without hand-offs may exploit the difference
+between actual and shadow call prices after off-menu translation. Test a parameter-free
+correction with `q = call / (pot + call)`. When actual q is cheaper, multiply abstract fold
+mass by `q_actual/q_shadow` and transfer the removed mass to call. When actual q is more
+expensive, multiply call mass by `q_shadow/q_actual` and transfer the removed mass to fold.
+Leave raise mass and equal-price decisions unchanged. This is a heuristic, particularly
+in multiway pots; the experiment must establish its value rather than assuming it.
+
+**Candidate:** an opt-in `TrackOpts::price_aware` (default false), applied consistently in
+bench, search, and the exploiter's training target. CLI selector `--price-aware`, offline
+arena selector `ARENA_PRICE_AWARE=1`; neither live configuration nor defaults are changed.
+Three new tests cover mass/price invariants, training/evaluation parity on translated
+histories, and search/bench parity. Required five-package release tests passed on the
+isolated Platinum worker: **148 tests / 27 suites**, zero failed or ignored; all five
+requested builds passed (`price-validation.log`, `price-validation.ok`). Same nice/affinity/
+isolated-environment constraints as iteration 4. Native runtime binaries are built on the
+original host, nice 10, eight build workers, alongside the unchanged 11-worker 3M learner.
+
+**Predeclared A/B:** use the *same saved 1M attacker* and identical deal seeds in both
+arms. Before examining candidate results, require the disabled new binary to exactly
+reproduce all frozen reference estimates and learner miss rate at seed 271829, 100,000
+deals/seat. Failure stops the queue for investigation. Then evaluate both arms at 200,000
+deals/seat with seed 271829 (discovery). Proceed to the reserved seed 314160, again
+200,000 deals/seat per arm, only if the candidate's upper 95% bound is below the baseline's
+lower bound. Apply the same disjoint-CI criterion to confirmation. Do not increase sample
+counts or tune the formula after observing this candidate. A failed gate means revert or
+report an inconclusive result; it does not authorize retaining an unproved defending change.
+
+Native queue `~/fix/hardening-06/price-ab.sh` (launcher PID 707978), logs/JSON under
+`hardening-06/`. Build command from `~/fix/sharingan`:
+
+```sh
+env RAYON_NUM_THREADS=8 CARGO_BUILD_JOBS=8 /home/ubuntu/.cargo/bin/cargo build \
+  --release -j 8 -p sharingan-arena -p bench -p exploit -p search -p sharingan-serve
+```
+
+Copy immutable executables to `hardening-06/exploit-price` and `arena-price`; record their
+SHA-256 in `binary-sha256.txt`. Evaluation command from `~/fix` (queue inherits nice 10):
+
+```sh
+./hardening-06/exploit-price --compact \
+  --target /srv/sharingan/models/sharingan-1.plcp --sizing medium \
+  --buckets /srv/sharingan/models/buckets-200 --players 6 --threads 11 \
+  --learner-sizing adversarial --load-learner hardening-02/learner-1m-confirm.bin \
+  --seed 1 --eval-deals 200000 --eval-seed 271829 \
+  --out hardening-06/discovery-base.json
+```
+
+Candidate adds `--price-aware` and writes `discovery-price.json`; holdout substitutes
+314160 and writes `holdout-base.json` / `holdout-price.json`. Replay uses 100000 deals and
+writes `replay-disabled.json`. All evaluations are 11 workers; with the 3M run, total
+compute workers remain at most 22, and only C@2e10 is used. This queue stops after the
+frozen-attacker gates. Keeping a playing-policy change still requires probe/control A/B,
+adaptive attack/LBR checks, final-model confirmation and the normal-strength head-to-head
+gate. No defending-policy improvement is claimed yet.
+
+**Discovery result:** baseline **+447.4 ± 67.3**, price-aware **−2,849.2 ± 52.4**
+mbb/game for the frozen attacker, 200,000 deals/seat per arm. Raw winnings are +449.2 ±
+80.2 and −2,848.7 ± 73.2 respectively. The disabled-binary 100k replay exactly matches
+the saved reference, all seats/raw estimates and learner miss rate included. Native builds
+passed. Binary SHA-256: exploit `025d7aabb5cf7f5fac2cbd4a3928cf2f1ea27a197996225742c09a5d6c5b36d2`,
+arena `d8070111757b534f4e0d544a66bc06bc79404ec6bcff74aca8da0b28d9476f23`.
+**Confirmation:** seed 314160, 200,000 deals/seat: baseline **+459.4 ± 67.5**, candidate
+**−2,863.1 ± 52.6**. Both predeclared frozen-attacker gates pass. This demonstrates that
+this frozen attack loses under the candidate, not that an adaptive attacker cannot exploit it.
+Confirmation raw winnings: baseline +444.7 ± 80.6, candidate −2,882.6 ± 73.4. All six
+candidate seat estimates have negative upper 95% bounds (seat selection is unnecessary).
+
+**Broader gates queued before confirmation results:** `hardening-06/price-broad.sh`
+(launcher PID 713889) waits for both frozen gates and stops if either fails. Run fixed-track
+baseline (`ARENA_PRICE_AWARE=0`) versus candidate (`=1`) with the immutable arena binary;
+`ARENA_TRACK` unset in both. In order: offline quickstart, tag, sombra, and the six
+`probe_*.py` fixtures. Both arms use `--hands 20004 --lanes 8 --seed ab-20004 --local
+--track sharingan-1`, C@2e10/medium/tables buckets. Each JSON must have all 20,004 hands,
+zero forfeits/crashes/timeouts/illegal actions, positive lane decisions, and matching deal
+digests. Stop at any attacker whose candidate lower CI exceeds its baseline upper CI.
+Never import the old live-client `ctl_quickstart.py`.
+
+If external gates pass, run the iteration-5 20k LBR command against `exploit-price` with
+`--price-aware`, same seed 5/eight workers, output `lbr-price-20k.json`. Stop on a
+disjoint-CI regression in either configuration. If that passes, train a fresh adaptive
+attacker: the iteration-1 command with `--iters 1000000 --threads 11 --mem-gb 15 --seed 7
+--eval-seed 161803 --eval-deals 100000 --price-aware --save-learner
+hardening-06/learner-price-1m.bin --out hardening-06/train-price-1m.json`. Save the weights
+for later cross-policy and independent-deal confirmation; fresh training itself is not a
+paired policy comparison. The queue is sequential, with at most 11 workers alongside the
+existing 11-worker 3M job; it does not touch the final model or any live service.
+
+**External A/B completed:** 20,004 hands per arm, duplicate + AIVAT, identical
+`ab-20004` deals. Positive means the attacker wins. Every run passed the validity checks
+above, including zero failures and matching deal digests. All baseline scores reproduce
+the earlier fixed-policy measurements at the displayed precision.
+
+| attacker/control | fixed baseline | price-aware candidate |
+|---|---|---|
+| offline quickstart | −596.4 ± 135.2 | −857.7 ± 148.1 |
+| tag | −465.6 ± 118.5 | −409.9 ± 117.7 |
+| sombra | −419.6 ± 161.6 | −332.3 ± 156.5 |
+| translation midpoints | −4,173.8 ± 573.4 | −4,743.5 ± 543.0 |
+| min-bet | −5,983.4 ± 637.3 | −8,715.7 ± 639.9 |
+| min-raise war | −8,937.9 ± 735.9 | −11,775.4 ± 782.6 |
+| overbet (3x pot) | −661.6 ± 197.2 | −675.8 ± 186.2 |
+| random sizes | −5,745.0 ± 485.7 | −6,528.6 ± 444.6 |
+| tiny bets / river shove | −1,801.8 ± 353.0 | −1,933.4 ± 331.9 |
+
+No disjoint-CI regression; min-bet and min-raise war improve with disjoint CIs. Other
+changes are inconclusive under the predeclared criterion. These controls can use off-menu
+sizes; they do not by themselves establish strictly on-menu invariance. Files use each
+bot's basename and `-base.json` / `-price.json` under `hardening-06/`; sombra's basename
+is `bot`. LBR is now running; adaptive retraining and final-model gates remain pending.
+
+**Strict on-menu gate (added before its measurements).** Add
+`arena/bench/tests/price_on_menu.rs`: feed both configurations identical medium-menu
+histories and compare action lists and every exposed probability bit for bit, including
+queries with another valid private hand. A filled-source fixture covers heads-up/six-max
+replays and requires identical same-seed AIVAT/raw/per-seat control match estimates.
+Its source always has a distribution, so it cannot introduce off-menu fallback actions.
+The separate real-model test replays 20,000 six-max strict-menu hands, then evaluates a
+uniform medium-menu control against five model copies on 100,000 deals/seat, both arms,
+seed `0xA11CE`. Compare the resulting CIs using the same no-disjoint-regression gate.
+The actual model's fallback is unchanged and can itself choose off-menu sizes; therefore
+the full real-model match is measured rather than assumed identical. This control does
+not replace the final-model normal-strength head-to-head gate.
+
+The model test is explicitly ignored in the model-free suite and must run separately on
+the original worker. Native driver `hardening-06/strict-native.sh` (PID 728815), nice 10,
+CPU affinity 20–22, two build jobs and three Rayon workers. With existing 11-worker
+training and 8-worker LBR, at most 22 compute workers. Commands from `~/fix/sharingan`:
+
+```sh
+RAYON_NUM_THREADS=3 CARGO_BUILD_JOBS=2 /home/ubuntu/.cargo/bin/cargo test \
+  --release -j 2 -p bench --test price_on_menu -- --nocapture --test-threads=1
+PRICE_TEST_MODEL=/srv/sharingan/models/sharingan-1.plcp \
+  PRICE_TEST_BUCKETS=/srv/sharingan/models/buckets-200 \
+  PRICE_TEST_OUT="$HOME/fix/hardening-06/strict-control-c.json" \
+  RAYON_NUM_THREADS=3 CARGO_BUILD_JOBS=2 /home/ubuntu/.cargo/bin/cargo test \
+  --release -j 2 -p bench --test price_on_menu -- --ignored --nocapture --test-threads=1
+```
+
+Logs `strict-unit.log`, `strict-model.log`, `strict-queue.log`. The isolated Platinum
+worker also reruns the full five-package release suite and five builds with this fixture
+(`run-strict.sh`, PID 2495922, `strict-validation.log` / `strict-validation.ok`), same
+four-CPU affinity, nice 10 and clean environment as before. No defending runtime code
+or experiment formula changed after observing the earlier A/B.
+
+**Strict gate results:** 362,440 exposed probability queries on 20,000 real C@2e10
+strict-menu histories match bit for bit, with zero after-off-menu classifications or
+desyncs. The real-model control A/B (100,000 deals/seat, 600,000 hands per arm) is also
+exactly identical in both arms: AIVAT **−3,554.0 ± 105.5**, raw **−3,634.1 ± 110.0**
+mbb/game for the control. Output `strict-control-c.json`; native explicit model test
+passed in 163.0 seconds. The full updated five-package suite passed **149 tests across
+28 suites**, one deliberately ignored model-dependent test (run separately and passed
+as above), zero failures. All five release builds passed (`strict-validation.ok`).
+
+**Extra-capacity attempt:** existing Platinum budget has a $3/hour configured compute
+cap and a current $1.21/hour primary. An isolated 8-CPU/128-GB model-validation worker
+would cost about $1.64/hour, combined $2.85/hour before disk, permitting final-model work
+without evicting C@2e10 on the original host. The initial `ptxp scale 1 --yes --no-input
+-o json` setup failed because its versioned Linux CLI release artifact returned HTTP 404;
+the platform removed the failed `main2-1` machine. Read-only inventory confirms only the
+original primary remains. The primary's installed Linux CLI version differs from the
+Mac version; its public release artifact also returns 404. Investigate whether a fork
+from that live root can reuse its already-installed CLI, without updating or restarting
+the primary. No model-validation worker or additional hourly capacity is claimed yet.
+
+**Standard LBR A/B completed:** same seed 5, 20,000 deals/seat, 120,000 hands per
+configuration and arm. Strong: baseline **+841.4 ± 161.7**, candidate **+462.9 ± 179.3**
+mbb/game, a disjoint-CI improvement. Weak: baseline +330.0 ± 164.8, candidate +232.6 ±
+168.3, inconclusive difference. Both candidate configurations still find significant
+profit against fixed C@2e10; the candidate does not close every tested attack. Runtime
+1,874.8 seconds; `lbr-price-20k.json` / `.log`. The same-seed one-deal ABR placeholder
+again must not be interpreted. The queue passed its LBR gate and started adaptive
+1M/15-GB training with the predeclared seed/menu/budgets; the policy is still uncommitted.
+
+**Worker recovery in progress:** invoking the existing Linux CLI from `main2` with
+`ptxp scale 1 --from main2 --yes --no-input -o json` successfully forked `main2-1`
+without downloading a missing release. Inventory/context verified zero sessions/agents
+there and a separate `/work` disk; the original primary remained unchanged. Disk growth
+to 500 GB succeeded. Requesting the larger CPU/RAM profile from inside the new worker
+stopped that worker during its restart path and returned `sandbox not running`; inventory
+still shows the old 16-CPU/64-GB profile, stopped. Recover via the existing Linux CLI on
+the primary, targeting only `main2-1`. Do not claim the planned 8-CPU/128-GB capacity or
+launch model jobs until the running state and actual resources are verified.
+
+**Verified fallback capacity:** the external resize also stopped the new worker without
+applying the larger profile. Recovering it with the existing Linux CLI's `ptxp up --box
+main2-1 --no-input -o json` succeeds at **16 CPU / 64 GB / 500 GB disk**. Use that verified
+profile; do not keep retrying the larger resize. The primary remains `main2`, unchanged
+at 16 CPU/64 GB with its existing sessions/agents. Combined running compute is about
+**$2.43/hour**, within the configured $3/hour cap. This dedicated worker is for trusted
+Rust/model validation; do not run the third-party sombra code as its `dev` user.
+
+Start pinned, unauthenticated public-weight downloads on that worker under
+`/work/sharingan-model-validation`, never copying credentials. Exact launch:
+
+```sh
+setsid nohup nice -n 10 taskset -c 0-1 env -i \
+  PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/work/sharingan-model-validation/tmp \
+  /usr/bin/python3 -I -u /work/sharingan-model-validation/download.py \
+  > /work/sharingan-model-validation/download.log 2>&1 < /dev/null &
+```
+
+Actual Python PID **1059** (launcher shell 1052), confirmed live/nice 10. The task-owned
+script and `public-manifest.json` live alongside the log. SHARINGAN-2 public revision
+`c97c4736260db5b34d5e6ebd0a1544fccb401cf1`; C@2e10 public revision
+`7cc90baa6c4350692668dd70e29601d5590a0d71`. Download SHARINGAN-2 then C sequentially;
+no inference jobs run during this preparation. Each 25-GB part is resumed with curl,
+checked against its published LFS SHA-256, appended to the assembled file, checkpointed,
+then only that task-created scratch part is removed. Verify the final assembled SHA-256
+against each pinned `SHA256SUMS.models` before renaming it into place. Checkpoint/lock
+files prevent a second writer or mixing revisions. No giant local-Mac model copies.
+
+The bucket archive's SHA-256 **72c46597e63c6a245037d65989e72e8d03e76078aa758f149a9b2c61694227bc**
+passed before safe extraction under the task's `data/` directory. The first model part is
+downloading; model identity, cross-host frozen replay and final-model results remain
+unproven until their verification completes. Full models and large outputs stay on the
+worker's `/work`, not the shared home. Inspection found the fork did not include the
+primary's mounted source/build cache; materialize a curated source snapshot and build
+runtime binaries on the new worker. The original Mac remains edit-only.
+
+**Normal-strength harness preparation:** add per-side `--price-aware-a` /
+`--no-price-aware-a` and corresponding `-b` selectors to `pluribus h2h`, with explicit
+`track_a` / `track_b` fields in its JSON. Three tests cover independent sides, explicit
+baseline selection, global/per-side precedence and conflicting flags. Preserve the
+existing default when selectors are absent. Keep C@2e10 as the fixed reference in both
+arms; changing both models' wrappers would obscure the intended comparison.
+
+The first build launch failed before compilation because the expected source directory
+was absent. Do not treat its launcher as a successful build. Copy a **192-file / 517,030-byte**
+source-only archive (SHA-256
+`5c8df09e200e21cf6ec80d223718dcbeb4056d0716e622a1382a79b0a8963c25`) through
+the primary's existing local-file connection into a uniquely named small `~/.pt/xfer/`
+artifact. Verify that hash before safe extraction into the new worker's task-owned
+`/work/sharingan-hardening-1c51-audit`. No `.git`, environment/credential files, models,
+website or `docs/research/`. Large models remain outside the shared home.
+
+Corrected driver `run-h2h-tests-v2.sh` (PID **2726**), log
+`/work/sharingan-model-validation/h2h-validation-v2.log`: nice 10, affinity CPUs 2–9,
+clean environment and isolated Cargo/TMP/target directories. Run the required five-package
+release suite **plus pluribus**, eight build/Rayon workers, then build the six packages
+and copy immutable `pluribus-price`, `exploit-price`, `serve-price` binaries into the
+model-validation directory, recording their SHA-256. Model download retains CPUs 0–1.
+This changes only the measurement selector/metadata; the defending formula is unchanged.
+
+**Predeclared normal-strength measurement:** after full model checksums, runtime tests,
+cross-host frozen replay and a 200-deal mechanical smoke test, run both head-to-head arms
+on **4,000,000 identical deals per format**, seed 1, 6-max/medium/tables, full duplicate +
+AIVAT, all three existing formats. Use one head-to-head process at a time on the dedicated
+worker, with no competing model job. Baseline command (paths relative to its task directory):
+
+```sh
+nice -n 10 env -i PATH=/usr/local/bin:/usr/bin:/bin ./pluribus-price h2h \
+  --a models/sharingan-2.plcp --sizing-a medium \
+  --b models/sharingan-1.plcp --sizing-b medium --buckets data/buckets-200 \
+  --players 6 --deals 4000000 --threads 12 --seed 1 \
+  --no-price-aware-a --no-price-aware-b --out h2h-base-4m.json
+```
+
+Candidate substitutes `--price-aware-a` for `--no-price-aware-a`, keeps
+`--no-price-aware-b`, and writes `h2h-price-4m.json`. Do not use `--warm` on the smaller
+worker. Verify explicit track fields; investigate a baseline inconsistent with the
+historical +5.09 ± 1.16 mixed-format estimate before trusting a new result. A significant
+regression is a candidate upper CI below the baseline lower CI for the first two formats,
+or a candidate lower CI above baseline upper CI for the mirror (whose first side is C).
+This test is still pending; strict-menu control invariance does not replace it.
+
+**Expanded runtime validation completed:** required five-package suite plus `pluribus`:
+**155 tests / 32 suites**, zero failures, one deliberately ignored large-model test
+(separately passed earlier on the original worker). All six package builds passed.
+Immutable worker binaries: `pluribus-price` SHA-256
+`dc42183573a576fa5bcfbd1e529e98191f8df81a64edcb30bc557c0213543d93`,
+`exploit-price` `bb73ac665be30dbf2870a2a6848e176df6115be3b66cdcf810fe9b3dfe6e46ef`,
+`serve-price` `0abf1075be73435ac5d25cd30ab1746101a5845cc5f18eb95684d4aa2e0216de`.
+
+**Stronger frozen-attack gate:** after the original 3M training/holdout driver finished,
+`hardening-06/3m-price.sh` (PID 751960) first required exact disabled-binary replay of
+the saved 3M attack, all per-seat/raw/pooled estimates and miss rates included. It passed.
+Then the same archive and same 100k-deal seeds gave:
+
+| evaluation seed | fixed baseline | price-aware candidate |
+|---|---|---|
+| 271828 | +2,325.2 ± 106.5 | −2,589.2 ± 77.5 |
+| 314159 | +2,288.3 ± 106.2 | −2,512.3 ± 76.8 |
+
+Both improvements have disjoint CIs. Pooling only these evaluations of the same 3M
+archive gives baseline **+2,306.7 ± 75.2**, candidate **−2,550.7 ± 54.6**; candidate raw
+−2,476.8 ± 77.8. All units mbb/game for the attacker. Exact candidate commands are the
+iteration-2 reload command with `--price-aware`, seeds 271828 and 314159, outputs
+`hardening-06/3m-price.json` / `3m-holdout-price.json`. Comparison and pooled artifacts:
+`3m-price-comparison.json`, `pooled-price-3m.json`; both frozen 3M gates passed.
+
+**Adaptive training completed:** 1M iterations / 15 GB, seed 7, all six seats, accurate
+configured price-aware target fallback. Reported 4,103.3 seconds; 7,730,927,301 traversal
+nodes, 268,331,773 infosets, 1,875,000,000 slots; store full, miss rate 11.575% in the
+initial evaluation. The trained attacker loses **−1,094.8 ± 50.9**, raw −1,132.2 ± 66.5,
+on its predeclared seed 161803 / 100k deals per seat. This negative result alone does not
+establish robustness or a best response; the finite store still has the documented
+learner fallback mismatch. Its native weights are saved as `learner-price-1m.bin`.
+
+**Adaptive A/B protocol:** `adaptive-1m-ab.sh` (PID 784153), nice 10 / 11 workers, first
+replays that saved policy against the candidate on seed 161803 and requires exact
+pooled/per-seat/raw estimates, confidence intervals, counts and miss rate. That check
+passed. Evaluate this same frozen policy against baseline on seed 161803, then both
+arms on the independently reserved seed 271830, 100k deals/seat per arm throughout.
+Commands use `--load-learner hardening-06/learner-price-1m.bin --seed 7 --eval-deals
+100000 --threads 11` and `--no-price-aware` / `--price-aware`; other C@2e10/medium/
+adversarial/tables arguments are unchanged. Any candidate lower CI above baseline upper
+CI is a regression, even if the attacker loses in both arms. No sample-size tuning.
+
+| evaluation seed | baseline, adaptive attack | candidate, same adaptive attack |
+|---|---|---|
+| 161803 | −1,321.0 ± 51.9 | −1,094.8 ± 50.9 |
+| 271830 | −1,350.3 ± 52.4 | −1,133.2 ± 51.3 |
+
+**Both adaptive seeds fail the regression gate.** The prototype yields about 226 and
+217 mbb/game more to this attacker; neither result claims profitable exploitation.
+`adaptive-1m-comparison.json` records both failures and the driver stopped. Do not weaken
+that gate after seeing the much larger improvements against the old frozen attacks.
+Cancel the candidate's planned final-model/4M head-to-head promotion checks: a failed
+gate already rules out retaining it. Retain the trained policies for later regression
+experiments and final-model *baseline* attack confirmation.
+
+**Source rollback:** restore all seven modified tracked Rust files to main and remove
+only the task-created `arena/bench/tests/price_on_menu.rs` (hash checked before removal,
+locally and on the original worker). `docs/research/` is untouched. Preserve the failed
+prototype as `hardening-06/sharingan-h06-retired-source.patch` and `.tar.gz`; source-archive
+SHA-256 **681807acb2aa92043b4ff6143b9e252a1c352dcaf2a99f31b05d615a692a1cb4**.
+The immutable experiment executables and full 192-file source snapshot remain available
+for reproduction. Main has no price-aware option/correction from this attempt.
+Restored validation driver `hardening-06/reverted-tests.sh` (PID 795826), nice 10,
+affinity CPUs 0–15, eight build/Rayon workers: rerun the required five-package release
+suite plus pluribus and build all six packages. **148 tests / 31 suites passed**, zero
+failed or ignored; all six builds passed (`reverted-validation.log`,
+`reverted-validation.ok`). No restored-source policy improvement is claimed.
+
+**Transport and identity checks:** the first private command relay truncated an 8-MiB
+archive chunk (the direct command path is capped at 256 KiB of output). Its byte-length
+guard rejected the payload before appending anything, and PID 13894 exited. Do not use
+command output as a large-file transport. The worker had no active local-file connection;
+start its per-worker link **from the Mac**, `ptxp link --box main2-1 -o json`, preserving
+the existing policy revision 2. Read-only status confirmed both this connection and the
+primary connection running; no permissions were broadened and no primary session was
+stopped. Never run attach/link from a machine.
+
+Prepare the original frozen 1M archive after the 3M gate (driver `prepare-transfer.sh`,
+PID 755984): `zstd -q -T1 -c hardening-02/learner-1m-confirm.bin`, test the compression,
+and record native/compressed/metadata SHA-256. Transfer its compressed file through a
+task-owned Mac temporary directory using nice-10 rsync, then the standard chunked
+`ptxp local cp` on the worker. Corrected `copy-attacker-v2.sh` (PID 16628) passed both
+hashes and native-size checks:
+
+* Native: 12,415,042,764 bytes,
+  `169ef576454787e2add5fb519ff15606ba8d5bab2c752ba0a784ce6e9c485e35`.
+* Compressed: 5,725,274,680 bytes,
+  `ec0465646df34ce2db9b19dd0077657e3fff5381ef868d759fb1c0277bf14910`.
+
+Only the copied archive manifest's bucket *path* is rehomed to the task's verified
+bucket directory, with original metadata preserved and relocation hashes recorded.
+Weights are byte-identical. Cross-host frozen replay is still required before using
+that copy's match results. Remove only the task-created 5.7-GB Mac relay file after
+remote verification; no heavy Mac build/training or full-model copies were performed.
+
+**C model identity discrepancy (investigating):** nice-10/idle-I/O full SHA-256 reads
+with `O_DIRECT` bypassed the original host's model page cache. SHARINGAN-2 exactly matches
+the pinned public release: 169,906,172,488 bytes,
+`0f57b29605cb0fc5f2ecf4c1fcb266df6321d8459784b1577a30d54bb94c5b8f`.
+The provided `/srv/sharingan/models/sharingan-1.plcp` has 124,681,168,783 bytes but hashes
+to **acf73d86e16f1b681f703c58bd880ae8cf39e84342750bcd1c82bef07560fc23**,
+whereas its pinned public `SHA256SUMS.models` advertises
+`2a4484f6fabf61470a67c941552f5a97c6f6474e14ea010ef94a41d7b5861300`.
+Its first 128 header bytes match the public file. The part audit already confirms that
+part 00 matches its public LFS hash, whereas part 01 differs (provided-file part SHA-256
+`6d7a84f09234189f979869acf4efd624ba7ccf28cf3b76c507a4ed9447ac154f`).
+Thus the provided C file is not byte-identical to the pinned public parts; the full
+section audit remains in progress. All original C measurements above
+used this same provided file and reproduced; no cross-host public-C number has been
+trusted. Investigate before treating the public C copy as identical: direct-I/O
+`sharingan-c-part-audit.py` (PID 808881) compares every provided-file part with the pinned
+LFS SHA-256 values and records per-section hashes, without modifying any model or public
+repository. The complete model/part audit and final-model attack confirmation remain
+open; do not infer a cause for the mismatch from its size/header alone.
+
+The extra worker rebooted during part 03 of the public C download; no numerical match
+was running there. Autopilot remains disabled, and kernel logs are unavailable to the
+worker user, so the cause is undetermined. The resumable downloader restarts only after
+confirming its old process is gone; its single-writer lock and final SHA-256 gate remain
+required. Rehash the verified SHARINGAN-2 file and transferred learner before use after
+this interruption. No extra-worker match result has been accepted.
+
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
 | test | 3 + 3 | 1 vs 5 | 5 vs 1 (other side) |
