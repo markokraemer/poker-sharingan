@@ -86,7 +86,7 @@ PLCP1 stores 8-bit probabilities plus an infoset index (about 12 B/infoset). `--
 * **Exploiter caveat**: the ABR is limited by its learner's abstraction, storage and training/evaluation budgets.
   It supplies a lower-bound attack result, not a proof of unexploitable play. A negative or inconclusive result
   only describes the attacks tested. The larger adversarial evaluation in `docs/RESULTS.md` found
-  +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker.
+  +2,307 ± 75 mbb/game against fixed C@2e10 from two fresh-deal evaluations of one frozen 3M-iteration / 35-GB attacker. These original-host estimates are provisional while an inconsistent-model-read audit is resolved; see RESULTS iteration 7.
   Its saved strategy reproduces exactly on reload. Final-model confirmation remains open.
 
 **Memory, checkpoints and training ops**

@@ -8,6 +8,15 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
+**2026-11-04 model-integrity audit:** numerical C evaluations are paused. Repeated
+read-only reads of the provided C file returned different bytes at the same offset,
+with unchanged inode, size, mtime and ctime. The public copy and one direct read agree;
+other reads return zero pages in that key-index region. Earlier C estimates below
+are historical original-host measurements; their scope remains provisional until a
+verified independent copy reproduces them. No model, RAID configuration or live service
+has been modified. See iteration 7 below. This is an input-integrity concern, separate
+from the fixed translation bug.
+
 **The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
 
 1. bets less than the smallest abstract size. With `BelowMenu::Check` (the old default) the blueprint read that bet as a check, which closed the street in its shadow game but not at the table;
@@ -928,6 +937,71 @@ worker user, so the cause is undetermined. The resumable downloader restarts onl
 confirming its old process is gone; its single-writer lock and final SHA-256 gate remain
 required. Rehash the verified SHARINGAN-2 file and transferred learner before use after
 this interruption. No extra-worker match result has been accepted.
+
+### Hardening iteration 7 — shadow parity and C input integrity (2026-11-04, investigating)
+
+**Hypotheses.** The attack trainer shares one target shadow across all opponent seats;
+evaluation keeps a shadow per seat and labels only that seat's own actions as own.
+Check whether the difference changes queried target histories before changing the
+trainer. Separately, investigate the C checksum discrepancy from iteration 6 rather
+than trusting a numerically different input.
+
+**Shadow diagnostic (no retained source change):** external task-owned Rust crates
+`hardening-07/sharingan-shadow-parity-v1` and `-v2` compare the trainer's shared shadow
+with six evaluation-style seat shadows, sampling concrete actions from the actor's
+own shadow. Fixed translation options, 6-max / medium target. Compare target history
+keys and sync reasons before every opponent decision. The model-free diagnostic does
+not query a policy or estimate poker winnings.
+
+* V1, seed 2026110407, uniform menu actions: 100,000 strict-menu hands / 753,323 target
+  decisions and 100,000 adversarial-menu hands / 764,134 decisions; **zero differences**.
+* V2, independent seed 2026110408, favor passive and smaller non-all-in bets to reach
+  longer histories: 1,000,000 strict-menu hands / 17,464,126 target decisions and
+  1,000,000 adversarial-menu hands / 19,010,808 decisions; **zero differences**.
+
+Build and run with task-owned `sharingan-shadow-parity-run-v1.sh` / `-v2.sh`: nice 10,
+`CARGO_TARGET_DIR=/home/ubuntu/fix/sharingan/target`, release/offline build, four workers
+on CPUs 0–3; each diagnostic runs on CPU 0. Executables `shadow-parity-audit` /
+`shadow-parity-audit-v2`, each with and without `--strict`. Source, build logs, output
+logs and completion markers remain under `hardening-07/`. These samples do not prove
+parity for all histories or randomized translation. They supply no reason to retain
+a trainer change. Main playing code remains unchanged; its last required release
+suite passed 148 tests / 31 suites, all six builds passed in iteration 6.
+
+**Input audit, unresolved:** the original C part-01 direct hash differs from public.
+Part 00 and part 02 match their pinned public LFS hashes. A complete 25-GiB part-01
+comparison, using 1-GiB SHA-256 blocks and direct I/O on both machines, finds only one
+differing GiB, starting at 28,991,029,248 bytes. Refine it to one 4-MiB block, then one
+64-KiB block starting at **29,250,551,808 bytes** within the key index. At 4-KiB granularity,
+five original-host pages hash as all-zero pages; the pinned public copy has ordinary
+key bytes. Captured byte comparison shows exactly **20,480 zeroed bytes / 2,560 keys**
+(20,440 byte values differ), with the remaining 45,056 bytes identical. The good/public
+block is strictly sorted; the zeroed block has 2,559 adjacent sortedness violations.
+However, another direct read of the *same original-file block* exactly matches
+the public bytes. Thus a static different-export explanation is insufficient.
+
+Same original-file 64-KiB range has returned SHA-256
+`62b40adda8eadade3d02d51d05f6acde89f8eb768bf92f80f081b3b6f2fcf0d1`
+(public/matching read) and
+`50519d1c0058aa529e8f4a3f8c3b5330cb71686cf91ebd91e16971288e5fc664`
+(five zero pages). Both Python `readv` with anonymous aligned buffers and native
+`dd iflag=direct` read-only probes are used. A buffered read also returned a third
+mixed-block digest. File inode 24912546, size 124,681,168,783, mtime and ctime remained
+unchanged across the repeated-read probe. No claim about a physical cause is established.
+Read-only `/proc/mdstat` identifies a two-member RAID1, both marked up; sysfs reports
+clean, non-degraded, idle. **Do not initiate a RAID scrub/repair, alter /srv, or restart
+services.** Hardware/configuration repair is outside this hardening experiment.
+
+Exact probe commands and captured per-read JSON are retained in
+`hardening-07/sharingan-c-read-stability-v1.py`, `c-read-stability-v1.json`,
+`sharingan-c-part01-gib-audit.py`, `c-part01-gib-source.json`; matching public block
+checks are on the isolated worker under `/work/sharingan-model-validation/`.
+The first probe's good original-host block and public block are byte-identical;
+keep small distinct read samples as evidence, never patch the original model.
+The complete original-host part/section audit continues read-only. No new C matches
+are authorized by this observation. Finish and verify the independent public models,
+rehash the transferred learner, then require a frozen replay before interpreting new
+measurements. No defending-policy fix is kept in this iteration so far.
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
 
