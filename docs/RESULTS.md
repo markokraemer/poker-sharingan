@@ -1079,6 +1079,52 @@ now records that the 1.83e11 run finished on 2026-11-02. These edits change no e
 code or model; the prior 148-test / six-build restored-main validation still applies.
 No new poker A/B claim is attached to documentation edits.
 
+**Private reconstruction rejected:** the copied/repaired incoming file failed its first
+full buffered SHA-256 check: `96ba366924704018287ae68c2f5466cccfded7c17b4f56ca5a89d4e7d5e106a7`,
+not the release digest. The source-copy digest was `fd132496...`, a further observed
+read variant despite unchanged source metadata. Do not infer that the known 20-KiB
+region accounts for all inconsistencies. The incoming file stays as evidence, is not
+published under the final model name, and is never used for evaluation. The preparation
+parent exited before starting 3M compression. Both conditional experiment queues then
+exited because their input marker was absent; **zero iteration-8 poker measurements
+were run**. This is a failed input reconstruction, not a measured policy regression.
+
+Switch to `hardening-07/sharingan-download-c-v1.py`: fresh public C parts pinned to the
+same revision/LFS hashes as the independently verified worker. Assemble only verified
+parts, fsync/checkpoint each append, then require full buffered and direct SHA-256 to
+equal `2a4484f6...` before publishing the fresh private file. It copies no bytes from
+the original model. Keep the failed reconstruction and all logs; no live/model/storage
+configuration changes are authorized. Start the independent 3M compression/checksum
+step separately only after process/output checks prove the old parent is terminal and
+that this step had never started (PID 886597, `prepare-3m-independent-v1.log`). Its native
+buffered/direct equality guard is unchanged. Subsequent experiment drivers must depend
+on the new download proof and the independent archive job, not the failed reconstruction.
+Fresh-download PID **886877**, log `public-c-download-v1.log`. The failed-copy file is
+preserved under its `.incoming` name; all four old copy-dependent processes are confirmed
+terminal. Frozen v3 (PID **889457**) replaces only those failed input dependencies,
+reading `private-c-download.json` and the independent 3M producer's marker. Its public
+region stability guard, binary/source/learner checks, reference replays, seeds, sample
+counts and statistical comparisons remain unchanged. No policy-result data informed
+this input change. Keep original v1/v2 logs and scripts for the failure record.
+
+Prepare the independently checked 3M attacker for a later SHARINGAN-2 baseline confirmation
+while C inputs are restored. A task-owned Mac watcher (`sharingan-relay-3m-v1.py`, PID
+65621) waits on the live source producer and its native buffered/direct/compressed
+verification marker. It then relays only the compressed learner through a bounded
+Mac temporary directory, checking available space and byte length. No model file is
+copied to the Mac and no model/build/training job runs there. Full compressed/native
+SHA-256 checks on the destination remain required; a completed relay is not yet an
+accepted match input. The independent compute worker is asleep until this data is ready.
+Twelve small probes of the failed incoming copy (eight native direct reads with
+4-KiB/64-KiB blocks plus four buffered reads) all match the public digest for the patched
+64-KiB region. `failed-copy-region-reads.json` records them. The known-region repair
+therefore did not make the full copy valid; no further guessed patches are attempted.
+
+The current broader queue is immutable `sharingan-odds-broad-v2.py` (PID **891541**),
+waiting on frozen v3 and the fresh-download proof. Its earlier v1 process is terminal
+with no evaluations started. Only the input dependency and proof path changed; all
+external/LBR/new-adaptive commands, gates and sample sizes stay as declared above.
+
 ### Hardening iteration 8 — preserve pure decisions while repricing mixed passive odds (2026-11-04, preregistered)
 
 **Hypothesis.** Iteration 6 transferred mass from pure fold into call and from pure call
@@ -1198,6 +1244,28 @@ and 12 times buffered. Every digest must equal the verified public block digest
 with unchanged file metadata. Record every read in `private-c-read-stability.json` and
 stop on any mismatch. The metric, seeds, sample counts and statistical gates are
 unchanged, and no new correction result has been observed.
+
+**Conditional broader queue:** `sharingan-odds-broad-v1.py` runs only after
+`frozen-gates.ok`; it exits if the frozen driver terminates without that marker. It
+first runs the verified-input old-leak positive control, then all nine external A/B
+pairs. External commands retain `--local --track sharingan-1 --hands 20004 --lanes 8
+--seed ab-20004`; use only the immutable `arena-odds`, the verified private C path,
+`ARENA_PASSIVE_ODDS=0|1`, medium sizing and the original buckets. Require all planned
+hands, zero forfeits/crashes/illegal actions/timeouts and identical deal digests in
+both arms. Run as `ubuntu` with a constructed environment containing no credentials;
+cap Rayon, Tokio, OpenMP and BLAS to one worker per lane so the eight native/bot pairs
+stay within the host allowance. Stop on any significant external regression.
+
+After those pass, explicitly run the ignored `passive_odds_on_menu` fixture with
+`ODDS_TEST_MODEL` pointing to the verified C; then run both 20k-deal LBR arms with
+seed 5, eight workers, same model and native executable. The one-deal ABR placeholder
+in LBR outputs is not interpreted. Only after those no-regression gates, launch the
+predeclared fresh 1M / 15-GB / seed-8 attacker using 11 workers, save native weights,
+verify buffered/direct archive hashes, require exact enabled reload at seed 161804,
+and perform both cross-policy A/B seeds. The queue stops on any replay failure or
+significant AIVAT/raw defender regression. Final-model and normal-strength checks are
+still separate mandatory gates; this queue cannot promote code. Every command,
+constructed environment and output is recorded under `hardening-08/`.
 
 
 The full-budget run (C@final, 1.83e11 iterations, finished 2026-11-02) is SHARINGAN-2. 6-max, duplicate + AIVAT, 4M deals per format:
