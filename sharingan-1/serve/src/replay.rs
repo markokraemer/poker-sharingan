@@ -13,8 +13,7 @@
 //!
 //! When `big_blind` divides 100 the scaling is exact and both engines are isomorphic. Otherwise
 //! raises are rounded/clamped into the scaled engine's legal range; if the engines ever disagree
-//! (extremely rare) the hand is flagged `desync` and the decision falls back to a passive legal
-//! action instead of a wrong one.
+//! the hand is flagged `desync` and the decision uses the real-state strength fallback.
 
 use crate::api::*;
 use crate::error::ApiError;
@@ -773,20 +772,28 @@ mod tests {
             src_infosets: 0, used_snapshots: false,
         };
         let core = Core::with_blueprint(&cfg, bp, meta).unwrap();
-        for bb in [100, 1_000] {
+        for bb in [100, 1_000, 2_000, 10_000, 100_000] {
             for hero in 1..6 {
                 let mut req = near_all_in_request(bb, hero);
                 req.options.seed = Some(1);
+                req.options.include_probs = true;
                 let response = core.decide(&req, format!("scaled-terminal-{bb}-{hero}")).unwrap();
                 let hand = Hand::replay(&req, None, 1).unwrap();
-                assert!(hand.is_legal(if bb == 100 { Action::Call } else { hand.passive() }));
+                assert!(hand.is_legal(Action::Call));
                 if bb == 100 {
                     assert_eq!(response.source, "blueprint");
                     assert_eq!(response.action.kind, "call");
                 } else {
                     assert_eq!(response.source, "fallback");
-                    assert_eq!(response.action.kind, "fold");
+                    // A royal flush must call one chip into an almost 600-BB pot,
+                    // even though the scaled engine already ended the hand.
+                    assert_eq!(response.action.kind, "call");
                     assert!(response.fallback_reason.unwrap().starts_with("desync: "));
+                    let probs = response.probs.unwrap();
+                    assert_eq!(probs.len(), 1);
+                    assert_eq!(probs[0].kind, "call");
+                    assert_eq!(probs[0].to, response.action.to);
+                    assert_eq!(probs[0].p, 1.0);
                 }
                 assert_eq!(response.legal.call.unwrap().added, 1);
             }

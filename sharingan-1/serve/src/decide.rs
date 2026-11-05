@@ -357,7 +357,8 @@ impl Core {
                 };
                 hand.to_real(d.action(i))
             }
-            None => hand.passive(),
+            // This fallback uses real chips and cards; to_real would scale it twice.
+            None => bench::bp::fallback_action(&hand.real, &hand.board, hand.hole),
         };
         if self.cfg.max_stack_bb > 0.0 {
             let capc = (self.cfg.max_stack_bb * hand.big_blind as f64).round() as i64;

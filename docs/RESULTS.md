@@ -196,6 +196,437 @@ Keep all new archives; stop for disk headroom instead of deleting old evidence.
 Exact commands/environments/hashes/logs go under
 /work/sharingan-model-validation/hardening-11/training-v1. No public deployment.
 
+**Supplemental API/native parity and phase scheduling (registered before its
+results):** on canonical BB 100, instrument each API target decision with a
+stateful native CompactPolicy queried on the identical generated public state,
+hero cards and observation stream. Require maximum action-probability difference
+<=1.01e-6 (the API rounds displayed probabilities) and report any sampling
+differences under the API's seed transform. The instrumentation must first
+exactly reproduce the existing 20,004-hand near-all-in control statistics and
+decision/fallback/error counts. Then measure Sombra on independent seed
+2026110515 / 20,004 hands, retaining the original SDK code/adapter and abort-on-error
+rules. This distinguishes policy/replay disagreement from differing samples and
+adapter histories; it does not change a playing strategy.
+
+Insert the full original-host C API matrix before the predeclared 4M h2h gate.
+The continuation controller waits until all S2 LBR/native arms finish. It may
+terminate only its owned original Python coordinator while it has no inference
+child and is partway through its C checksum pass; preserve every completed
+result and record the intentional scheduling handoff. The replacement acquires
+that run lock, requires completed S2 API/parity gates, verifies C in full from
+scratch and exactly replays its frozen reference. Run the historical API
+positive/exact-grid controls and every registered C API variant/SDK/built-in pair,
+then the unchanged 200-deal h2h smoke and both 4M/all-three-format h2h arms. No
+strategy/gate/sample count is weakened. It never interrupts inference, stops a
+live service, or overlaps a separate model job with h2h. Fresh controller outputs:
+~/fix/hardening-11/c-api-h2h-v1; C API outputs: api-c-v1.
+
+**Residual-size attack search, registered before native size results:** the
+profitable six-/ten-chip API controls motivate a broader frozen sizing attacker.
+While S2 remains the only target in cache, after the existing LBR/native pairs
+finish, search residual stacks of 1/2/5/10/25/50/100/200/500/1000/2000/3300/5000
+chips at canonical BB 100. Use immutable native harness SHA 3a9c570e… with exposed
+native probabilities, 3,334 duplicate deals / 20,004 hands per configuration,
+discovery seed 2026110516, disabled/enabled mixed-passive arms. First exactly
+reproduce the just-completed registered native one-chip reference, including
+diagnostics, and repeat it exactly; require the baseline lower bound above +1,000.
+
+Select the single residual size with the largest enabled-candidate discovery
+mean (ties choose the smaller residual). Freeze it and confirm both target arms
+on untouched seed 2026110517 / 100,000 duplicate deals per seat / 600,000 hands.
+Report every exploratory size and the independent confirmation separately.
+Any disjoint raw/corrected defender regression rejects the mixed-passive candidate;
+do not proceed with its h2h promotion work after such rejection. A 40-minute job
+deadline preserves scheduling; incomplete output is not a passed attack gate.
+
+Before it performs any handoff or poker measurement, retire the waiting v1 C
+coordinator and preserve its log. V2 adds this serial S2 search before C hashing,
+then runs the same full C API matrix and unchanged h2h gates. Fresh paths are
+c-api-h2h-v2, native-size-sweep-v2, and api-c-v1. The sole size-search process uses
+12 nice-10 workers, with no other model job running on that host. It changes no
+policy formula, existing gate, public service or result sample retrospectively.
+
+**Continuation results and expanded attacker registration (2026-11-05):** final S2
+LBR is complete: weak +137.2 ± 170.0 to +135.4 ± 170.4; strong +795.0 ± 165.2 to
++704.4 ± 166.4 for baseline/mixed-passive. Neither comparison is conclusive.
+The residual search selected 500 chips (5 BB). Its untouched 100k-deal/all-seat
+confirmation gives +3,277.1 ± 145.8 baseline and +1,268.2 ± 138.2 candidate;
+raw +3,296.6 ± 200.8 and +1,300.2 ± 196.9. The candidate significantly reduces
+this attack but remains clearly profitable. In its blind seats the candidate
+attacker earns +9,824.6 ± 289.5 and +10,070.0 ± 288.3; other seats lose. These
+position estimates motivate a separate attack that folds outside the blinds,
+not a claim that the pooled all-seat result already measures that strategy.
+
+API/native parity passes on identical canonical histories: near-all-in 115,601
+target decisions, maximum displayed-probability delta 4.9994e-7, zero sampled
+action differences; independent Sombra 151,479 decisions, maximum 4.9962e-7,
+zero sampled differences. The latter API-format sample earns +162.1 ± 109.0
+(raw +181.5 ± 129.5), seed 2026110515 / 20,004 hands. It confirms moderate profit
+under this adapter and sampling sequence. The original SDK worker negative
+sample uses a different deal/button/participant-history sequence. Do not replace
+one with the other or state that the fixed policy defeats every Sombra variant.
+The full S2 API matrix passes all declared SDK/built-in regression gates; the
+verified C matrix is running, after full buffered/direct hashes and exact frozen
+reference reproduction. Public access remains disabled.
+
+The extra 64-GiB worker passed its C input/reference checks, but its first
+3M training attempt achieved only about 20–25 iterations/s due to insufficient
+cache. Stop only that owned process group before completion and preserve its
+logs; there is no usable new learner archive or completed attacker measurement.
+Attempted larger profiles fail the service's 65,536-MiB RAM limit. The owned
+worker is stopped; the busy primary is untouched. Relocate the three registered
+studies to the original 188-GiB host rather than treating the incomplete queue
+as passed. Use 11 workers there (at most 19 including four API workers and four
+SDK processes), keep the original study seeds/menus/seat choices, and preserve
+all frozen extraction, independent-deal and S2 confirmation gates.
+
+Before those three studies, add a 3M-iteration / 35-GB attacker, seed 18,
+focused on seats 0 and 1. Its attacker-only `residual-v1` menu contains every
+adversarial-menu action plus legal raises leaving 1/2/10/100/500/1000/3300 chips
+in the canonical 50/100 scale, with the same raise cap. Freeze the exact menu
+definition in archive metadata and reject incompatible reloads. Add explicit
+comma-separated seat selection, rejecting duplicates/out-of-range indices.
+These changes alter attacker coverage, not target policies or model loading.
+The first source build catches a u32/u8 comparison before tests; preserve the
+failure and fix the casts. V3 source SHA256
+79d877cc7039691b5d17acc5bf8dc800777ce0d3412917f182fecae057b3367f.
+
+Required seven-package release tests/builds run for isolated default and
+iteration-8-overlay variants. Before training, require both binaries to exactly
+replay the old C frozen reference (normalize only the added disabled option in
+tracking text). Train against enabled mixed-passive C, save native archives,
+verify buffered/direct hashes and exact enabled reload. All four studies use
+the registered 100k-deal discovery/holdout seeds 2026110513/2026110514, average
+and argmax extraction, identical frozen policies across both target arms, and
+both raw/corrected disjoint-interval no-regression gates. Keep focused-seat
+statistics explicitly conditional; a full-table attack must also be evaluated
+with its actual outside-seat folding policy. Preserve store saturation and miss
+rates; finite learners with training/evaluation fallback mismatch cannot certify
+robustness. Complete C inference before switching to S2, recheck its prior full
+input certificate/metadata/boot and exact frozen reference, then confirm all
+four frozen attacks. Source/commands/logs: ~/fix/hardening-12.
+
+Freeze that full-table probe as 500 chips left in seats 0/1 and fold in seats
+2–5. Its extended native harness must exactly reproduce the original all-seat
+attacker statistics/diagnostics before new results. Measure disabled/enabled arms
+on fresh seeds 2026110519 and 2026110520, 100,000 deals / 600,000 hands each, on C
+and then S2. These seeds were not used for residual-size or position selection.
+Report the actual full-table estimate and verify the outside-seat payoff is zero;
+do not infer its CI by dividing separately reported seat intervals.
+
+Before the C API child starts, register a scheduling-only barrier: it writes
+its completed C API marker, then waits for these original-host C/S2 studies
+before returning to its parent and releasing the unchanged 4M h2h gate. It
+does not weaken any measurement gate or overlap a separate model job with h2h.
+
+**Compose the API action repair with current main:** source archive
+bed13e07336439538c3d42944c06bb86362288f7375b74bb608495b62d362fd1
+starts at a51a377 and changes only the missing-distribution action, its replay
+documentation/regression, and the always-run HTTP/batch test. The retained
+probability reporting maps distributions after action selection and remains
+unchanged. Run all required seven-package release tests/builds, including the
+4,000 generated plus explicit fallback HTTP cases, with two workers. Rebuild
+both current-main API harness arms, then exactly reproduce the completed old
+C matrix primary, exact-grid and canonical scores/diagnostics at both registered
+seeds (20,004 hands per arm). The full C/S2 control matrices remain mandatory;
+the two repairs must compose without changing these sampled actions. This
+serve-only change does not alter native blueprint/search/h2h behavior. Fresh
+receipts: ~/fix/hardening-12/api-realstate-final-v1. No service is restarted.
+
+**Next native hypothesis, before measurements:** when a non-all-in translates
+nearest to an all-in, keep_sync preserves all-in flags by selecting a distant
+smaller raise. Test an isolated opt-in `handoff_allin` (default false) that
+explicitly hands off instead at that exact boundary. It reuses the existing
+real-state fallback, preserves the current allin_snap/translation rules, true
+shoves and ordinary on-menu actions, and does not relax synchronization. Start
+from the unchanged iteration-8 mixed-passive source; compare that candidate
+alone with the same candidate plus this handoff, using the same frozen attackers
+and seeds. Add direct 95-BB-to-8.5-BB regression coverage, on-menu invariance,
+and bench/search/training fallback parity. Required release checks precede
+measurement. First measure the full residual-size grid and independent blind
+probe on C while it is the only cached model; any fixed-probe gain remains
+provisional until trained attacks, all external controls, final-model and
+normal-strength gates pass. No defending default is changed by preparing it.
+
+Preregister its initial C grid: residuals
+1/2/5/10/25/50/100/200/500/1000/2000/3300/3400/4000/5000, both all-seat and
+blind-only-with-outside-folding policies, 3,334 duplicate deals at seed
+2026110521 per configuration/arm. Baseline is mixed-passive enabled; candidate
+adds handoff_allin. First exactly replay both disabled/ enabled-mixed-passive
+original probe statistics and diagnostics with handoff disabled, and require
+the original fixed-target positive control. The primary is the already chosen
+500-chip blind attack. Require disjoint improvement of both raw/corrected
+primary CIs and no disjoint regression across the grid. Independently confirm
+the primary and the grid's largest candidate mean (tie: smaller residual, then
+all-seat) at seeds 2026110522 and 2026110523, 100k duplicate deals / 600k hands
+per arm. Initial failure rejects this prototype before expensive adaptive gates;
+initial success still requires the complete subsequent C/S2 gates. Immutable
+source SHA256 12806d60b79818adc7fb91b9bb292e087ea8eb0ed25b7ece1af4a85cdbd90242;
+source/build/fixed-attack receipts: ~/fix/hardening-13.
+
+The residual-training coordinator was still waiting for its builds, with no
+inference children, no command/result outputs, and only its registration/lock.
+Preserve that waiting directory and stop only that coordinator; v2 keeps every
+registered training/evaluation gate and adds explicit C/S2 phase-release barriers
+for the native handoff experiment. No inference is interrupted or restarted.
+Complete original C measurements before any additional large-archive evaluation;
+do not switch to S2 until the additional C stage releases it. Likewise, complete
+all additional S2 work before h2h starts. At most 11 training, four fixed-probe
+and two composed API-replay workers run together; source builds use two workers
+and are serialised. Model phase identity/metadata/boot gates remain mandatory.
+
+**Validation assertion failure, investigated before continuing:** the first
+blind-only C run stopped because its driver incorrectly required corrected
+outside-seat AIVAT scores to be exactly zero. It had not begun training. The
+four corrected means were +0.797/+0.399/+1.410/−1.957, with 95% half-widths
+3.258/3.335/3.570/4.268; all include zero. AIVAT adds zero-mean corrections, so
+an exactly zero raw strategy can have finite-sample corrected noise. Do not
+force those estimates to zero or change the estimator.
+
+Preserve that complete partial run and the resulting scheduler failure. Add
+raw per-seat mean/CI/count diagnostics to the helper; retain every old corrected
+and pooled raw field unchanged. Require exact raw zeros outside the blinds,
+and use a separate 4-SE corrected-null diagnostic to halt for investigation,
+without changing any reported 95% CI or defending-policy improvement gate.
+V3 exactly reproduces the first run's complete existing statistics/diagnostics;
+its new raw values and CIs are exactly zero in all four outside positions,
+100,000 hands each. All other raw/corrected native references and both frozen
+C binary references also reproduce exactly. There is no observed estimator
+failure here; the erroneous assertion was in the new validation driver.
+
+The continued full-table C probe (100k duplicate deals / 600k hands per arm):
+
+| fresh evaluation seed | fixed main | mixed-passive candidate |
+|---|---:|---:|
+| 2026110519 | +4,551.9 ± 85.4 | +3,325.1 ± 81.1 |
+| 2026110520 | +4,474.9 ± 85.3 | +3,258.5 ± 80.9 |
+
+Raw respectively +4,534.4 ± 111.5 / +3,285.6 ± 110.6 and
++4,512.7 ± 111.6 / +3,294.7 ± 110.6. These independently sampled, fixed
+blind-only attacks are stronger C attack bounds than the previous frozen 3M
+all-seat attacker. Do not pool their estimates with that different strategy.
+The candidate improves both samples significantly and still loses heavily;
+final S2 confirmation remains queued. New 3M / 35-GB residual-menu training
+started only after all new diagnostics/reference checks passed. Fresh driver
+residual_study_v3.py preserves every seed, sample count and original four
+training studies; only the invalid null assertion and added reporting differ.
+
+The full C API scoring matrix completed all policy gates before the unrelated
+null-assertion failure propagated through its later scheduling barrier. Its
+completed measurements/marker remain preserved; that scheduler exit does not
+count as a failed API poker comparison. Resume h2h only through a new controller
+that explicitly verifies those completed gates and every remaining study.
+No incomplete stage is silently marked passed.
+
+Keep the two held native-handoff coordinators' waiting registrations/logs; they
+had no build/inference children when stopped. V2 restarts them with unchanged
+source/strategy/gates, a native-only helper carrying the same raw diagnostics,
+and strict old-stat replay after excluding only newly added per-seat fields.
+Use an independent build target, seven nice-10 workers and one test thread, so
+the original 11-worker training plus two-worker API checks remain within the
+22-worker budget. No live build target, service or model is modified.
+
+**Narrow adaptive attacker registered before training:** reuse the task-owned
+64-GiB worker for a different cache hypothesis, after stopping the earlier slow
+large-menu attempt. It is intentionally woken for this study, boot
+f2666d63-4a21-4fab-9f67-d09d8d77902d; the primary remains untouched. New full
+buffered/direct C and frozen-learner hashes pass, and all four bucket files match
+the original host exactly. Only trusted Rust is copied/run there, never Sombra
+or credentials. Profile remains 16 CPU / 64 GiB; no larger machine is claimed.
+
+The separate `pressure-v1` learner omits small pot-fraction raises, retaining
+fold/check/call, real shoves and legal raises leaving 1/2/10/100/500/1000/3300
+chips, with exact versioned action metadata. Its narrower target lookup paths
+may fit cache. Add `--fold-outside-seats` so a frozen position-focused policy
+can be evaluated through the actual six-seat match, folding elsewhere. The
+always-run test verifies active-player preservation, legal exposed outside
+fold/check behavior, mid-hand forks and exactly zero raw nonblind payouts.
+The two menu definitions each pass exact archive reload/mismatch rejection.
+Required seven-package release tests/builds pass before inference; immutable
+source SHA256 f182bb8c50f795eec8fe19fe56ecfc23d9579c76ee7c89543c6497310f88634c.
+
+First require exact old C frozen-reference estimates/miss rate, normalizing
+only the two added disabled option labels. Then train 3M iterations / 5 GB,
+12 nice-10 workers, seats 0/1, seed 26, against mixed-passive plus the experimental
+all-in handoff. That target is fixed before any native-handoff poker result;
+this is an independent adaptive attack, not evidence the defender is ready.
+At five minutes require the latest cumulative training rate to be >=100 it/s;
+otherwise terminate only this owned process group, preserve resource/progress
+logs, and report an incomplete resource experiment without EV or usable weights.
+
+On completion, hash the native archive with buffered/direct reads and require
+exact focused enabled reload. Freeze it for main / mixed-passive / combined
+target variants, both average/argmax extraction, discovery 2026110527 and
+independent confirmation 2026110528, 100k duplicate deals / 600k hands per arm.
+These are actual full-table scores with outside-position folding; retain all
+raw/corrected estimates, original/candidate regression comparisons, miss rates
+and store saturation. Negative finite-learner scores prove no robustness claim.
+Finish/review all C work before explicit release-c.ok allows the worker to
+hash S2 in full, replay its frozen reference and repeat the complete frozen
+matrix. Receipts: /work/sharingan-model-validation/hardening-14. No deployment.
+
+**Current-main API suite stopped on a pre-existing statistical fixture:** the
+full v1 release run reaches pluribus::eval_pipeline, where the 60k-versus-200
+iteration toy comparison produces +167.54 ± 194.97 in the mixed table. Its
+asserted significant win is inconclusive. The API decision repair is not used
+by this native test; the fixture trains Hogwild models and assumes their
+finite-sample strength difference. Preserve the failed suite instead of
+retrying until the random training outcome passes. The other two pipeline
+tests passed; the later API suites had not run in this stopped command.
+
+Replace only that detection fixture with persisted, compacted pure strategies:
+aggressive seats shove/call, the other seats fold to bets. Enumerate every
+reachable preflop public history across the evaluated compositions and store
+the action for every one of the 169 hole-card classes. All pots go to the
+aggressive group, so its group gain is exactly the other group's posted blinds.
+For the actual balanced seatings, raw scores must be +250 / +1,250 / −250
+mbb/game in the three formats, independent of cards. Keep the significant
+positive corrected-edge assertion, all 3,000 deals, and add the known raw-score
+and zero-variance assertions; do not widen a CI or lower a strength threshold.
+Check this fixture with 1/2/4 Rayon workers, then repeat the complete required
+release suite/builds and current-main API replays. Correct the evaluation docs
+to describe the existing eight mixed seatings (block rotations plus two
+alternating patterns); no h2h engine, production policy or historical method
+is changed. V2 archive SHA256
+46230576424c70e93122b8647a469830b7622c5c41687d24424924700b59c4d6;
+fresh receipts: ~/fix/hardening-12/api-realstate-final-v2. API retention remains
+pending this full gate.
+
+**Performance experiment registered before timings:** iteration 3's per-deal
+cache failed end-to-end repeatability and remains rejected. Test a different,
+bounded design: immutable tables of the exact existing 400-sample preflop
+equities for every 1,326 actual hole-card combinations and 1–5 opponents.
+Keep actual cards rather than the 169 rank classes because the deterministic
+sampling seed uses the card mask. Model constructors initialize complete tables
+before serving hands, independent of the private hand; direct fallback callers
+that skip warmup retain the old calculation. Postflop uses the unchanged code.
+The five tables occupy about 108 kB. There is no policy formula, sampling budget,
+translation or random-stream change, and startup time must be included in timing.
+
+First require bit-exact equality for all 6,630 valid preflop keys, reversed-card
+queries, concurrent initialization and postflop bypass. Run all seven required
+release packages, using the same new known-payoff H2H fixture. Against verified
+C require the exact 100k-deal frozen 1M reference. Then require two old and two
+new single-thread 1k-iteration runs at seed 30 to have identical complete native
+learner-file hashes, infosets/slots/nodes/store-full/miss counts, target diagnostics
+and evaluation estimates. Any difference stops the experiment before a speed
+claim. This is stricter than iteration 3's already-failed comparison.
+
+If exactness passes, time old/new subprocesses at seeds 31–35, alternating order,
+one thread, 1 GB, pressure-v1 seats 0/1, fixed combined experimental target,
+200 evaluation deals at seed 2026110529, saving every archive. Include model
+open, cold full-table initialization, training, evaluation and file writing in
+whole-process wall time. Require exact paired archive/statistic identity at
+each seed. Report the geometric paired speedup with a 95% Student-t interval
+over log ratios (df 4, t=2.776445105); its lower bound must exceed 1.20 to justify
+retention. This is a worker/workload performance metric, never a poker EV gain.
+Require final S2 frozen-reference equality and current-main source composition
+before a cache-only commit. C-only jobs stop before that worker's explicit
+model-phase release. Four build/reference workers plus its 12-worker learner
+fit its 16 CPUs; timings use one worker after the build. Source SHA256
+3d58d31150e3f565be124c08283be5279c91cf90e070f6e5f951104b252af20c;
+receipts: /work/sharingan-model-validation/hardening-15. No deployment.
+
+**Snap-restricted native handoff: initial fixed-attack results.** Both independent
+C holdouts pass the registered primary raw/corrected improvement gate, with no
+significant regression in the discovery/holdout matrix. These are 100k duplicate
+deals / 600k actual full-table hands per arm, folding outside the blinds:
+
+| seed / chips left | mixed-passive only | plus snap-restricted handoff |
+|---|---:|---:|
+| 2026110522 / 500 | +3,325.4 ± 81.0 | −4,517.5 ± 46.1 |
+| 2026110523 / 500 | +3,268.5 ± 80.8 | −4,528.6 ± 46.2 |
+| 2026110522 / 4000 | +1,546.1 ± 63.2 | +1,545.7 ± 63.2 |
+| 2026110523 / 4000 | +1,509.6 ± 62.9 | +1,508.9 ± 62.9 |
+
+The 40-BB residual remains significantly profitable. Initial fixed-attack
+success is not retention: frozen/adaptive/SDK/LBR/S2/normal-strength checks
+remain mandatory. All flags stay opt-in in isolated worktrees.
+
+**Nearest-all-in follow-up, registered before measurements.** The existing
+0.5 snap filter excludes the shove from the translation bracket for a 60-BB
+bet. Test a separate default-false flag that computes the full deterministic
+nearest bracket solely for deciding whether to hand off explicitly. Accepted
+translation, true shoves, legal on-menu play and random streams are unchanged.
+`Bracket::Exact` also denotes menu clamping, so it cannot identify exact on-menu
+bets; calculate the full bracket for every opponent raise and test that boundary.
+Mark this new explicit handoff off-tree, leaving the old disabled experiment's
+metadata untouched. Add boundary, on-menu and bench/search/training parity tests,
+plus independently selectable h2h flags. No live environment is changed.
+
+Source SHA256 bf87c38f84d65695a5f63febc578798faba91254922379c75e57fd528fab2066;
+remote seven-package release tests/builds precede inference. Exactly reproduce
+the completed 2026110523 4000-chip snap-handoff holdout with the new flag off,
+including all raw/corrected per-seat values and diagnostics. Baseline is
+mixed-passive plus snap-restricted handoff; candidate additionally enables the
+new nearest-all-in guard. Fresh discovery seed 2026110540, 3,334 duplicate deals
+per arm, both all-seat and blind-only policies, residuals
+1/2/5/10/25/50/100/200/500/1000/2000/3300/3400/4000/5000/6000/7000/8000/
+8504/8505/8506/8507/9000/9150. Primary: 4000 chips, blinds only. Select the
+largest candidate discovery mean (ties: smaller residual, then all-seat), then
+confirm it and the primary at fresh seeds 2026110541/2026110542, 100k duplicate
+deals per arm. Require disjoint raw/corrected primary improvement at discovery
+and both holdouts, reject any significant regression across all sampled pairs.
+Outside-seat raw scores must be exactly zero; corrected-null 4-SE diagnostics
+remain separate from the reported 95% intervals. Initial failure rejects this
+prototype; success still requires full adaptive/frozen/control/final-model and
+normal-strength gates. Receipts: ~/fix/hardening-16; no automatic promotion.
+
+**Current-main API release checks:** v2 completes 185 reported passes across
+40 suites, zero failed/ignored. The same 17 fixture-dependent tests return early;
+168 tests actually execute, including the authenticated 25 single + 25 batch
+cases and all 4,000 generated HTTP cases plus explicit scaled-terminal control.
+The known-payoff fixture passes independently at 1/2/4 workers with exact raw
++250/+1,250/−250 and zero variance. The post-test mandatory-name checker falsely
+rejected a module-qualified Rust test name; preserve failure.json and correct
+only its matching expression. The continuation then stopped before its first
+build because its package-selector variable was missing; preserve that separate
+failure too. V3 verifies all unchanged source hashes, complete test summaries
+and mandatory names before continuing the unfinished build/replay stages.
+No test or poker threshold is relaxed; API retention still awaits those stages.
+
+**Narrow pressure learner completed:** 3M iterations in 3,209.50 seconds,
+83,987,788 infosets / 475,390,968 slots, store not full. Complete native archive
+buffered/direct identity and exact enabled reload pass; unseen evaluation rate
+is 1.72% in the focused discovery sample. Initial actual full-table average
+extraction at discovery 2026110527 scores +55.09 ± 32.91 against main,
+−52.05 ± 32.05 against mixed-passive, and −239.47 ± 30.88 against combined
+snap-handoff. The independent main holdout is +73.20 ± 33.31. Remaining holdout,
+argmax and S2 measurements are pending; this finite learner omits the newly
+identified 4000-chip residual and does not bound all remaining attacks.
+
+The first nearest-handoff build stops before poker inference: its expanded
+bench/search parity test moved a shared `Arc` in the first loop iteration and
+then reused it. Preserve the v1 failed build and its waiting-study failure.
+Clone that test-only Arc, leaving every production source and measurement gate
+unchanged; fresh v2 build/study directories repeat all required release checks.
+Corrected source SHA256 953528d4cdb37df82652090ed8b0a4f7d97a1cb3e5028e130f8933c0718b5651.
+
+**API action repair kept after all gates.** The current-main composed build
+and all twelve 20,004-hand primary/boundary/canonical replays pass: every old
+attacker statistic and target diagnostic is exact on both registered seeds.
+Required release tests/builds pass as reported above. The full independent
+C/S2 API matrices complete their primary improvement and all raw/corrected
+control gates with zero API errors. Main changes only the absent-distribution
+API branch to the existing real-state strength fallback; no native blueprint,
+search policy, translation, model weights or h2h action changes. Retain the
+always-run replay/HTTP tests, the deterministic known-payoff evaluation fixture
+and accurate eight-seating documentation. Experimental native flags and learner
+menus stay outside main. No live service, public result or deployment changes.
+
+| model / seed | original API attacker mbb/game | repaired API |
+|---|---:|---:|
+| verified C / 2026110410 | +14,283.3 ± 910.5 | −2,391.2 ± 453.9 |
+| verified C / 2026110411 | +14,850.8 ± 934.5 | −2,854.3 ± 474.4 |
+| SHARINGAN-2 / 2026110410 | +13,900.5 ± 888.7 | −2,325.7 ± 452.0 |
+| SHARINGAN-2 / 2026110411 | +14,532.0 ± 918.7 | −2,757.5 ± 472.1 |
+
+This API scaling result does not fix the separate native residual-size leak or
+establish robustness. Full exact commands, hashes, raw CIs and all controls:
+~/fix/hardening-11/api-{c-v1,s2-v3}, with composed current-main receipts under
+~/fix/hardening-12/api-realstate-final-v2. Original checker/continuation failures
+remain preserved alongside their explicit recovery receipts.
+
 ### Public arena privacy shutdown (2026-11-05)
 
 The user requested that the displayed bot/reference standings no longer be public.

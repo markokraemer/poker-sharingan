@@ -5,7 +5,8 @@ use bench::bp::{train_toy, CoarseBucketer};
 use bench::compact::CompactPolicy;
 use bench::policy::PolicyFactory;
 use blueprint::compact::{compact_checkpoint, CompactOptions};
-use nlhe::abstraction::BetSizing;
+use nlhe::abstraction::{abstract_actions, ActionList, BetSizing, History};
+use nlhe::{GameConfig, State};
 use pluribus::h2h::{h2h, print_summary, H2hConfig};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,6 +40,45 @@ fn pol(path: &PathBuf, name: &str) -> Arc<dyn PolicyFactory> {
     Arc::new(Named(p, name.to_string()))
 }
 
+fn known_payoff_pair() -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+    // Every aggressive seat shoves/calls; every other seat folds to a bet.
+    // Enumerate all public histories in the tested seatings and store the same
+    // action for all 169 preflop classes. These profiles end before postflop
+    // decisions. This tests persisted/compacted strategies, not CFR convergence.
+    let stores = [blueprint::store::Store::new(1 << 20), blueprint::store::Store::new(1 << 20)];
+    let sizing = BetSizing::tiny();
+    for mask in 0..64u32 {
+        if ![1, 3, 5].contains(&mask.count_ones()) { continue; }
+        let mut state = State::new(&GameConfig::new(6));
+        let mut history = History::new();
+        while !state.is_terminal() {
+            assert_eq!(state.street(), nlhe::Street::Preflop);
+            let aggressive = mask & (1 << state.to_act().unwrap()) != 0;
+            let mut list = ActionList::new();
+            abstract_actions(&state, &sizing, &mut list);
+            let chosen = if aggressive { list.len() - 1 } else { 0 };
+            for bucket in 0..169 {
+                let slot = stores[usize::from(aggressive)].infoset(history.key(), bucket, list.len(), 169, true);
+                stores[usize::from(aggressive)].add_regret(slot, chosen, 1.0);
+                stores[usize::from(aggressive)].bump_avg(slot, chosen);
+            }
+            history.push(chosen);
+            state.apply(list.get(chosen));
+        }
+    }
+    let save = |store: &blueprint::store::Store, tag: &str| {
+        let checkpoint = tmp(&format!("{tag}.bin"));
+        let compact = tmp(&format!("{tag}.plcp"));
+        blueprint::io::save(store, &checkpoint).unwrap();
+        let options = CompactOptions { threads: 4, min_visits: 0, chunk: 1 << 14, group_slots: 1 << 24, part_bytes: 4 << 20, tmp_dir: None };
+        compact_checkpoint(&checkpoint, None, &compact, &options, &|_| {}).unwrap();
+        (checkpoint, compact)
+    };
+    let (strong_checkpoint, strong) = save(&stores[1], "known_aggressive");
+    let (weak_checkpoint, weak) = save(&stores[0], "known_fold");
+    (strong_checkpoint, strong, weak_checkpoint, weak)
+}
+
 #[test]
 fn h2h_self_match_is_zero() {
     let (ck, out) = make(6, 60_000, 5, "self");
@@ -56,16 +96,21 @@ fn h2h_self_match_is_zero() {
 
 #[test]
 fn h2h_detects_a_clear_difference() {
-    // 200 iterations of training vs 60,000: the barely trained blueprint must lose clearly to
-    // the trained one in the mixed table.
-    let (c1, strong) = make(6, 60_000, 5, "strong");
-    let (c2, weak) = make(6, 200, 6, "weak");
+    // All pots go to aggressive seats; their group's gain is exactly the
+    // folding seats' posted blinds, regardless of the cards or training races.
+    let (c1, strong, c2, weak) = known_payoff_pair();
     let cfg = H2hConfig { players: 6, deals: 3000, seed: 9, threads: 4 };
     let rep = h2h(pol(&strong, "strong"), pol(&weak, "weak"), &cfg);
     print_summary(&rep);
     let first = &rep["results"][0]["mbb"];
     let (m, ci) = (first["mbb"].as_f64().unwrap(), first["ci95"].as_f64().unwrap());
-    assert!(m - ci > 0.0, "trained blueprint should beat the untrained one at a mixed table: {m} +- {ci}");
+    assert!(m - ci > 0.0, "known winning profile must have a positive lower bound: {m} +- {ci}");
+    for (result, expected) in rep["results"].as_array().unwrap().iter().zip([250.0, 1250.0, -250.0]) {
+        let raw = &result["raw_mbb"];
+        let actual = raw["mbb"].as_f64().unwrap();
+        assert!((actual - expected).abs() < 1e-8, "{}: {actual} instead of {expected}", result["format"]);
+        assert!(raw["ci95"].as_f64().unwrap() < 1e-6, "known group payoff is card-independent");
+    }
     for p in [c1, strong, c2, weak] {
         let _ = std::fs::remove_file(p);
     }

@@ -10,7 +10,7 @@ In a 6-max duplicate match every deal (hole cards and board) is replayed with th
 so luck of the draw and positional advantage cancel. The same seed gives the same deals across arms, which makes *paired* comparisons between two
 configurations much tighter than independent runs. Formats used:
 
-* `3A + 3B`: three copies of each bot, all seat assignments.
+* `3A + 3B`: three copies of each bot, all six rotations of `AAABBB` plus `ABABAB` and `BABABA` (eight seatings).
 * `1A vs 5B` and `1B vs 5A`: one bot against five copies of the other, in every seat.
 * `hero vs 5 x field`: one bot against five copies of a field bot (blueprint, rule bot, RLCard, SvanBot).
 
