@@ -8,6 +8,15 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
+**2026-11-05 live leaderboard E2E:** at the user's request the old sombra entry
+and its four runs were deleted through the supported admin API. Four fresh operator
+bot entries completed real hosted, signed, verified 20,004-hand runs with zero
+forfeits and sandbox teardown. An unranked executable-identity diagnostic could not establish the deployed
+source version: its marker check failed a positive control, so the initial
+version-mismatch interpretation was withdrawn. These live results do not establish
+deployment of the fix or a current live sombra loss. No services/images/models were rebuilt or reconfigured.
+See [the E2E results and runtime evidence](LEADERBOARD_E2E.md).
+
 **2026-11-04 model-integrity audit:** numerical C evaluations using the original
 `/srv` file are paused. Repeated
 read-only reads of the provided C file returned different bytes at the same offset,
