@@ -380,13 +380,28 @@ impl Core {
             let mut out: Vec<ProbOut> = vec![];
             if let Some(d) = &dist {
                 for i in 0..d.len() {
-                    let a = hand.describe(hand.to_real(d.action(i)));
+                    // Report the same real-chip actions that selection can actually return.
+                    // Several abstract entries may collapse onto one capped action.
+                    let mut real = hand.to_real(d.action(i));
+                    if self.cfg.max_stack_bb > 0.0 {
+                        let cap = (self.cfg.max_stack_bb * hand.big_blind as f64).round() as i64;
+                        if let Some((guarded, _)) = hand.cap_guard(real, cap) {
+                            real = guarded;
+                        }
+                    }
+                    if !hand.is_legal(real) {
+                        real = hand.passive();
+                    }
+                    let a = hand.describe(real);
                     let p = d.prob(i);
                     match out.iter_mut().find(|o| o.kind == a.kind && o.to == a.to) {
                         Some(o) => o.p += p,
                         None => out.push(ProbOut { kind: a.kind, to: a.to, p }),
                     }
                 }
+            } else {
+                let a = hand.describe(ra);
+                out.push(ProbOut { kind: a.kind, to: a.to, p: 1.0 });
             }
             for o in out.iter_mut() {
                 o.p = (o.p * 1e6).round() / 1e6;

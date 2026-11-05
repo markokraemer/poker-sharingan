@@ -8,6 +8,194 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
+### Hardening continuation — finish gates and expand API attacks (2026-11-05)
+
+The user resumed autonomous hardening; public access remains disabled. Resume the
+immutable iteration-8 candidate without changing its formula, gates or old results.
+Its mixed-passive correction reduced the final-model frozen 3M attack from
++2,543.1 ± 105.7 to +428.1 ± 100.0 at discovery and +2,382.6 ± 106.9 to
++251.6 ± 100.8 at holdout: substantial reductions, with remaining profitable play.
+No policy promotion is justified until its unfinished checks pass.
+
+`hardening-11/finish_passive_odds.py` runs as ubuntu/nice 10, at most 12 workers:
+verify immutable executable hashes, buffered/direct full final-model hashes and
+stable metadata, then exactly replay the existing frozen 1M reference. Complete
+the interrupted enabled S2 LBR arm with the existing 20,000-deal seed-5 baseline
+and identical command/configuration. Reuse of that completed baseline is explicit;
+the exact frozen reference verifies model/executable behavior before comparison.
+Run the already registered native one-chip-left attacker against S2, 3,334 duplicate
+deals / 20,004 hands per arm, seeds 2026110410 and 2026110411, disabled/enabled.
+Reject any significant raw or corrected defender regression under the original
+disjoint-95%-interval rule.
+
+Then verify private C in full and perform the original 200-deal mechanical h2h
+smoke followed by both 4,000,000-deal, all-three-format arms at seed 1: S2 disabled
+versus C disabled, then S2 enabled versus C disabled. Only this single prescribed
+h2h process uses both models together; other model jobs are serialized. Require
+the baseline mixed-format CI to overlap the historical +5.09 ± 1.16, investigate
+any discrepancy, and retain all original raw/corrected normal-strength gates.
+Fresh outputs go under `~/fix/hardening-11`; no old incomplete file is overwritten.
+Failures stop the driver and preserve a traceback/commands/logs. All prior external,
+adaptive and frozen-attack gates remain mandatory. No live services or models are
+rebuilt or changed. API repair preparation and compilation may proceed separately,
+but inference against C waits until the S2/h2h queue releases the model cache.
+
+**API repair registration (before new measurements).** Keep iteration 10's
+real-state fallback change isolated from mixed-passive odds: only the API's absent
+distribution branch calls the existing fallback with real state/cards, without
+scaling that action twice; its requested probability response is the actual
+deterministic action with mass one. Extend the model-free royal-flush regression
+to five blind scales, and add always-run authenticated HTTP and batch coverage.
+The first source-only build omitted the compile-time SQL migration; it failed
+before tests or poker evaluation. Preserve that failure and use the complete v2
+archive, SHA256 a498ec3c2cc65918c507cd301e70c5999d57808ce5fcd52aa31c98af2b9f5190.
+Required seven-package release tests/builds run remotely with four workers.
+
+The extended API measurement harness must exactly replay the original near-all-in
+harness's baseline score/per-seat statistics/diagnostics before interpreting its
+results. Primary attack remains BB 1000, one chip left, seeds 2026110410/2026110411,
+3,334 duplicate deals / 20,004 hands per arm; require a profitable baseline lower
+bound above +1,000 and disjoint improvement intervals on each seed. Test boundaries
+2/5/6/10 chips at both seeds, and one chip at BB 100/200/2000/10000. Preserve the
+10-chip exact-grid and BB-100 native controls exactly. All comparisons reject a
+significant raw or corrected defender regression; no post-result sample tuning.
+
+Run all original nine SDK bots through actual Core::decide (search disabled),
+plus nit/TAG/LAG/maniac/station/random, at BB 100 and 1000, seed 2026110411,
+20,004 hands/arm. The SDK adapter independently reconstructs chip/history totals
+and asserts them against each native public state. Keep a hand in one bot process,
+preserve its original code/memory and SDK legalization, abort on timeout/bridge
+failure, and reject logs containing caught bot tracebacks. Sombra remains ubuntu
+only, no-new-privs, empty HOME and credential-free environment. Canonical outcomes
+must match exactly for deterministic bots; Sombra's adaptation and the seeded
+random probe have scheduling-dependent process histories, so use their declared
+raw/corrected regression gates rather than claiming exact replay.
+
+Final S2 API runs share only S2 cache with the native LBR stage (four API workers
+plus at most four SDK processes; <=20 total computing workers including builds).
+They stop if the native queue advances to C or an input/reference gate fails.
+S2 results remain provisional until the new baseline also exactly reproduces the
+historical C API positive and exact-grid controls, and C passes the same repair
+checks. No API result, source-only build or synthetic nuts regression alone
+establishes a proven poker improvement. No live API is restarted or exposed.
+
+**API release validation:** the seven-package release suite completed with 180
+reported passes across 38 suites, zero failures/ignored tests. As in the earlier
+API audit, 17 existing fixture-dependent tests return early because no tiny model
+fixture is installed; 163 tests actually executed. All five mandatory model-free
+regressions executed, including the new authenticated single/batch HTTP test
+(25 single requests plus the same 25 requests in a batch). Separate always-run
+4,000-request legality/probability fuzzing is added to cover mixed player counts,
+deep/short stacks and exact/inexact blind scales; its result is still pending.
+No new poker measurement is claimed by this release-suite result.
+
+**Additional probability-reporting defect (before its repair):** the new
+model-free real-chip HTTP fuzz test failed on generated request h-78010 at BB 30:
+the actual raise was 2,520 after the stack guard capped a proposed 3,060, but
+`probs` still assigned probability one to 3,060. The original 4,000-case run stops
+at that first failure; it does not establish a failure rate over all cases.
+The API poker harness explicitly marks target decisions unexposed, so it never
+uses these metadata for AIVAT. The separate probability repair must apply the
+same cap/legality mapping to every reported distribution entry and aggregate
+actions that map to the same real action, without changing action selection.
+
+Preregister a 512-request model-free deep-stack matrix (six blind scales and
+button positions, 200–711 BB stacks) using a pure-shove source: baseline must
+show all 512 action/probability mismatches and pass the uncapped control. After
+the smallest reporting-only change, require zero mismatches, all sampled actions
+and all other non-timing/non-probability response fields byte-identical, and the
+uncapped control unchanged. Report Wilson 95% intervals for this synthetic error
+rate, never as poker EV. Preserve both source snapshots, commands and response
+arrays. Then rerun the 4,000-case HTTP matrix and required release checks.
+No reporting fix may be counted as a poker-strength improvement.
+
+**Reporting A/B target passed, release gate pending:** after correcting a fixture
+assumption about zero-probability entries (which remain present in the API), the
+baseline reproduces 512/512 mismatches and its uncapped control passes. The
+reporting-only candidate gives 0/512, with every non-timing/non-probability response
+field identical. Wilson reference intervals are [99.255%,100%] and [0%,0.745%]
+over the fixed synthetic sample; these do not estimate production frequency.
+The two-raise coalescing and deterministic-fallback probability tests also pass.
+
+With that correction, all 4,000 generated HTTP requests pass legality/probability
+checks, but the initial test then fails its own coverage assertion: none happened
+to enter the outer API fallback. Do not call that first run a passed test. Keep
+its log and add the known scaled-terminal request explicitly, without weakening
+the legality/probability checks. Final v2 source archive
+68a58971c06fbf52535776a526184692059e06b0388e4f62aafb19b47c1d8419 changes
+only that additional test relative to v1. Rerun targeted checks, the 4,000 generated
+plus one explicit HTTP case, and the required seven-package release suite/builds.
+The production reporting code is unchanged between those candidate versions.
+No reporting change is committed until the complete gate passes.
+
+**Reporting iteration outcome — kept:** v2 passes the 512-case A/B again, the
+uncapped/coalescing/fallback controls, and all 4,000 generated plus one explicit
+authenticated HTTP cases. Generated coverage: preflop/flop/turn/river
+2,445/870/440/245; 2/3/4/5/6 players 726/779/832/849/814. The required seven-package
+release suite reports 184 passes / 39 suites, zero failures/ignored; excluding
+the 17 existing fixture-dependent early returns, 167 tests executed. All release
+builds pass. Commands, source hashes, both response arrays and A/B/validation
+receipts are preserved under ~/fix/hardening-11/probability-{baseline-v2,fixed-v2}.
+Main's changed Rust/test files match the validated source hashes exactly.
+
+The production change only reports guard-mapped probabilities and the existing
+deterministic fallback action; sampling/action selection is unchanged. It does
+not repair the API poker leak or change native blueprint/search strength, so a
+new poker EV or native h2h result is not attributed to this reporting fix. The
+separate real-state action repair and mixed-passive policy remain uncommitted
+pending their own complete gates; public access remains disabled.
+
+**Separate API action-repair preliminary S2 results:** the extended harness exactly
+replays both original-harness control outputs before its first new comparison.
+At BB 1000 / one chip left, 20,004 hands per arm:
+
+| evaluation seed | baseline attacker | real-state fallback candidate |
+|---|---:|---:|
+| 2026110410 | +13,900.5 ± 888.7 | −2,325.7 ± 452.0 |
+| 2026110411 | +14,532.0 ± 918.7 | −2,757.5 ± 472.1 |
+
+Both raw and corrected primary improvements have disjoint intervals. These API
+target decisions are unexposed; never pool with native full-decision AIVAT scores.
+The two-/five-chip variants show the same repair effect, but six-/ten-chip
+exact-grid variants remain profitable (about +4,145 ± 814 on holdout), unchanged
+by this repair. Full SDK/built-in controls, historical C replay and the C matrix
+remain pending; no API poker improvement is retained yet. The Sombra API sample
+also needs follow-up: its canonical BB-100 baseline is +198.9 ± 111.3 and
+candidate +240.4 ± 110.2, unlike the different-seed native worker loss. These
+are distinct sampling/adapter paths, not a paired contradiction or proof of a
+new bug; require native/API distribution parity and independent confirmation
+before interpreting this as an additional Sombra attack bound.
+
+**Stronger attacker variations registered before training:** use the existing
+task-owned PTXP worker main2-1 (16 CPU / 64 GB / 500 GB), which was already running
+and idle with no terminals/agents. Do not change its size or the busy primary.
+Only trusted Rust runs there; no third-party/Sombra code or credentials are copied.
+New boot 4c96fcf0-f7a0-4dd4-9f7a-e7fab5c09202 invalidates the old input certificate:
+first fully hash private C using buffered/direct reads, hash the frozen reference
+learner, and exactly replay its 100k-deal/all-seat reference (+419.45 ± 95.37).
+
+Train three new frozen attackers against the opt-in mixed-passive candidate on C:
+3M iterations each, 15 GB, 12 nice-10 workers: adversarial-menu seat 2 / seed 12;
+adversarial-menu seat 3 / seed 13; and paper-menu every seat / seed 14. The two
+focused seats are exploratory choices from the old C seat audit, not independently
+selected final-model findings. Per-seat training concentrates the finite store;
+the third study tests a different menu across all six seats. Existing full-store
+learner training/evaluation fallback mismatch remains a limitation: record miss
+rates/store saturation and never interpret a negative finite learner as robustness.
+
+Each study saves its native archive, verifies buffered/direct archive hashes,
+and requires exact enabled reload. Evaluate the same frozen policy against
+disabled/enabled target arms at 100,000 duplicate deals per trained seat, discovery
+2026110513 and holdout 2026110514, using both average and argmax extraction (fixed
+within each A/B). Keep all estimates/per-seat/raw results and reject a significant
+defender regression under the original disjoint-CI rule. After all C studies,
+hash S2 in full on this boot, replay its frozen reference exactly, then run all
+the same frozen A/B pairs on S2. Only one target model is used at a time per host.
+These additional attack gates must finish before mixed-passive default promotion.
+Keep all new archives; stop for disk headroom instead of deleting old evidence.
+Exact commands/environments/hashes/logs go under
+/work/sharingan-model-validation/hardening-11/training-v1. No public deployment.
+
 ### Public arena privacy shutdown (2026-11-05)
 
 The user requested that the displayed bot/reference standings no longer be public.
