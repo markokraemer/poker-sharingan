@@ -4,6 +4,7 @@
   "main": "arena-proxy-worker.ts",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
-  "vars": { "UPSTREAM": "https://51-158-206-42.sslip.io" },
+  "preview_urls": false,
+  "vars": { "UPSTREAM": "https://51-158-206-42.sslip.io", "PUBLIC_ARENA_ENABLED": "false" },
   "routes": [{ "pattern": "arena.sharingan.poker", "custom_domain": true }]
 }

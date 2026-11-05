@@ -8,6 +8,35 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
+### Public arena privacy shutdown (2026-11-05)
+
+The user requested that the displayed bot/reference standings no longer be public.
+The public edge now fails closed unless PUBLIC_ARENA_ENABLED is exactly "true";
+the deployed configuration sets "false". All public API paths and methods,
+including result lookups, new submissions, inference and WebSocket handshakes,
+return a generic 503 before any origin fetch. Responses are no-store/noindex.
+Worker development/preview URLs are disabled. The play and standings pages are
+replaced with static unavailable notices without data-fetching scripts, and
+operational run summaries are removed from public site content/model-card drafts.
+
+Records are retained for private validation. No origin service, model, image,
+database record or system configuration is stopped, rebuilt, deleted or changed.
+The GitHub repository is private; detailed evaluation receipts remain there and in
+the existing private work directory. Reopening public access requires an explicit
+decision after validating the intended code/model deployment, plus restoring the
+public UI; switching the edge flag alone is not a validation procedure.
+
+Five remote Node tests passed (zero failures), covering default/malformed flags,
+query/auth/header/encoded-path bypass attempts, writes, WebSocket upgrades, HEAD
+responses and the preserved forwarding/header behavior when explicitly enabled.
+The tests mock origin fetch and assert zero origin calls during maintenance.
+Node v22.23.2 was downloaded from nodejs.org into the private work directory and
+verified against its official SHA256 manifest; no system installation was made.
+Command: nice -n 10 node --experimental-strip-types --test --test-concurrency=1
+arena-proxy-worker.test.ts, under ~/fix/public-arena-private-20261105.
+All 15 HTML pages pass relative-link/JSON-LD checks, notice pages have no scripts,
+operational row identifiers/scores are absent, and skill/model-card mirrors match.
+
 ### Original sombra submission rerun (2026-11-05)
 
 The user requested another run of the original submission against the current

@@ -2,83 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="canonical" href="https://sharingan.poker/play/">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Play Poker Against an AI (SHARINGAN-2) | Poker Sharingan</title>
-<meta name="description" content="Play six-player no-limit hold'em against SHARINGAN-2, an open Pluribus reproduction, in your browser.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
+<meta name="robots" content="noindex, nofollow">
+<title>Public play unavailable | Poker Sharingan</title>
+<link rel="canonical" href="https://sharingan.poker/play/">
 <link rel="stylesheet" href="../shared.css">
-<link rel="stylesheet" href="play.css">
 </head>
 <body>
-<main class="doc pk-doc"><div class="pk">
-  <header class="pk-head">
-    <h1><a href="../" data-int><span class="chip">POKER SHARINGAN</span></a></h1>
-    <nav class="nav"><a href="./" data-int class="on">Play</a><a href="../leaderboard/" data-int>Leaderboard</a><a href="../docs/" data-int>Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav>
-  </header>
-
-  <div class="pk-bar">
-    <div class="btns" id="rooms" role="group" aria-label="Room"></div>
-    <div class="pk-opts">
-      <button class="lnk" id="oUnit" title="Show amounts in big blinds or chips">units: bb</button>
-      <button class="lnk" id="oAuto" title="Deal the next hand automatically">auto-deal: on</button>
-      <button class="lnk" id="oStack" title="Stack mode">stacks: reset</button>
-    </div>
-  </div>
-  <p class="pk-desc muted" id="roomdesc"></p>
-
-  <div id="banner" class="pk-banner" role="status" aria-live="polite"></div>
-
-  <section class="tbl" id="tbl" aria-label="Poker table">
-    <div class="oval"></div>
-    <div class="oval in"></div>
-    <div class="center">
-      <div class="potline" id="potline"></div>
-      <div class="board" id="board"></div>
-    </div>
-    <div id="bets"></div>
-    <div id="seats"></div>
-    <div class="hint" id="tblmsg" aria-live="polite"></div>
-  </section>
-
-  <div class="sidepots" id="pots" aria-live="polite"></div>
-
-  <section class="dock" id="dock">
-    <div class="info" id="info"></div>
-    <div class="sizing" id="sizing" hidden>
-      <div class="presets" id="presets"></div>
-      <div class="sl">
-        <input id="slider" type="range" min="0" max="1" step="1" value="0" aria-label="Raise size">
-        <input id="amt" type="text" inputmode="decimal" autocomplete="off" aria-label="Raise to amount">
-      </div>
-    </div>
-    <div class="acts">
-      <button id="bFold" disabled>Fold <span class="k">f</span></button>
-      <button id="bCall" disabled>Check <span class="k">c</span></button>
-      <button id="bRaise" class="go" disabled>Raise <span class="k">r</span></button>
-    </div>
-    <div class="nextrow" id="nextrow" hidden>
-      <button id="bNext" class="go">Next hand <span class="k">space</span></button>
-      <span id="nextnote" class="muted"></span>
-    </div>
-  </section>
-
-  <section class="sess">
-    <div class="kvr"><span class="up muted">Session</span><span id="result">0 bb, 0 hands</span></div>
-    <div class="kvr"><span class="up muted">Last hand</span><span id="lasthand" class="muted">-</span></div>
-    <div class="sessbtn"><button class="lnk" id="bReset">reset score</button><button class="lnk" id="bNew">new table</button><button class="lnk" id="bLeave">leave table</button></div>
-  </section>
-
-  <section>
-    <div class="up muted logh">Hand history</div>
-    <div id="log" class="log"></div>
-  </section>
-  <p class="muted foot">No limit hold'em, 6-max, blinds <span id="blinds">0.5/1 bb</span>. Amounts are "raise to". "Pot" is the money already in the middle; bets of the current street are shown in front of their players. Reloading the page resumes your table and the hand in progress. Keys: f fold, c check/call, r raise (type or use the slider, Enter confirms, Esc cancels), a select all-in (press a again or Enter to send it), space next hand. SHARINGAN-2 plays its 2e10 checkpoint here, blueprint only, without real-time search. For research and bot arenas.</p>
+<main class="doc"><div class="sheet">
+  <div class="l"><a href="../"><span class="chip">POKER SHARINGAN</span></a></div>
+  <div class="l"><span class="rule">========================================================================================================</span></div>
+  <div class="l"><h1 class="up">Public play unavailable</h1></div>
+  <div class="l"><span class="p">Public play is temporarily unavailable.</span></div>
+  <div class="l"><nav class="nav"><a href="../docs/">Docs</a><a href="https://huggingface.co/markokraemer/sharingan-2">Weights</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
 </div></main>
-<script src="../shared.js"></script>
-<script src="eval.js"></script>
-<script src="play.js"></script>
 </body>
 </html>

@@ -33,6 +33,8 @@ means the Rust crates `blueprint` and `bench` read the PLCP1 files; there is no
 Transformers or PyTorch loader. Real-time turn/river search is optional code,
 not part of the weight file. The checkpoint comparisons below use **no search**.
 
+Public play, hosted benchmarks and standings are temporarily unavailable. The weights and local/self-hosted tooling remain available.
+
 ## Public arena and model names
 
 The public **`sharingan-1` track uses five copies of C@2e10 (SHARINGAN-1), without
@@ -41,11 +43,6 @@ configuration uses C@2e10 with turn/river search. Download and self-host the fin
 file below to use the full SHARINGAN-2 blueprint. The track ID remains
 `sharingan-1`; it is not the model's training budget or a promise about the deployed
 Rust revision.
-
-On November 5, the exact original sombra submission scored **+4,761 ± 492 mbb/game**
-in a fresh verified hosted run against that public **C@2e10** track (20,004 hands,
-zero forfeits). This is not a result against final SHARINGAN-2 or the fixed offline
-build. [Hosted run record](https://arena.sharingan.poker/v1/benchmarks/sharingan-1/runs/w_da35215b0163).
 
 Model weights, action-translation code and deployed worker versions are separate.
 A local fixed-build result must not be presented as a live hosted result. Record
@@ -93,9 +90,7 @@ for exact commands, confidence intervals, reruns and deployment distinctions.
 
 The earlier fixed offline sombra reference, −390 ± 156, reproduced exactly before
 the fresh rerun. Both model files and all original submission files were verified.
-The fresh hosted C@2e10 score above and these offline final-model scores use
-different deal seeds and execution paths; do not pool them or infer a deployment
-source version from the difference. The rerun changes no strategy weights or code.
+These fixed offline samples do not establish any hosted deployment version. Operational hosted-run receipts are private. The rerun changes no strategy weights or code.
 
 Historical six-max gauntlet scores for SHARINGAN-2 against nit / TAG / LAG / maniac /
 calling station / random are +125 ± 35 / +303 ± 56 / +933 ± 85 / +1,622 ± 99 /

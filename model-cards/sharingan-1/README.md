@@ -33,7 +33,9 @@ is released as [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2): i
 
 **Evaluation provenance matters:** model weights, action-translation code and deployed worker versions are separate. The source-level sync fix and offline attack scores do not establish which policy version is deployed. Record the full model checksum, buckets, sizing, code revision and tracking options; the public blueprint fingerprint alone does not establish all of them. See the [current results and deployment checks](https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
 
-**Fresh hosted rerun (2026-11-05):** the exact original sombra archive wins **+4,761 ± 492 mbb/game** against the public C@2e10 track over 20,004 hands, verified with zero forfeits. A new fixed offline C@2e10 run on fresh deals scores **−467 ± 162**, also over 20,004 hands with zero forfeits; the earlier −420 ± 162 fixed reference was reproduced exactly. The hosted and offline samples use different deal seeds and paths, so the behavior gap is not a controlled diagnosis of its cause. [Run record](https://arena.sharingan.poker/v1/benchmarks/sharingan-1/runs/w_da35215b0163).
+**Fixed offline rerun (2026-11-05):** the original tiny-bet attacker scores −467 ± 162 against verified C@2e10 over 20,004 hands, with zero forfeits. The earlier −420 ± 162 fixed reference reproduced exactly. Operational hosted-run receipts are private.
+
+Public play, hosted benchmarks and standings are temporarily unavailable. The weights and local/self-hosted tooling remain available.
 
 ## What is in this repository
 
@@ -125,7 +127,7 @@ Unless noted otherwise: 6-max, duplicate deals + AIVAT, mbb/game (1 mbb/game = 0
 | C@4.77e10 vs C@2e10 (3+3) | +3.8 +- 1.0 |
 | A@2e10 vs C@2e10 (3+3) | -4.0 +- 1.3 |
 | trained best response (12M iters) vs C@2e10 / C@4.77e10 / A@2e10 | -323 +- 62 / -290 +- 59 / -372 +- 61 (this limited attack loses; later adversarial-menu attacks below find profitable deviations) |
-| original sombra strategy (tiny bets misread as checks) vs C@2e10 | historical hosted +5,231 ± 494; fixed **offline** build **−420 ± 162**, 20,004 hands. These do not establish current live behavior; see the current reruns in docs/RESULTS.md |
+| original sombra strategy (tiny bets misread as checks) vs C@2e10 | fixed **offline** build **−420 ± 162**, 20,004 hands. These do not establish current live behavior; see the current reruns in docs/RESULTS.md |
 | frozen adversarial-menu attacker (3M iters / 35 GB) vs fixed C@2e10 / final SHARINGAN-2, no search | **+2,307 +- 75 / +2,466 +- 75**, two deal seeds / 1.2M hands per target; verified model/learner inputs |
 | API chip-rounding attacker vs C@2e10, search disabled | **+14,283 ± 910**, 20,004 hands at 500/1,000 blinds; actual guarded Core API, chance/attacker corrections only, API target decisions unexposed. This is not the native 50/100 blueprint protocol |
 | strong profile LBR vs fixed C@2e10 (raw duplicate winnings, no AIVAT) | **+841 +- 162**, 20k deals / 120k hands; exactly reproduced on a verified public model copy |

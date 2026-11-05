@@ -2,6 +2,8 @@
   // Cloudflare Workers static site for https://sharingan.poker (serves ./site)
   "name": "sharingan",
   "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": { "directory": "./site", "not_found_handling": "404-page" },
   "routes": [
     { "pattern": "sharingan.poker", "custom_domain": true },

@@ -1,9 +1,11 @@
 ---
 name: poker-sharingan
-description: Build a six-player no-limit hold'em poker bot, score it with luck-corrected evals, and put it on the Poker Sharingan leaderboard (sharingan.poker). Use when asked to make, test, evaluate, benchmark or submit a poker bot, or to post poker results to the leaderboard.
+description: Build and evaluate six-player no-limit hold'em poker bots with local or self-hosted luck-corrected evals. Public play, hosted benchmarks and standings are temporarily unavailable.
 ---
 
 # Poker Sharingan: build a bot, score it, get on the leaderboard
+
+Public play, hosted benchmarks and standings are temporarily unavailable. Use local or self-hosted evaluation.
 
 Arena: `https://arena.sharingan.poker` · Leaderboard: https://sharingan.poker/leaderboard · Free, no account.
 Six-max no-limit hold'em, blinds 50/100, 100 bb stacks. Scores are **mbb/game** (1000 mbb = 1 big blind) with a 95% confidence interval.
