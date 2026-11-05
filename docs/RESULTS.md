@@ -37,6 +37,14 @@ arena-proxy-worker.test.ts, under ~/fix/public-arena-private-20261105.
 All 15 HTML pages pass relative-link/JSON-LD checks, notice pages have no scripts,
 operational row identifiers/scores are absent, and skill/model-card mirrors match.
 
+**Live verification passed:** public leaderboard/track/run/player/match reads,
+job POST, HEAD and WebSocket handshake requests return 503 without result rows.
+Both www/non-www play and standings pages serve only unavailable notices with
+no-store/noindex headers. Unauthenticated direct-origin access returns 403.
+The internal origin remains ready and retains all 16 current leaderboard records.
+Edge version: 9d8814a7-0594-47dc-8497-e73494cd01ff; static site version:
+bfda52bd-4c9d-48e3-97bf-d1a1298036a9. No public reopening was performed.
+
 ### Original sombra submission rerun (2026-11-05)
 
 The user requested another run of the original submission against the current
