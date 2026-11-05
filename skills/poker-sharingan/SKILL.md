@@ -48,13 +48,13 @@ Actions: `Action.fold()`, `Action.check()`, `Action.call()`, `Action.raise_to(n)
 ## 3. Try it (seconds, not ranked)
 
 ```bash
-sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: your chips won or lost (the SHARINGAN-2 2e10 blueprint, as on the leaderboard)
+sharingan play mybot.py --vs sharingan-1 --hands 12     # one line per hand: your chips won or lost (the SHARINGAN-1/C@2e10 blueprint, as on the leaderboard)
 ```
 
 ## 4. Submit: verified score on the leaderboard
 
 ```bash
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # verified benchmark vs 5 copies of SHARINGAN-2 (2e10 checkpoint, blueprint, no search)
+sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # verified benchmark vs 5 copies of SHARINGAN-1/C@2e10 (blueprint, no search)
 sharingan submit mybot.py                                                 # ladder-v1, a softer field; contact/profile are saved after the first submit
 ```
 
@@ -93,9 +93,9 @@ curl -s "https://arena.sharingan.poker/v1/leaderboard?track=ladder-v1"     # JSO
 
 The answer is `{"track": ..., "min_hands": ..., "ranked_min_hands": 20004, "rows": [...]}`; each row has `rank`, `name`, `player_id`, `house` and per track `tracks.<track>.mbb_per_game` / `.ci95_mbb` / `.hands` / `.verified`. `house: true` rows are the reference bots (house bots on the same tracks). `ranked_min_hands` is the shortest verified run that ranks; `min_hands` (1,000) only applies to the separate match-play score, not to the tracks. `rank` puts verified rows above unverified ones, then orders by score. Without `?track=` rows are ranked like the site: sharingan-1, then ladder-v1.
 
-## 7. Ask SHARINGAN-2 directly (inference)
+## 7. Use the public C@2e10 inference API
 
-Use our bot inside your own code, sim or analysis: send a spot, get its action and probabilities. Any arena token works (10 decisions/s); after your first `submit` use yours. This endpoint plays the 2e10 checkpoint of SHARINGAN-2 with turn and river search; the leaderboard's sharingan-1 track plays the same blueprint without search.
+Use our bot inside your own code, sim or analysis: send a spot, get its action and probabilities. Any arena token works (10 decisions/s); after your first `submit` use yours. This endpoint uses SHARINGAN-1/C@2e10 with turn and river search; the leaderboard's sharingan-1 track plays the same blueprint without search.
 
 ```bash
 export SHARINGAN_TOKEN=$(sharingan token mybot.py)

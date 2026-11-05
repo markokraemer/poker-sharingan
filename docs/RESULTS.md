@@ -8,6 +8,97 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
+### Original sombra submission rerun (2026-11-05)
+
+The user requested another run of the original submission against the current
+hosted path and the latest retained fixed policy. Retrieve the artifact belonging
+to original job job_f5e9a193262bed4c / deleted historical run w_4bb6e197e24a
+through the runner's artifact API. Its exact compressed SHA256 is
+35414556b62e652763e5355e368d2b25da0d2b1ca9d755b051c54ae31a290d00.
+All 14 Python/data files match the previously tested local sombra copy. No entrant
+contact/profile data is printed or retained. Source is not committed here.
+
+**Fresh hosted result:** **+4,760.7 ± 491.7 mbb/game for sombra**, 20,004 hands,
+fresh duplicate deals + AIVAT, verified, zero forfeits and successful sandbox
+teardown. Job job_e3dc8893ea19c662, new operator player p_e1d1e121fba3,
+[run w_da35215b0163](https://arena.sharingan.poker/v1/benchmarks/sharingan-1/runs/w_da35215b0163).
+This uses the existing hosted worker, C@2e10 track sharingan-1, two lanes and the
+unchanged original archive. It does not recreate the deleted historical row.
+The current hosted path remains significantly profitable for this attack.
+No serving binary, image, model or service configuration was changed.
+
+Driver sharingan-sombra-live-rerun.py and sanitized artifact identity, commands,
+receipts and gate live-rerun.ok are under ~/fix/sombra-rerun-20261105.
+The trusted operator submits POST /v1/jobs in worker mode with hands 20004,
+lanes 2, entry bot.py, artifactTgzBase64 containing the exact original gzip,
+and a stable idempotency key. Bot code runs unprivileged in the existing isolated,
+network-disabled hosted sandbox; credentials stay outside the bot process.
+
+**Fixed-policy reruns registered before their results:** after the live job ends,
+run only on the existing work host as ubuntu at nice 10, with no credentials in
+the child environment and no-new-privs inherited by bot processes. Use immutable
+arena-odds SHA256 43a141acf05e71fd8dc64c966b9fc85700bd63022682c690a52b1d2b0fbdb6f7,
+with ARENA_PASSIVE_ODDS=0, the validated fixed baseline; the unfinished odds
+candidate is disabled. This baseline has previously reproduced the retained
+policy exactly. No new Rust policy change is made.
+
+Verify the full private C file against published SHA256 2a4484f6… before any C
+inference, then run the old-leak positive control at seed ab-20004 with
+ARENA_TRACK=pre-sync-fix. Require its lower 95% bound above +1,000. The fixed
+reference at the same seed must exactly match all prior score/CI/hand/error fields
+in hardening-08/sombra-base.json before interpreting a fresh fixed sample at
+seed sombra-rerun-20261105-v1. Then switch to final SHARINGAN-2, verify its full
+SHA256 0f57b296…, exactly replay hardening-08/s2-sombra-base.json at ab-20004,
+and evaluate the same fresh seed. Each run uses 20,004 hands, eight lanes,
+medium sizing and buckets-200. There is one model job at a time; live and private
+phases do not overlap. Stop and investigate any hash/reference/control failure.
+
+Exact private command form, under taskset CPUs 0–15 and setpriv --no-new-privs:
+
+~~~sh
+~/fix/venv/bin/sharingan eval ~/fix/sombra-rerun-20261105/submission/bot.py \
+  --local --track sharingan-1 --hands 20004 --lanes 8 --seed SEED \
+  --quiet --out RESULT.json
+~~~
+
+The driver records the complete constructed environment and absolute argv,
+source hashes, model hashes/stat/boot checks, reference gates and output files.
+Fresh live and private samples use different seeds; do not treat them as a paired
+causal ablation or pool them. Until these checks finish, the new live profit and
+the prior fixed offline losses remain separate findings; neither a source-version
+diagnosis nor a new poker-policy improvement is established.
+
+**C checks completed:** the full private file hash matched published SHA256
+2a4484f6fabf61470a67c941552f5a97c6f6474e14ea010ef94a41d7b5861300
+with unchanged metadata. The old-leak positive control exactly reproduces
+**+5,381.8 ± 513.9**; the fixed ab-20004 reference exactly reproduces
+**−419.6 ± 161.6**, including all recorded hand/error fields. On the registered
+fresh seed the original submission scores **−467.1 ± 161.8** against the fixed
+C@2e10 policy, again 20,004 hands and zero forfeits, crashes or timeouts.
+The live +4,760.7 ± 491.7 and fresh fixed loss have disjoint intervals, but use
+different deal samples and deployment/input paths; this establishes a behavior
+gap, not a controlled diagnosis of its cause.
+
+**Final SHARINGAN-2 checks completed:** the full private S2 file hash matched
+published SHA256 0f57b29605cb0fc5f2ecf4c1fcb266df6321d8459784b1577a30d54bb94c5b8f
+with unchanged metadata. The fixed ab-20004 reference exactly reproduces
+**−390.4 ± 155.5**, including all recorded hand/error fields. On the registered
+fresh seed sombra scores **−526.5 ± 154.4** against final S2, 20,004 hands and zero
+forfeits, crashes or timeouts. The original 14 source/data files still match their
+initial hashes after all evaluations. Marker fixed-rerun.ok is present.
+
+| fresh rerun target/path | sombra mbb/game ± 95% CI | hands | forfeits |
+|---|---:|---:|---:|
+| current hosted C@2e10 worker | **+4,760.7 ± 491.7** | 20,004 | 0 |
+| validated fixed C@2e10 policy | **−467.1 ± 161.8** | 20,004 | 0 |
+| validated fixed final SHARINGAN-2 policy | **−526.5 ± 154.4** | 20,004 | 0 |
+
+The hosted row is a real signed/verified job. Private rows are controlled offline
+evaluations, not manually inserted verified leaderboard scores. No weights or Rust
+policy were changed by this rerun, and no serving deployment was performed.
+The private tests confirm the retained policy's response to this specific attack;
+the stronger profitable frozen learner and separate API weaknesses remain.
+
 **2026-11-05 live leaderboard E2E:** at the user's request the old sombra entry
 and its four runs were deleted through the supported admin API. Four fresh operator
 bot entries completed real hosted, signed, verified 20,004-hand runs with zero
@@ -1961,7 +2052,7 @@ SvanBot vs 5 × rule bots (sim budget, 20k deals):
 | station / random | +14,643 / +4,268 | |
 
 Reading:
-* Our near-equilibrium bot beats SvanBot head-to-head in both seatings, also at SvanBot's full live budget.
+* Our blueprint beats SvanBot head-to-head in both seatings, also at SvanBot's full live budget.
 * SvanBot's online adaptation helps it, by about 35–100 mbb/g compared with its cold priors, but not enough.
 * SvanBot is a far stronger *exploiter of weak fixed bots*, which is what an Open Poker ladder rewards.
 

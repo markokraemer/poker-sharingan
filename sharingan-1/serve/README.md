@@ -1,10 +1,14 @@
-# sharingan-serve: the SHARINGAN-1 inference API
+# sharingan-serve: the Poker Sharingan inference API
 
 Ask the bot for a decision over HTTP. **Stateless**: every request carries the full public hand
-history; the server replays it through `engine/nlhe`, validates every action, asks SHARINGAN-1
-(compact blueprint + turn/river real-time search, the "final config") and returns a **legal** action.
-This endpoint plays SHARINGAN-1 **with** search (it answers from the blueprint when a search slot is busy or the budget runs out).
-The leaderboard's `sharingan-1` track, `sharingan play --vs sharingan-1` and the browser play page use the released blueprint **without** search.
+history; the server replays it through `engine/nlhe`, validates every action, queries the
+configured compact blueprint with optional turn/river search, and returns a **legal** action.
+The public configuration uses **SHARINGAN-1/C@2e10 with search** (it answers from the blueprint when a search slot is busy or the budget runs out).
+The public `sharingan-1` benchmark track, `sharingan play --vs sharingan-1` and browser table use **C@2e10 without search**.
+**SHARINGAN-2 is the final C@1.83e11 weight release**, not a search configuration.
+Self-host with `--blueprint weights/sharingan-2.plcp --buckets data/buckets-200 --sizing medium`
+to use that model. The directory and track names remain unchanged. See the
+[two model cards](../../model-cards/README.md) for results, attack bounds and code/deployment distinctions.
 
 State and action JSON follow [`docs/TABLE_API.md`](../../docs/TABLE_API.md): table seats, 2-char cards
 (`"Ah"`), integer chips, history entries `{seat, type, to}`, and **every amount is a "to"** (the

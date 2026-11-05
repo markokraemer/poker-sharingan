@@ -26,7 +26,7 @@
   "headline": "Six-Player No-Limit Hold'em AI",
   "description": "Why six-player poker AI is harder than heads-up, how Pluribus handled it, what SHARINGAN-2 is, and how to evaluate 6-max bots with 3v3, 1v5 and duplicate play.",
   "datePublished": "2026-11-04",
-  "dateModified": "2026-11-04",
+  "dateModified": "2026-11-05",
   "author": {
    "@type": "Person",
    "name": "Marko Kraemer",
@@ -119,7 +119,7 @@
   <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="../../leaderboard/">Leaderboard</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"></div>
   <div class="l"><h1 class="up">Six-Player No-Limit Hold&#x27;em AI</h1></div>
-  <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
+  <div class="l muted"><span>Updated <time datetime="2026-11-05">November 5, 2026</time></span></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><p>A 6-max poker AI plays no-limit Texas hold'em with six players at the table. It is a harder problem than heads-up, where one opponent faces one bot, and for years it was the open one. This article explains why multiplayer poker AI is difficult, how Pluribus approached it, what is available in the open today, and how to evaluate a six player poker AI fairly.</p></div>
   <div class="l"></div>
@@ -143,20 +143,20 @@
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><h2>What is open today: SHARINGAN-2</h2></div>
   <div class="l"></div>
-  <div class="l"><p>Poker Sharingan is an open, from-scratch reproduction of Pluribus in Rust (Apache-2.0), with an arena that scores six-player bots. <a href="../sharingan-2/">SHARINGAN-2</a> is its model: a blueprint trained to a budget of 1.83e11 MCCFR iterations (finished November 2, 2026), played with real-time search on the turn and river. Weights are on <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a> and the code is on <a href="https://github.com/markokraemer/poker-sharingan">GitHub</a>.</p></div>
+  <div class="l"><p>Poker Sharingan is an open, from-scratch reproduction of Pluribus in Rust (Apache-2.0), with an arena that scores six-player bots. <a href="../sharingan-2/">SHARINGAN-2</a> is its model: a blueprint trained to a budget of 1.83e11 MCCFR iterations (finished November 2, 2026), usable with optional turn and river search from the Rust code. Weights are on <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a> and the code is on <a href="https://github.com/markokraemer/poker-sharingan">GitHub</a>.</p></div>
   <div class="l"></div>
   <div class="l"><p>Here are the results that exist, stated as measured:</p></div>
   <div class="l"></div>
-  <div class="l"><ul><li>An earlier checkpoint (2e10 iterations, with search) won +77.6 bb/100 over 2,329 live hands on a public bot arena.</li><li>A later checkpoint (4.77e10 iterations) beat SvanBot, the top bot on that arena, in both seatings.</li><li>The final SHARINGAN-2 beats the 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game, in a 3 vs 3 seating over 4 million deals with duplicate and AIVAT (95% confidence intervals).</li><li>A short best-response run (12M iterations) found no profitable exploit. That is a sanity check, not a measure of exploitability.</li></ul></div>
+  <div class="l"><ul><li>An earlier checkpoint (2e10 iterations, with search) won +77.6 bb/100 over 2,329 live hands on a public bot arena.</li><li>A later checkpoint (4.77e10 iterations) beat SvanBot, the top bot on that arena, in both seatings.</li><li>The final SHARINGAN-2 beats the 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game, in a 3 vs 3 seating over 4 million deals with duplicate and AIVAT (95% confidence intervals).</li><li>An earlier 12M-iteration learner lost, but a later adversarial-menu attacker wins +2,466 ± 75 mbb/game against the fixed final blueprint on verified inputs, over 1.2M hands without search. Known profitable deviations remain.</li></ul></div>
   <div class="l"></div>
-  <div class="l"><p>SHARINGAN-2 has not played professional humans, and no claim is made here that it is unexploitable or superhuman. It differs from the paper in two known ways: the exact Pluribus bet menus are unpublished, so three menus were built and the medium one won by measurement, and search runs on the turn and river only. You can <a href="../../play/">play it in the browser</a>.</p></div>
+  <div class="l"><p>SHARINGAN-2 has not played professional humans, and no claim is made here that it is unexploitable or superhuman. It differs from the paper in two known ways: the exact Pluribus bet menus are unpublished, so three menus were built and the medium one won by measurement, and search runs on the turn and river only. You can <a href="../../play/">play the earlier C@2e10 checkpoint (SHARINGAN-1) in the browser</a>.</p></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><h2>How to evaluate 6-max bots</h2></div>
   <div class="l"></div>
   <div class="l"><p>Six-handed results are noisy, and the field matters. A bot that beats five weak opponents may lose to five strong ones. Use more than one seating, and always correct for luck.</p></div>
   <div class="l"></div>
-  <div class="l"><table><thead><tr><th>Seating</th><th>Setup</th><th>What it tells you</th></tr></thead><tbody><tr><td>1 vs 5</td><td>One test bot against five copies of a reference bot</td><td>Can the bot beat a fixed opponent? This is the leaderboard format against SHARINGAN-2.</td></tr><tr><td>3 vs 3</td><td>Three copies of bot A against three copies of bot B, seats alternating</td><td>Head-to-head strength between two bots. Used for the SHARINGAN-2 checkpoint comparisons above.</td></tr><tr><td>5 vs 1</td><td>Five copies of the test bot against one reference bot</td><td>Is the bot robust when it faces itself? Pluribus was also tested as one professional against five copies of itself.</td></tr><tr><td>Mixed field</td><td>Several different bots in one table</td><td>Closest to a real lobby, but results depend on who is in it.</td></tr></tbody></table></div>
+  <div class="l"><table><thead><tr><th>Seating</th><th>Setup</th><th>What it tells you</th></tr></thead><tbody><tr><td>1 vs 5</td><td>One test bot against five copies of a reference bot</td><td>Can the bot beat a fixed opponent? This is the leaderboard format against C@2e10 (SHARINGAN-1).</td></tr><tr><td>3 vs 3</td><td>Three copies of bot A against three copies of bot B, seats alternating</td><td>Head-to-head strength between two bots. Used for the SHARINGAN-2 checkpoint comparisons above.</td></tr><tr><td>5 vs 1</td><td>Five copies of the test bot against one reference bot</td><td>Is the bot robust when it faces itself? Pluribus was also tested as one professional against five copies of itself.</td></tr><tr><td>Mixed field</td><td>Several different bots in one table</td><td>Closest to a real lobby, but results depend on who is in it.</td></tr></tbody></table></div>
   <div class="l"></div>
   <div class="l"><p>Then add the corrections. <b>Duplicate</b> replays the same deals with seats rotated, so every bot holds every set of cards. <b>AIVAT</b> ( <a href="https://arxiv.org/abs/1612.06915">Burch et al., 2018</a>) uses a value function to subtract chance luck without bias. Report mbb/game with a 95% confidence interval. <a href="../measuring-poker-bots/">Measuring poker bots</a> explains each step.</p></div>
   <div class="l"></div>

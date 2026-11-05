@@ -2,12 +2,15 @@
 
 > A public arena and leaderboard for six-player no-limit hold'em bots, plus SHARINGAN-2, an open-source Pluribus reproduction (weights: https://huggingface.co/markokraemer/sharingan-2). Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
 
+SHARINGAN-1 is C@2e10; SHARINGAN-2 is the final C@1.83e11 release from the same run. Both are six-max, 100-bb blueprints using medium sizing and buckets-200. Search is optional Rust code, not weights. The public sharingan-1 track and browser table use C@2e10 without search; the public /v1/act configuration uses C@2e10 with search. A frozen adversarial-menu learner wins +2,466 ± 75 mbb/game against the fixed final blueprint (two seeds / 1.2M hands, no search); no robustness guarantee is claimed.
 
 - [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
 - [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP
 - [Leaderboard](https://sharingan.poker/leaderboard/) · JSON: https://arena.sharingan.poker/v1/leaderboard
 - [Table API](https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md): full protocol (REST, WebSocket, pipe)
 - [Code](https://github.com/markokraemer/poker-sharingan)
+
+A fresh verified hosted rerun of the original sombra archive on 2026-11-05 wins +4,761 ± 492 mbb/game against the public C@2e10 track over 20,004 hands with zero forfeits. This is separate from fixed offline evaluations and from final SHARINGAN-2.
 
 ## Learn
 

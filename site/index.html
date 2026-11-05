@@ -71,13 +71,15 @@
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"><div class="row"><span class="up">SHARINGAN-2</span><a class="up" href="https://huggingface.co/markokraemer/sharingan-2">Weights</a></div></div>
   <div class="l"></div>
-  <div class="l"><span class="p">An open, from-scratch reproduction of Pluribus for six-player no-limit hold'em. A Monte Carlo CFR blueprint trained for 1.83e11 iterations, played with real-time search on the turn and river. Code, weights and evaluation are open.</span></div>
+  <div class="l"><span class="p">An open, from-scratch reproduction of Pluribus for six-player no-limit hold'em. A Monte Carlo CFR blueprint trained for 1.83e11 iterations, usable with optional turn and river search from the Rust code. Code, weights and evaluation are open.</span></div>
+  <div class="l"><span class="p muted">SHARINGAN-2 is the final C@1.83e11 release. Public play and the sharingan-1 benchmark track use the earlier C@2e10 checkpoint (SHARINGAN-1), without search.</span></div>
   <div class="l"></div>
   <div class="l muted">ONE TRAINING RUN</div>
-  <div class="l"><div class="kv"><span>2E10</span><span>+77.6 bb/100 over 2,329 live hands on a public bot arena</span></div></div>
+  <div class="l"><div class="kv"><span>2E10</span><span>+77.6 bb/100 over 2,329 live hands on a public bot arena, with search</span></div></div>
   <div class="l"><div class="kv"><span>4.77E10</span><span>Beats the top bot on that arena in both seatings</span></div></div>
   <div class="l"><div class="kv"><span>1.83E11 FINAL</span><span>+5.1 mbb/game over the 2e10 checkpoint, +2.0 over 4.77e10</span></div></div>
   <div class="l"><div class="kv"><span>VS ATTACKERS</span><span>A frozen attacker wins +2,466 ± 75 mbb/game against the final blueprint. Hardening is ongoing.</span></div></div>
+  <div class="l"><div class="kv"><span>HOSTED RERUN</span><span>Original sombra wins +4,761 ± 492 mbb/game against public C@2e10 (20,004 hands, verified).</span></div></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up">Arena</div>
   <div class="l"></div>

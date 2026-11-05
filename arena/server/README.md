@@ -12,14 +12,23 @@ cargo run --release -p sharingan-arena -- --port 8080
 
 ## Self-host
 
-Both benchmark tracks (and `sharingan eval`) seat SHARINGAN-1, so the arena needs a blueprint and its card buckets.
+Both benchmark tracks (and `sharingan eval`) include the configured house blueprint,
+so the arena needs a model file and its card buckets. The public arena uses
+**SHARINGAN-1/C@2e10 without search**. **SHARINGAN-2 is final C@1.83e11** from the same
+training run; search is optional code and is not stored in either weight file.
 
-**The real one** (the same scores as the public leaderboard; ~125 GB disk): download it from [Hugging Face](https://huggingface.co/markokraemer/sharingan-1) (see the [model card](../../MODEL_CARD.md)), then
+**The public checkpoint** (~125 GB disk): download it from [Hugging Face](https://huggingface.co/markokraemer/sharingan-1) (see the [model card](../../model-cards/sharingan-1/README.md)), then
 
 ```bash
 ARENA_BLUEPRINT=$PWD/sharingan-1.plcp ARENA_BUCKETS=tables:$PWD/buckets-200 ARENA_SIZING=medium \
   cargo run --release -p sharingan-arena -- --port 8080
 ```
+
+To use final SHARINGAN-2 locally, download its [169.9-GB weights](https://huggingface.co/markokraemer/sharingan-2)
+and set `ARENA_BLUEPRINT` to `sharingan-2.plcp`; keep `medium` sizing and the same
+`buckets-200` tables. Local scores with that opponent are not public C@2e10 scores.
+Even with the same model, comparisons require matching code revision and tracking
+options; model fingerprints alone do not establish the complete policy version.
 
 **A toy one in a minute** (for testing your setup; its scores are not comparable to the leaderboard):
 

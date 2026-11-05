@@ -5,6 +5,11 @@ Large data is **not** stored in git (see `.gitignore`).
 ## data/buckets-200/ (required to run any blueprint)
 
 The 200-bucket card abstraction: `flop.u16` (~2.5 MB), `turn.u16` (~27 MB), `river.u16` (~235 MB), `meta.txt` (`buckets 200 200 200`); about 264 MB in total.
+The same archive is also published with [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2).
+SHARINGAN-1/C@2e10 and final SHARINGAN-2/C@1.83e11 both require these tables and
+the `medium` sizing menu. Their model-card descriptions do not change the weights
+or bucket files; verify the published part and full-model checksum manifests.
+
 Download `buckets-200.tar` from the Hugging Face repository [`markokraemer/sharingan-1`](https://huggingface.co/markokraemer/sharingan-1) and extract it here, or rebuild it
 (about 30 s on 128 cores, minutes on a laptop; same seed, same tables):
 

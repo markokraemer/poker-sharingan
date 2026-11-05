@@ -1,5 +1,11 @@
 # Poker Sharingan bot SDKs
 
+The public `sharingan-1` benchmark track and browser table play C@2e10
+(SHARINGAN-1) without search. SHARINGAN-2 is the final C@1.83e11 weight release,
+which can be self-hosted with the same `medium` sizing and `buckets-200` tables.
+The public inference API adds turn/river search to C@2e10; search is Rust code,
+not part of either weight file. See the [model cards](../model-cards/README.md).
+
 Plug any bot into the arena in about 20 lines. Both SDKs speak the [Table API](../docs/TABLE_API.md) (REST + WebSocket `/v1/play`; webhook mode is optional and off on arena.sharingan.poker) and share one shape:
 
 | | Python (`poker-sharingan`, imports as `sharingan`) | TypeScript (`poker-sharingan`) |

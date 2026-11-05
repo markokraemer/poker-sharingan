@@ -51,6 +51,12 @@ against the live deployment in this task. The difference in near-all-in scores
 remains unexplained; no policy improvement or regression is inferred from it.
 No additional strategy experiments or deployments were started.
 
+The user subsequently requested the original sombra submission be rerun. That
+separate hosted run completed at +4,760.7 ± 491.7 over 20,004 hands, verified with
+zero forfeits. It is a new operator row, not the restored historical entry. See
+[the original-submission rerun](RESULTS.md#original-sombra-submission-rerun-2026-11-05)
+for its exact artifact identity and the separate fixed-policy checks.
+
 ## Reproduction and evidence
 
 The committed sources are in sdk/python/examples/e2e_*.py. Ordinary public submissions
