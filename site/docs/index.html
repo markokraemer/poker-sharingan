@@ -1,129 +1,71 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<link rel="canonical" href="https://sharingan.poker/docs/">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Build a Poker Bot: Docs | Poker Sharingan</title>
-<meta name="description" content="Bring your poker bot in four steps: install, write act(), try it, submit for a verified score.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
-<link rel="stylesheet" href="../shared.css">
-</head>
-<body>
-<main class="doc"><div class="sheet">
-  <div class="l"></div>
-  <div class="l"><h1 style="font:inherit;margin:0"><a href="../" data-int style="text-decoration:none"><span class="chip">BRING YOUR BOT</span></a></h1><nav class="nav"><a href="../play/" data-int>Play</a><a href="./" data-int class="on">Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
-  <div class="l"></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><span class="p">Four steps. Your bot plays the house ladder and gets a luck-corrected, verified score on the leaderboard.</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><span class="p">Public play, hosted benchmarks and standings are temporarily unavailable. These instructions remain available for local and self-hosted use.</span></div>
-  <div class="l up">Using an agent?</div>
-  <div class="l"></div>
-  <div class="l"><span class="code">Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.</span></div>
-  <div class="l"><span class="p muted">Works in Claude Code, Codex, Cursor. <a href="../skill.md">skill.md</a> is also an Agent Skill: drop it in <span class="red">.claude/skills/poker-sharingan/SKILL.md</span>.</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">1. Install</div>
-  <div class="l"></div>
-  <div class="l"><span class="code">pip install &quot;git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python&quot;
-export SHARINGAN_SERVER=<span class="api">https://arena.sharingan.poker</span></span></div>
-  <div class="l"><span class="p muted">Python 3.9+. Installs straight from GitHub (PyPI later).</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">2. Write act()</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Get the table state, return an action. Amounts are "to", the total on this street. Illegal moves are fixed for you.</span></div>
-  <div class="l"></div>
-  <div class="l"><span class="code"># mybot.py
-from sharingan import Action
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Run locally — Poker Sharingan</title><meta name="description" content="Download the models, build the Rust tools and run Poker Sharingan locally.">
+<meta property="og:title" content="Run locally — Poker Sharingan"><meta property="og:description" content="Download the models, build the Rust tools and run Poker Sharingan locally.">
+<meta property="og:image" content="https://sharingan.poker/media/intro-poster.jpg">
+<link rel="canonical" href="https://sharingan.poker/docs/"><style>
+  :root { --ink:#111; --paper:#fff; --gutter:#8a8a8a; --faint:#c9c9c9; --muted:#595959; --red:#d0141e;
+          --mono:"Source Code Pro", ui-monospace, Menlo, monospace; --lh:1.8; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#e8e8e8; --paper:#0d0d0d; --gutter:#6b6b6b; --faint:#3a3a3a; --muted:#a0a0a0; } }
+  :root[data-theme="dark"] { --ink:#e8e8e8; --paper:#0d0d0d; --gutter:#6b6b6b; --faint:#3a3a3a; --muted:#a0a0a0; }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { overflow-x:hidden; margin:0; background:var(--paper); color:var(--ink); font-family:var(--mono); font-size:15px; line-height:var(--lh); }
+  b, strong, h1, h2, h3, th { font-weight:400; }
+  a { color:inherit; }
+  .doc { counter-reset:ln; padding:48px 0 64px; }
+  .sheet { max-width:96ch; margin:0 auto; padding:0 16px 0 56px; }
+  .l { counter-increment:ln; position:relative; min-height:calc(var(--lh) * 1em); display:flex; flex-wrap:wrap; justify-content:space-between; column-gap:2ch; }
+  .l::before { content:counter(ln); position:absolute; left:-5ch; width:3.2ch; text-align:right; font-size:10px; color:var(--gutter); top:.55em; }
+  .l > * { min-width:0; }
+  .up { text-transform:uppercase; }
+  .muted { color:var(--muted); }
+  .red { color:var(--red); }
+  .rule { color:var(--faint); overflow:hidden; white-space:nowrap; display:block; flex:1 1 0; min-width:0; }
+  .chip { display:inline-block; background:var(--ink); color:var(--paper); padding:0 1.5ch; margin:-1px 0; }
+  .eye { display:inline-block; width:1.05em; height:1.05em; vertical-align:-.17em; margin-left:1.5ch; }
+  .p { display:block; max-width:80ch; }
+  .kv { display:grid; grid-template-columns:18ch minmax(0,1fr); width:100%; }
+  .step { display:grid; grid-template-columns:4ch minmax(0,1fr); width:100%; }
+  .row { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:2ch; width:100%; }
+  .row > :last-child { text-align:right; }
+  .nav { display:flex; flex-wrap:wrap; gap:0 2ch; }
+  .nav a { text-decoration:none; text-transform:uppercase; color:var(--muted); }
+  .nav a:hover { color:var(--ink); text-decoration:underline; }
+  .code { display:block; white-space:pre; overflow-x:auto; color:var(--muted); width:100%; }
+  @media (max-width:640px) {
+    .sheet { padding:0 16px 0 40px; } .l::before { left:-4.2ch; }
+    .kv { grid-template-columns:minmax(0,1fr); }
+    .code { white-space:pre-wrap; }
+  }
 
-def act(s):
-    if s.legal.raise_ and s.hole_cards[0][0] in "AK":
-        return Action.raise_to(3 * s.big_blind)
-    if s.legal.check:
-        return Action.check()
-    return Action.call() if s.pot_odds &lt; 0.25 else Action.fold()</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">3. Try it</div>
-  <div class="l"></div>
-  <div class="l"><span class="code">sharingan play mybot.py --vs sharingan-1 --hands 12     # prints every hand, not ranked</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">4. Submit (free, verified)</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Our machines play the bot in an isolated sandbox (Python, no network, 4 CPU, 12 GB) on fresh secret deals, replayed from every seat so luck cancels, each rotation by a fresh copy of your bot. The score is signed and shown as <span class="red">verified</span> on the leaderboard. Only a verified run of the full 20,004 hands ranks; a shorter <span class="red">--hands</span> run is for testing.</span></div>
-  <div class="l"></div>
-  <div class="l"><span class="code">sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you   # verified benchmark vs five C@2e10 copies (SHARINGAN-1)
-sharingan submit mybot.py                        # ladder-v1, a softer field
-# mybot: +132.4 +- 41.0 mbb/game over 20004 hands on ladder-v1 [VERIFIED, hosted job job_...]</span></div>
-  <div class="l"></div>
-  <div class="l"><span class="p">No account needed: the first run registers the bot, named after the file (<span class="red">deepstack.py</span> plays as deepstack), and saves its token in <span class="red">~/.config/sharingan/tokens.json</span>, so later runs land on the same row. Every submit needs <span class="red">--contact</span> (your email) and <span class="red">--profile</span> (a link to your X, LinkedIn, GitHub or personal page): never shown publicly, saved after the first submit. Print the token with <span class="red">sharingan token mybot.py</span>; on another machine: <span class="red">export SHARINGAN_TOKEN=sk_...</span>. More files: <span class="red">sharingan submit botdir/ --entry bot.py --requirements requirements.txt</span>. A <span class="red">Bot</span> subclass keeps state only within one rotation of a deal (about a sixth of a run), and hosted runs fire only <span class="red">on_hand_end</span> and <span class="red">on_error</span>: rebuild state from <span class="red">s.history</span>.</span></div>
-  <div class="l"><span class="p muted">Limits (free): hands 600 to 200,000 (rounded up to a multiple of 6, so 200,000 becomes 200,004); 1M hands per bot per rolling 24 h (on sharingan-1 also per person: all of one person's bots together, by profile or email), and every accepted job counts its planned hands even if it is aborted or fails; 2 jobs at a time per bot and per address; 10 submits a minute per address. A run must finish within 30 minutes, so roughly under 50 ms per decision on average (a single decision may take up to 5 s). A fast bot plays 20,004 hands in about 15 s. Both benchmark tracks accept submissions.</span></div>
-  <div class="l"></div>
-  <div class="l muted">BOT NEEDS THE NETWORK (LLM, REMOTE MODEL)</div>
-  <div class="l"><span class="code">sharingan benchmark mybot.py --hands 1200        # runs on your machine over a WebSocket: unverified</span></div>
-  <div class="l"></div>
-  <div class="l muted">OR RAW HTTP (your arena bot token is the bearer: TOKEN=$(sharingan token mybot.py))</div>
-  <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' -d '{"botName":"mybot","language":"python","entry":"mybot.py",
-  "track":"ladder-v1","hands":20000,"idempotencyKey":"run-1","contact":"you@example.com","profile":"https://x.com/you",
-  "artifactTgzBase64":"'$(tar czf - mybot.py | base64 | tr -d '\n')'"}'
-# -> {"id":"job_..."}: JOB_ID=job_...
-curl -s <span class="api">https://arena.sharingan.poker</span>/v1/jobs/$JOB_ID -H "authorization: Bearer $TOKEN"   # status, score, verified
-curl -s -X POST <span class="api">https://arena.sharingan.poker</span>/v1/jobs/$JOB_ID/abort -H "authorization: Bearer $TOKEN"
-curl -s <span class="api">https://arena.sharingan.poker</span>/v1/quota -H "authorization: Bearer $TOKEN"        # what you have used today</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">No Python? Use the API</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Any language. Register once, keep the token (shown once), then connect a WebSocket and answer each <span class="red">your_turn</span>. Or just ask for a benchmark.</span></div>
-  <div class="l"></div>
-  <div class="l muted">REGISTER</div>
-  <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/players \
-  -H 'content-type: application/json' \
-  -d '{"name":"mybot","kind":"bot"}'
-# {"player_id":"p_...","token":"sk_..."}: PLAYER_ID=p_... TOKEN=sk_... (the token is shown once)</span></div>
-  <div class="l"></div>
-  <div class="l muted">MATCH (connect the WebSocket below first, or start answers 409 not_connected)</div>
-  <div class="l"><span class="code"># 600 hands, duplicate, vs the ladder
-curl -s <span class="api">https://arena.sharingan.poker</span>/v1/matches \
-  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"participants":["'$PLAYER_ID'"],"field":"ladder",
-       "hands_planned":600,"duplicate":true}'
-# {"match_id":"m_..."}: MATCH_ID=m_...
+  .film { margin:28px 0 38px; width:100%; }
+  .film video { display:block; width:100%; height:auto; aspect-ratio:16/9; background:#151515; border:1px solid var(--faint); }
+  .film figcaption { margin-top:8px; font-size:12px; color:var(--muted); }
+  h2 { font:inherit; text-transform:uppercase; margin:28px 0 12px; }
+  p { max-width:76ch; margin:12px 0; }
+  pre { padding:20px; border:1px solid var(--faint); overflow:auto; font:12px/1.8 var(--mono); }
+  .hero-title { font-size:clamp(25px,5vw,44px); line-height:1.25; letter-spacing:-.05em; margin:28px 0 18px; }
+  .actions { display:flex; gap:24px; flex-wrap:wrap; margin:22px 0; }
+  .actions a { text-underline-offset:5px; }
+</style></head>
+<body><main class="doc"><div class="sheet">
+<nav class="nav" aria-label="Main"><a href="/">Poker Sharingan</a><a href="/docs/">Docs</a><a href="/learn/">Learn</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav>
 
-curl -s -X POST <span class="api">https://arena.sharingan.poker</span>/v1/matches/$MATCH_ID/start \
-  -H "authorization: Bearer $TOKEN"
+<h1 class="hero-title">Run it locally.</h1>
+<p>The source, weights and evaluation tools are available independently. Start with the final SHARINGAN-2 blueprint or explore the earlier SHARINGAN-1 checkpoint.</p>
+<h2>01 / Get the code</h2><pre>git clone https://github.com/markokraemer/poker-sharingan.git
+cd poker-sharingan
+cargo build --release -p sharingan-serve -p bench -p exploit -p pluribus</pre>
+<h2>02 / Download the weights</h2>
+<p>Follow the download, reassembly and checksum steps in the <a href="https://huggingface.co/markokraemer/sharingan-2">SHARINGAN-2 model card</a>. You also need the buckets-200 card abstraction. The final weight file is about 170 GB; plan disk space and RAM accordingly.</p>
+<h2>03 / Start inference</h2><pre>./target/release/sharingan-serve \
+  --blueprint weights/sharingan-2.plcp \
+  --buckets data/buckets-200 --sizing medium --no-auth</pre>
+<p>Use <code>--no-auth</code> only in an isolated local environment. The <a href="https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md">server documentation</a> covers authentication, requests and search configuration.</p>
+<h2>04 / Evaluate</h2>
+<p>Use identical seeds and configuration for A/B comparisons. Record the model checksum, code revision, sizing and buckets, and report confidence intervals. See the <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/EVALUATION.md">evaluation guide</a> and <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md">measured results</a>.</p>
+<p class="muted">Both model releases have known profitable attacks. These tools support research; they do not guarantee optimal or unexploitable play.</p>
 
-curl -s <span class="api">https://arena.sharingan.poker</span>/v1/matches/$MATCH_ID
-# standings: mbb_per_game, ci95_mbb, hands</span></div>
-  <div class="l"></div>
-  <div class="l muted">PLAY LIVE</div>
-  <div class="l"><span class="code">wss://arena.sharingan.poker/v1/play?token=$TOKEN
-→ {"type":"your_turn","data":{"decision_id":"d-1-9","hole_cards":["As","Kd"],...}}
-← {"type":"act","data":{"hand_id":"...","decision_id":"d-1-9","type":"raise","to":800}}</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">Ask SHARINGAN-2</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Send a spot, get the bot's action and probabilities. This plays the 2e10 checkpoint of SHARINGAN-2 with turn and river search (the leaderboard plays the same blueprint without search). Any arena token, 10 decisions/s. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/sharingan-1/serve/README.md">Request format</a>.</span></div>
-  <div class="l"><span class="code">curl -s <span class="api">https://arena.sharingan.poker</span>/v1/act -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"small_blind":50,"big_blind":100,"button_seat":3,"hero_seat":0,"hole_cards":["Ah","Kd"],"board":[],
-       "players":[{"seat":0,"stack_start":10000},{"seat":1,"stack_start":10000},{"seat":2,"stack_start":10000},
-                  {"seat":3,"stack_start":10000},{"seat":4,"stack_start":10000},{"seat":5,"stack_start":10000}],"history":[]}'</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">Links</div>
-  <div class="l"></div>
-  <div class="l"><div class="kv"><span>CODE</span><a href="https://github.com/markokraemer/poker-sharingan">github.com/markokraemer/poker-sharingan</a></div></div>
-  <div class="l"><div class="kv"><span>FULL PROTOCOL</span><a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md">docs/TABLE_API.md</a></div></div>
-  <div class="l"><div class="kv"><span>WEIGHTS</span><a href="https://huggingface.co/markokraemer/sharingan-2">huggingface.co/markokraemer/sharingan-2</a></div></div>
-  <div class="l"><div class="kv"><span>PYTHON SDK</span><a href="https://github.com/markokraemer/poker-sharingan/tree/main/sdk/python">sdk/python</a></div></div>
-  <div class="l"><div class="kv"><span>LEADERBOARD</span><a href="../leaderboard/" data-int>Where your score shows up</a></div></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l muted">For research and bot arenas. Real-money sites ban bots.</div>
-</div></main>
-<script src="../shared.js"></script>
-<script>
-  // Show the API base in curl examples (follows ?api=).
-  document.querySelectorAll(".api").forEach(function (e) { e.textContent = ARENA_API; });
-</script>
-</body>
-</html>
+<footer style="margin-top:48px;color:var(--muted);font-size:12px">Apache-2.0 · Built for research and local experimentation.</footer>
+</div></main></body></html>

@@ -1,23 +1,9 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Poker Sharingan: Open-Source Pluribus Poker AI</title>
-<meta name="description" content="SHARINGAN-2 is an open-source reproduction of Pluribus, the six-player no-limit hold'em poker AI, with weights, code and an arena that scores poker bots without the luck.">
-<meta property="og:title" content="Poker Sharingan: Open-Source Pluribus Poker AI">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Poker Sharingan">
-<link rel="canonical" href="https://sharingan.poker/">
-<meta property="og:description" content="SHARINGAN-2 is an open-source reproduction of Pluribus, the six-player no-limit hold'em poker AI, with weights, code and an arena that scores poker bots without the luck.">
-<meta property="og:image" content="https://sharingan.poker/og.png">
-<meta property="og:url" content="https://sharingan.poker/">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://sharingan.poker/og.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Ccircle r='11' fill='%23111'/%3E%3Ccircle r='10' fill='%23d0141e'/%3E%3Cg fill='%23111'%3E%3Ccircle cy='-5.6' r='1.9'/%3E%3Ccircle cx='4.9' cy='2.8' r='1.9'/%3E%3Ccircle cx='-4.9' cy='2.8' r='1.9'/%3E%3C/g%3E%3Ccircle r='2.2' fill='%23111'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap">
-<style>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Poker Sharingan — Open-source poker AI</title><meta name="description" content="An open-source Rust reproduction of the Pluribus method. Explore trained weights, real-time search and reproducible poker evaluation.">
+<meta property="og:title" content="Poker Sharingan — Open-source poker AI"><meta property="og:description" content="An open-source Rust reproduction of the Pluribus method. Explore trained weights, real-time search and reproducible poker evaluation.">
+<meta property="og:image" content="https://sharingan.poker/media/intro-poster.jpg">
+<link rel="canonical" href="https://sharingan.poker/"><style>
   :root { --ink:#111; --paper:#fff; --gutter:#8a8a8a; --faint:#c9c9c9; --muted:#595959; --red:#d0141e;
           --mono:"Source Code Pro", ui-monospace, Menlo, monospace; --lh:1.8; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#e8e8e8; --paper:#0d0d0d; --gutter:#6b6b6b; --faint:#3a3a3a; --muted:#a0a0a0; } }
@@ -52,57 +38,46 @@
     .kv { grid-template-columns:minmax(0,1fr); }
     .code { white-space:pre-wrap; }
   }
-</style>
-<script type="application/ld+json">
-[{"@context":"https://schema.org","@type":"WebSite","name":"Poker Sharingan","url":"https://sharingan.poker/","description":"Open-source Pluribus reproduction (SHARINGAN-2) and a luck-corrected arena for six-player no-limit hold'em poker bots."},
-{"@context":"https://schema.org","@type":"Organization","name":"Poker Sharingan","url":"https://sharingan.poker/","logo":"https://sharingan.poker/og.png","sameAs":["https://github.com/markokraemer/poker-sharingan","https://huggingface.co/markokraemer/sharingan-2"]},
-{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"SHARINGAN-2","alternateName":["Poker Sharingan","open-source Pluribus"],"description":"An open, from-scratch reproduction of Pluribus (Brown and Sandholm, Science 2019) for six-player no-limit Texas hold'em: Monte Carlo CFR blueprint, real-time search, trained weights.","codeRepository":"https://github.com/markokraemer/poker-sharingan","programmingLanguage":["Rust","Python"],"license":"https://www.apache.org/licenses/LICENSE-2.0","author":{"@type":"Person","name":"Marko Kraemer","url":"https://github.com/markokraemer"},"citation":"https://doi.org/10.1126/science.aay2400","keywords":"pluribus, poker ai, poker bot, counterfactual regret minimization, MCCFR, six-player no-limit hold'em"}]
+
+  .film { margin:28px 0 38px; width:100%; }
+  .film video { display:block; width:100%; height:auto; aspect-ratio:16/9; background:#151515; border:1px solid var(--faint); }
+  .film figcaption { margin-top:8px; font-size:12px; color:var(--muted); }
+  h2 { font:inherit; text-transform:uppercase; margin:28px 0 12px; }
+  p { max-width:76ch; margin:12px 0; }
+  pre { padding:20px; border:1px solid var(--faint); overflow:auto; font:12px/1.8 var(--mono); }
+  .hero-title { font-size:clamp(25px,5vw,44px); line-height:1.25; letter-spacing:-.05em; margin:28px 0 18px; }
+  .actions { display:flex; gap:24px; flex-wrap:wrap; margin:22px 0; }
+  .actions a { text-underline-offset:5px; }
+</style></head>
+<body><main class="doc"><div class="sheet">
+<nav class="nav" aria-label="Main"><a href="/">Poker Sharingan</a><a href="/docs/">Docs</a><a href="/learn/">Learn</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav>
+
+<h1 class="hero-title">Poker AI.<br>Open to study.</h1>
+<p>An open reproduction of the Pluribus method for six-player no-limit hold’em. Explore the strategy, run the models, and build on the code.</p>
+<figure class="film" style="margin-left:0;margin-right:0">
+<video id="intro" controls muted playsinline loop preload="metadata" poster="/media/intro-poster.jpg" aria-label="Poker Sharingan project introduction" width="960" height="540">
+<source src="/media/intro.mp4" type="video/mp4">
+<track kind="captions" src="/media/intro.vtt" srclang="en" label="English">
+<a href="/media/intro.mp4">Watch the project introduction</a></video>
+<figcaption>Open code. Open weights. Reproducible evaluation. <a href="/media/transcript.txt">Video transcript</a></figcaption></figure>
+<div class="actions"><a href="https://github.com/markokraemer/poker-sharingan">Explore the code ↗</a><a href="https://huggingface.co/markokraemer/sharingan-2">Download SHARINGAN-2 ↗</a><a href="/docs/">Run locally →</a></div>
+<h2>The project</h2>
+<p>A Rust poker engine, Monte Carlo CFR training, blueprint inference and optional turn/river search. The evaluation tools use duplicate deals and AIVAT to reduce variance and report confidence intervals.</p>
+<h2>One run. Two releases.</h2>
+<div class="l"><div class="kv"><span>SHARINGAN-1</span><span>C@2e10 — the earlier checkpoint.</span></div></div>
+<div class="l"><div class="kv"><span>SHARINGAN-2</span><span>C@1.83e11 — the full-length blueprint.</span></div></div>
+<p>Both models use six players, 100 bb stacks and the medium bet-size menu. Search is provided by the code, separately from the weights.</p>
+<h2>Start with the source</h2>
+<p><a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/METHOD.md">Read the method</a>, <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/TRAINING.md">train a blueprint</a>, or <a href="/docs/">run inference locally</a>.</p>
+<p class="muted" style="font-size:13px">Research models with known exploitable weaknesses. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md#action-translation-leak-and-fix-nov-2026">Read the evaluation and limitations.</a></p>
+<script>
+const film=document.getElementById('intro');
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches && !navigator.connection?.saveData){
+ const observer=new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){film.play().catch(()=>{});}else{film.pause();}}},{threshold:0.3});
+ observer.observe(film);
+ film.addEventListener('pointerdown',()=>observer.disconnect(),{once:true});
+}
 </script>
-</head>
-<body>
-<main class="doc"><div class="sheet">
-  <div class="l"></div>
-  <div class="l"><h1 style="font:inherit;margin:0"><span class="chip">POKER SHARINGAN</span><svg class="eye" viewBox="-12 -12 24 24" aria-hidden="true"><circle r="11" fill="#111"/><circle r="10" fill="#d0141e"/><g fill="#111"><circle cy="-5.6" r="1.9"/><circle cx="4.9" cy="2.8" r="1.9"/><circle cx="-4.9" cy="2.8" r="1.9"/></g><circle r="2.2" fill="#111"/></svg></h1></div>
-  <div class="l"></div>
-  <div class="l up">An open reproduction of Pluribus.</div>
-  <div class="l up">And an arena that scores poker bots without the luck.</div>
-  <div class="l"></div>
-  <div class="l"><nav class="nav"><a href="play/">Play</a><a href="docs/">Docs</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a><a href="https://huggingface.co/markokraemer/sharingan-2">Weights</a></nav></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><div class="row"><span class="up">SHARINGAN-2</span><a class="up" href="https://huggingface.co/markokraemer/sharingan-2">Weights</a></div></div>
-  <div class="l"></div>
-  <div class="l"><span class="p">An open, from-scratch reproduction of Pluribus for six-player no-limit hold'em. A Monte Carlo CFR blueprint trained for 1.83e11 iterations, usable with optional turn and river search from the Rust code. Code, weights and evaluation are open.</span></div>
-  <div class="l"><span class="p muted">SHARINGAN-2 is the final C@1.83e11 release. Public play and the sharingan-1 benchmark track use the earlier C@2e10 checkpoint (SHARINGAN-1), without search.</span></div>
-  <div class="l"></div>
-  <div class="l muted">ONE TRAINING RUN</div>
-  <div class="l"><div class="kv"><span>2E10</span><span>+77.6 bb/100 over 2,329 live hands on a public bot arena, with search</span></div></div>
-  <div class="l"><div class="kv"><span>4.77E10</span><span>Beats the top bot on that arena in both seatings</span></div></div>
-  <div class="l"><div class="kv"><span>1.83E11 FINAL</span><span>+5.1 mbb/game over the 2e10 checkpoint, +2.0 over 4.77e10</span></div></div>
-  <div class="l"><div class="kv"><span>VS ATTACKERS</span><span>A frozen attacker wins +2,466 ± 75 mbb/game against the final blueprint. Hardening is ongoing.</span></div></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">Arena</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Over a few thousand hands, luck hides skill. We replay every deal from every seat and subtract the luck, so the score reflects how the bot plays.</span></div>
-  <div class="l"></div>
-  <div class="l"><div class="kv"><span>ENGINE</span><span>Six-player no-limit hold'em.</span></div></div>
-  <div class="l"><div class="kv"><span>HARNESS</span><span>Millions of hands on your machine, with error bars.</span></div></div>
-  <div class="l"><div class="kv"><span>HOSTED</span><span>20,004 hands on our machines. A verified score and a replayable seed.</span></div></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l up">Start</div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Give this to your coding agent:</span></div>
-  <div class="l"><span class="code" style="font-size:13px">Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.</span></div>
-  <div class="l"></div>
-  <div class="l"><span class="p">Or by hand:</span></div>
-  <div class="l"><span class="code" style="font-size:13px">pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"
-sharingan submit mybot.py --track sharingan-1 --contact you@example.com --profile https://x.com/you</span></div>
-  <div class="l"></div>
-  <div class="l"><span class="p">A bot is one function. It gets the decision and returns an action:</span></div>
-  <div class="l"><span class="code" style="font-size:13px">→ {"hole_cards": ["As","Kd"], "board": ["7h","2c","9s"], "legal": {"call": {"to": 200}, ...}}
-← {"type": "raise", "to": 800}</span></div>
-  <div class="l"><span class="rule">========================================================================================================</span></div>
-  <div class="l"><nav class="nav"><a href="learn/">Learn</a><a href="learn/pluribus/">Pluribus</a><a href="learn/open-source-pluribus/">Open-source Pluribus</a><a href="learn/poker-bot/">Build a poker bot</a><a href="learn/cfr/">CFR</a></nav></div>
-  <div class="l muted">Apache-2.0. For research and bot arenas; real-money sites ban bots.</div>
-</div></main>
-</body>
-</html>
+
+<footer style="margin-top:48px;color:var(--muted);font-size:12px">Apache-2.0 · Built for research and local experimentation.</footer>
+</div></main></body></html>

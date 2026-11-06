@@ -105,7 +105,7 @@
     "name": "Can I play against SHARINGAN-2?",
     "acceptedAnswer": {
      "@type": "Answer",
-     "text": "Yes, in your browser at sharingan.poker/play/. You can also submit a Python bot and have it scored on the leaderboard."
+     "text": "Download the weights and use the local Rust tools. See the repository evaluation guide for reproducible measurements."
     }
    }
   ]
@@ -116,7 +116,7 @@
 <body>
 <main class="doc"><article class="sheet">
   <div class="l"></div>
-  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="/docs/">Run locally</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"></div>
   <div class="l"><h1 class="up">SHARINGAN-2: Open Six-Player Poker AI</h1></div>
   <div class="l muted"><span>Updated <time datetime="2026-11-05">November 5, 2026</time></span></div>
@@ -132,7 +132,7 @@
   <div class="l"><h2>What SHARINGAN-2 is</h2></div>
   <div class="l"></div>
   <div class="l"><p>SHARINGAN-2 is the final C@1.83e11 strategy table (blueprint) from self-play for six-player, 100-bb no-limit hold'em. SHARINGAN-1 is C@2e10 from the same training run. Both use medium bet sizing and buckets-200. Turn and river search is optional Rust code, not part of the weights. It follows the method of <a href="../pluribus/">Pluribus</a> and ships with the <a href="../open-source-pluribus/">open-source Pluribus reproduction</a>.</p></div>
-  <div class="l"><p>The public browser table and sharingan-1 benchmark track use C@2e10 (SHARINGAN-1) without search. The public /v1/act configuration adds search to that checkpoint. Download and self-host the final weights to use the full SHARINGAN-2 release. Model checksums, code revision and tracking options matter when comparing scores.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>
   <div class="l"><p>The code is in Rust and licensed Apache-2.0 at <a href="https://github.com/markokraemer/poker-sharingan">github.com/markokraemer/poker-sharingan</a>. The weights are at <a href="https://huggingface.co/markokraemer/sharingan-2">huggingface.co/markokraemer/sharingan-2</a>. The model runs on CPUs. No GPU was used to train or play it.</p></div>
   <div class="l"></div>
@@ -148,7 +148,7 @@
   <div class="l"></div>
   <div class="l"><p>The game is abstracted. Preflop is lossless with 169 hand classes. Flop, turn and river use 200 buckets each, with imperfect recall and suit isomorphism. Off-tree bets are handled with a "shadow game" state, which cut exploitability by about 37 times compared with naive nearest-size translation. The <a href="../cfr/">CFR page</a> explains the algorithm family.</p></div>
   <div class="l"></div>
-  <div class="l"><table><thead><tr><th>Checkpoint</th><th>Iterations</th><th>Notes</th></tr></thead><tbody><tr><td>Early</td><td>2e10</td><td>With search, +77.6 bb/100 over 2,329 live hands on a public bot arena. Leaderboard track ID <code>sharingan-1</code>.</td></tr><tr><td>Middle</td><td>4.77e10</td><td>Beat SvanBot, the top bot on that arena, in both seatings.</td></tr><tr><td>Final (SHARINGAN-2)</td><td>1.83e11</td><td>Full budget; the model released.</td></tr></tbody></table></div>
+  <div class="l"><table><thead><tr><th>Checkpoint</th><th>Iterations</th><th>Notes</th></tr></thead><tbody><tr><td>Early</td><td>2e10</td><td>With search, +77.6 bb/100 over 2,329 live hands on a public bot arena.</td></tr><tr><td>Middle</td><td>4.77e10</td><td>Beat SvanBot, the top bot on that arena, in both seatings.</td></tr><tr><td>Final (SHARINGAN-2)</td><td>1.83e11</td><td>Full budget; the model released.</td></tr></tbody></table></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l"></div>
@@ -159,7 +159,7 @@
   <div class="l"><table><thead><tr><th>Match</th><th>mbb/game (95% CI)</th></tr></thead><tbody><tr><td>SHARINGAN-2 vs 2e10 checkpoint</td><td>+5.09 &plusmn; 1.16</td></tr><tr><td>SHARINGAN-2 vs 4.77e10 checkpoint</td><td>+1.97 &plusmn; 0.97</td></tr></tbody></table></div>
   <div class="l"><p>More training helped, with diminishing returns: the gain over the 4.77e10 checkpoint is smaller than the gain over the 2e10 one. The live-arena numbers in the table above are from short runs and carry wide uncertainty.</p></div>
   <div class="l"></div>
-  <div class="l"><p>Why report checkpoints at all? Because they show the training curve. A blueprint is only a snapshot of an iterative process, and each checkpoint is a point on that curve. The 2e10 checkpoint is already strong enough to be the leaderboard reference. The final model is better than it, but the step from 4.77e10 to 1.83e11 iterations is worth only about 2 mbb/game against the middle checkpoint.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>
   <div class="l"><p>In November 2026 an external bot found a real leak: it bet less than the smallest size in the model's menu, the old translation read that as a check, and the model then lost track of the hand and called everything. Against the blueprint without search it won +5.2 big blinds per hand. The fixed Rust source never reads a bet as a check, keeps its view of the hand in step with the real game, and plays by hand strength if it ever cannot. In fixed offline tests the original exploit bot loses 390 ± 156 mbb/game against final SHARINGAN-2 over 20,004 hands, and a set of adversarial bet-size probes loses across the board. A stronger frozen attacker has since won +2,466 ± 75 mbb/game against the final blueprint on verified inputs, over 1.2M hands without search. Hardening is ongoing; see the <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md#action-translation-leak-and-fix-nov-2026">current measurements</a>. No six-player bot can be proven unexploitable.</p></div>
   <div class="l"></div>
@@ -179,7 +179,7 @@
   <div class="l"></div>
   <div class="l"><h2>How to use the weights</h2></div>
   <div class="l"></div>
-  <div class="l"><ul><li><strong>Try the earlier checkpoint.</strong> Open the <a href="../../play/">browser table</a> to play C@2e10 (SHARINGAN-1), without search. No install.</li><li><strong>Download the final model.</strong> Get the files from <a href="https://huggingface.co/markokraemer/sharingan-2">Hugging Face</a> with <code>hf download markokraemer/sharingan-2</code>, verify the part/full-file checksums, and clone the GitHub repo for the code. The <a href="../../docs/">docs</a> have build and run steps.</li><li><strong>Test your bot.</strong> Write <code>act(state)</code> in Python and run <code>sharingan submit mybot.py</code>. A hosted run plays 20,004 hands and returns a verified score. The <a href="../../leaderboard/">leaderboard</a> reference opponent is C@2e10 (SHARINGAN-1) without search.</li><li><strong>Use an agent.</strong> Tell your coding agent: "Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard."</li></ul></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"><p>For guidance on building a bot, see <a href="../poker-bot/">poker bot</a>, and for how solvers differ from bots, <a href="../poker-solver-vs-bot/">poker solver vs bot</a>.</p></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
@@ -204,7 +204,7 @@
   <div class="l"><p class="muted">At huggingface.co/markokraemer/sharingan-2. The code is at github.com/markokraemer/poker-sharingan.</p></div>
   <div class="l"></div>
   <div class="l"><h3>Can I play against SHARINGAN-2?</h3></div>
-  <div class="l"><p class="muted">Yes, in your browser at sharingan.poker/play/. You can also submit a Python bot and have it scored on the leaderboard.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>
   <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up muted">Related</div>

@@ -1,0 +1,9 @@
+Poker Sharingan — project introduction (18 seconds, silent)
+
+An open reproduction of the Pluribus method.
+Six seats. Hidden information.
+Blueprint strategy and optional real-time search.
+Open the black box: Rust code, trained weights, and duplicate-deal + AIVAT evaluation.
+Study. Build. Evaluate.
+sharingan.poker
+Research models; known limitations documented.

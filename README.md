@@ -19,19 +19,12 @@ The final blueprint scores **+5.09 ± 1.16 mbb/game** against SHARINGAN-1 in the
 3-versus-3 format (4M duplicate deals, 95% CI). This measures relative playing
 strength, not resistance to exploitation.
 
-## Exploitation risk
+## Research limits
 
-**Known profitable attacks exist. Do not treat either model as unexploitable.**
-Off-menu action translation and fallback decisions remain important weaknesses.
-The original tiny-bet synchronization bug was fixed, but that did not remove all
-profitable attacks. Experimental countermeasures that failed regression checks
-were not promoted to the default policy.
-
-A frozen 3M-iteration attacker nevertheless wins **+2,466 ± 75 mbb/game against the fixed final SHARINGAN-2 blueprint**, confirmed on two deal seeds with verified model/learner hashes (1.2M hands, duplicate + AIVAT). The same policy wins **+2,307 ± 75 against verified C@2e10**, with both seed results exactly reproduced on a fresh public model copy. An earlier frozen 1M attacker also wins +714 ± 67 against final SHARINGAN-2. Standard local best response also reproduces **+841 ± 162 against verified C**. The original host's supplied model file has inconsistent reads; new evaluations use a separately verified private copy. These are attack bounds against five blueprint copies, without search. Causes and fixes remain under investigation; these tests do not establish unexploitable play. [Measurements and input audit](docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
-
-Work is paused at a documented checkpoint. No hosted service is required or
-promised by this project. See [checkpoint status](docs/CHECKPOINT.md) for what was
-kept, rejected and left incomplete.
+Both models have known exploitable weaknesses, particularly around off-menu bets.
+They are research baselines, not guaranteed optimal strategies.
+[Evaluation results](docs/RESULTS.md#action-translation-leak-and-fix-nov-2026) ·
+[Research checkpoint](docs/CHECKPOINT.md)
 
 ## Use locally
 

@@ -113,7 +113,7 @@
     "name": "How are bots scored on sharingan.poker?",
     "acceptedAnswer": {
      "@type": "Answer",
-     "text": "Six-player no-limit hold'em with duplicate deals and AIVAT correction. Hosted runs play 20,004 hands and give a verified, reproducible score, and the local harness can play millions of hands."
+     "text": "Download the weights and use the local Rust tools. See the repository evaluation guide for reproducible measurements."
     }
    }
   ]
@@ -124,7 +124,7 @@
 <body>
 <main class="doc"><article class="sheet">
   <div class="l"></div>
-  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="../../play/">Play</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
+  <div class="l"><a href="../../" style="text-decoration:none"><span class="chip">POKER SHARINGAN</span></a><nav class="nav"><a href="../">Learn</a><a href="/docs/">Run locally</a><a href="https://github.com/markokraemer/poker-sharingan">GitHub</a></nav></div>
   <div class="l"></div>
   <div class="l"><h1 class="up">Measuring Poker Bot Skill: Duplicate and AIVAT</h1></div>
   <div class="l muted"><span>Updated <time datetime="2026-11-04">November 4, 2026</time></span></div>
@@ -172,9 +172,9 @@
   <div class="l"></div>
   <div class="l"><h2>How sharingan.poker scores bots</h2></div>
   <div class="l"></div>
-  <div class="l"><p>The arena on <a href="../../leaderboard/">sharingan.poker</a> scores six-player no-limit hold'em bots with duplicate deals and AIVAT luck correction. A bot is one Python function, <code>act(state)</code>, submitted with <code>sharingan submit mybot.py</code>. Hosted runs play 20,004 hands and return a verified, reproducible score. The local harness plays millions of hands on your own machine.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>
-  <div class="l"><p>The leaderboard's reference opponent is the blueprint of the 2e10-iteration SHARINGAN-2 checkpoint, without search (track name <code>sharingan-1</code>). For our own comparisons we use the same methods. For example, the final <a href="../sharingan-2/">SHARINGAN-2</a> beats the 2e10 checkpoint by +5.09 ± 1.16 mbb/game and the 4.77e10 checkpoint by +1.97 ± 0.97 mbb/game, in 3 vs 3 seating over 4M deals with duplicate and AIVAT and 95% intervals. Notice how small these edges are per hand, and how the intervals still resolve them.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>
   <div class="l"><p>Want to try it? See the <a href="../poker-bot/">poker bot guide</a>, or read how <a href="../cfr/">CFR</a> produces the strategies being measured and the <a href="../poker-ai-history/">poker AI history</a> for context. Bots are for research and bot arenas; real-money poker sites ban bots.</p></div>
   <div class="l"></div>
@@ -197,7 +197,7 @@
   <div class="l"><p class="muted">They measure the same thing in different units. bb/100 is big blinds per 100 hands; mbb/game is thousandths of a big blind per hand. Multiply bb/100 by 10 to get mbb/game.</p></div>
   <div class="l"></div>
   <div class="l"><h3>How are bots scored on sharingan.poker?</h3></div>
-  <div class="l"><p class="muted">Six-player no-limit hold'em with duplicate deals and AIVAT correction. Hosted runs play 20,004 hands and give a verified, reproducible score, and the local harness can play millions of hands.</p></div>
+  <div class="l"><p>Use the <a href="/docs/">local tools</a> to explore the models and run reproducible evaluations with confidence intervals.</p></div>
   <div class="l"></div>  <div class="l"><span class="rule">========================================================================================================</span></div>
   <div class="l up muted">Related</div>
   <div class="l"><nav class="nav"><a href="../pluribus/">Pluribus</a><a href="../cfr/">CFR explained</a><a href="../poker-ai-history/">Poker AI history</a><a href="../poker-bot/">Poker bot</a></nav></div>

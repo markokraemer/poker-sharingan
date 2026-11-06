@@ -1,25 +1,14 @@
 # Poker Sharingan
 
-> Poker Sharingan provides six-player no-limit hold'em research tooling and SHARINGAN-2, an open-source Pluribus reproduction (weights: https://huggingface.co/markokraemer/sharingan-2). Luck-corrected (duplicate + AIVAT) scores in mbb/game with 95% CIs.
+Open-source Rust reproduction of the Pluribus method for six-player no-limit hold'em.
 
-SHARINGAN-1 is C@2e10; SHARINGAN-2 is the final C@1.83e11 release from the same run. Both are six-max, 100-bb blueprints using medium sizing and buckets-200. Search is optional Rust code, not weights. The public sharingan-1 track and browser table use C@2e10 without search; the public /v1/act configuration uses C@2e10 with search. A frozen adversarial-menu learner wins +2,466 ± 75 mbb/game against the fixed final blueprint (two seeds / 1.2M hands, no search); no robustness guarantee is claimed.
-
-Public play, hosted benchmarks and standings are temporarily unavailable. Use local or self-hosted evaluation.
-
-- [Agent skill: build a bot, score it, submit it to the leaderboard](https://sharingan.poker/skill.md): the one file an agent needs
-- [Docs](https://sharingan.poker/docs/): install, act(), eval, hosted jobs, raw HTTP
-- [Table API](https://github.com/markokraemer/poker-sharingan/blob/main/docs/TABLE_API.md): full protocol (REST, WebSocket, pipe)
-- [Code](https://github.com/markokraemer/poker-sharingan)
-
-## Learn
-
-- [Pluribus poker AI: how it works](https://sharingan.poker/learn/pluribus/)
-- [Open-source Pluribus: code and weights](https://sharingan.poker/learn/open-source-pluribus/)
-- [SHARINGAN-2: the model](https://sharingan.poker/learn/sharingan-2/)
-- [How to build a poker bot](https://sharingan.poker/learn/poker-bot/)
-- [Six-player no-limit hold'em AI](https://sharingan.poker/learn/six-max-poker-ai/)
-- [Poker solver vs poker bot](https://sharingan.poker/learn/poker-solver-vs-bot/)
-- [Counterfactual regret minimization (CFR)](https://sharingan.poker/learn/cfr/)
-- [Poker AI history: Libratus, Pluribus, DeepStack, ReBeL](https://sharingan.poker/learn/poker-ai-history/)
-- [Measuring poker bot skill: duplicate and AIVAT](https://sharingan.poker/learn/measuring-poker-bots/)
+- [Source](https://github.com/markokraemer/poker-sharingan)
+- [Run locally](https://sharingan.poker/docs/)
 - [SHARINGAN-2 weights](https://huggingface.co/markokraemer/sharingan-2)
+- [SHARINGAN-1 weights](https://huggingface.co/markokraemer/sharingan-1)
+- [Agent workflow](https://sharingan.poker/skill.md)
+- [Method](https://github.com/markokraemer/poker-sharingan/blob/main/docs/METHOD.md)
+- [Evaluation](https://github.com/markokraemer/poker-sharingan/blob/main/docs/EVALUATION.md)
+
+Both models have known exploitable weaknesses. Detailed measurements and limitations
+are in docs/RESULTS.md; do not claim unexploitable play.
