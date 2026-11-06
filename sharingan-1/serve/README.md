@@ -21,9 +21,9 @@ player's total contribution on the current street after the action), never a "by
 | `GET /v1/info` | Bearer | model id, blueprint, sizing, search config, live stats |
 | `GET /v1/health` | none | liveness |
 
-**Public endpoint:** `https://arena.sharingan.poker/v1/act` (and `/v1/act/batch`, `/v1/info`). The bearer is any arena
-player token (`sk_...`, from `POST /v1/players` or the first `sharingan submit`; `sharingan token mybot.py` prints it), 10 decisions/s per player. A self-hosted
-server accepts such tokens with `--arena-auth-url http://ARENA` next to its own `--api-keys`.
+**Self-hosted use:** run your own endpoint using the configuration below.
+No project-hosted endpoint is promised. Model releases have known profitable
+attacks; see [checkpoint status](../../docs/CHECKPOINT.md).
 
 ## Run
 

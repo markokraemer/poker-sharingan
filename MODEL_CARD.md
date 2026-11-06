@@ -22,26 +22,33 @@ model-index:
 
 > This is C@2e10, the earlier checkpoint of the training run that produced [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2) at 1.83e11 iterations. The [SHARINGAN-2 model card](https://huggingface.co/markokraemer/sharingan-2) describes the final weights. Both releases have confirmed profitable deviations; longer training is not a robustness guarantee.
 
-SHARINGAN-1 is the reference bot of the [Poker Sharingan](https://sharingan.poker) arena: an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
+SHARINGAN-1 is an earlier blueprint from [Poker Sharingan](https://github.com/markokraemer/poker-sharingan): an open reproduction of Pluribus (Brown & Sandholm, *Science* 2019) for 6-player no-limit Texas hold'em. This repository holds the
 **trained strategy files** and the **card abstraction tables**. Code, training and evaluation tooling: https://github.com/markokraemer/poker-sharingan
 (Rust workspace, "library: custom": there is no `transformers`/`pytorch` loader; the weights are read by the Rust crates `blueprint` and `bench`).
 
-The released SHARINGAN-1 weights are blueprint **C@2e10** (`medium` bet sizes). The search-augmented SHARINGAN-1 agent adds optional turn/river search from the Rust code; search is not stored in these weights. The documented public configurations differ:
-the inference API (`/v1/act`) plays the full bot (it falls back to the blueprint when a search slot is busy); the leaderboard's `sharingan-1` track,
-`sharingan play --vs sharingan-1` and the browser play page use the released blueprint **without** search. The full-budget run (1.83e11 iterations)
-is released as [SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2): its blueprint beats C@2e10 by +5.09 ± 1.16 mbb/game (3 vs 3, 4M duplicate deals). The public track ID stays `sharingan-1`; it uses C@2e10, not the final weights.
+The released weights are blueprint **C@2e10**, with the `medium` action menu.
+Optional turn/river search is implemented in Rust, not stored in the weights.
+The final 1.83e11-iteration release is
+[SHARINGAN-2](https://huggingface.co/markokraemer/sharingan-2).
 
-**Evaluation provenance matters:** model weights, action-translation code and deployed worker versions are separate. The source-level sync fix and offline attack scores do not establish which policy version is deployed. Record the full model checksum, buckets, sizing, code revision and tracking options; the public blueprint fingerprint alone does not establish all of them. See the [current results and deployment checks](https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
+## Release status and risk
 
-**Fixed offline rerun (2026-11-05):** the original tiny-bet attacker scores −467 ± 162 against verified C@2e10 over 20,004 hands, with zero forfeits. The earlier −420 ± 162 fixed reference reproduced exactly. Operational hosted-run receipts are private.
-
-Public play, hosted benchmarks and standings are temporarily unavailable. The weights and local/self-hosted tooling remain available.
+This is an open-source research release for local inference and evaluation.
+**Known profitable attacks exist against both releases.** A verified frozen
+3M-iteration attacker scores +2,307 ±75 mbb/game against C@2e10 and +2,466 ±75
+against final SHARINGAN-2 (duplicate + AIVAT, 95% CI; no search).
+These are finite attack lower bounds, not guarantees about maximum exploitation.
+Off-menu action translation and fallback decisions remain weaknesses.
+Record the model checksum, buckets, sizing, code revision and tracking options.
+Hardening is paused at the documented
+[checkpoint](https://github.com/markokraemer/poker-sharingan/blob/main/docs/CHECKPOINT.md);
+no hosted service is required or promised.
 
 ## What is in this repository
 
 | file | size | what it is |
 |---|---|---|
-| `sharingan-1.plcp.part-*` | 124.7 GB | **SHARINGAN-1**: blueprint C after 2e10 iterations (PLCP1 compact). The blueprint of the bot that played live (with search on top). The arena's leaderboard track and play page run it without search |
+| `sharingan-1.plcp.part-*` | 124.7 GB | **SHARINGAN-1**: blueprint C after 2e10 iterations (PLCP1 compact). Search is optional code, separate from these weights |
 | `C-medium-4.77e10.plcp.part-*` | 141.7 GB | earlier blueprint C checkpoint after 4.77e10 iterations (+3.8 ± 1.0 mbb/game vs C@2e10; the final SHARINGAN-2 is stronger in the reported head-to-head) |
 | `B-local-2e10.plcp.part-*` | 28.3 GB | blueprint B (smaller `local` menu): the light option for normal machines |
 | `A-paper-2e10.plcp.part-*` | 186.9 GB | blueprint A (paper-style menu) |

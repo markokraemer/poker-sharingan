@@ -1447,6 +1447,96 @@ raw/corrected disjoint regression within that matrix. Argmax nearest at the regi
 and−14,161.77 ±148.86. These complete the focused C frozen-policy evidence only;
 the newly queued adapted C/final-model studies and normal strength remain required.
 
+**Larger-host recovery passed the resource gate.** H24's fresh original-host
+build completed207 reported release tests across40 suites,0failed/ignored
+(17fixture early returns), then exactly replayed C's +419.452 ±95.368 frozen
+reference, including miss rate and diagnostics. Candidate-adaptive seed97 passed
+the unchanged five-minute floor at267it/s. By448,672iterations it averaged602it/s;
+the5GB store was full at95,101,978infosets /~0.625Gslots. Preserve and report this
+capacity limitation alongside eventual held-out EV; no upper bound follows from
+a finite, capacity-limited attacker. The original UTG training child continues
+while only its scheduler is held, with guarded automatic resume already installed.
+
+**Main-only cache harness v1 stopped before candidate computation.** The
+baseline experimental binary supports comma-separated seats, but clean main
+accepts only a single seat or `all`. Passing `--seat 0,1` to the isolated main
+candidate panicked during argument parsing, before model loading. Preserve the
+995-second priming run,198.87-second baseline timing and failed candidate log;
+there is no paired speedup or accepted improvement from this attempt.
+
+Use ctx_cache_main_performance_v2.py with supported `--seat 0` in both arms and
+fresh seeds111–115; no CLI feature is added to the candidate. Keep4,096iterations,
+5GB,one worker,one untimed baseline prime per seed, alternating timed order,
+repeat111outside timing, exact full archives/counters/EV/diagnostics and the
+paired log-t95%lower>1.20 gate. Exactness-only evaluation uses256deals seed0716.
+The original five-pair data plan is not shortened or selectively pooled. Source
+eddbb8b… stays unchanged; old failure remains recorded and unretained.
+
+**UTG priority diagnosis registered after training, before new defender arms.**
+The3M UTG adversarial trainer completed with a provisional +963.074 ±147.886,
+raw+977.624 ±183.801 atseed0513;15GB store not full,214,649,189infosets,
+1.3267Gslots,1.765% evaluation misses. The held H12 scheduler has not yet
+certified/reloaded this archive, so do not promote that number prematurely.
+
+Run utg_priority_c_v1.py in H23 utg-priority-c-v1: full buffered/direct archive
+verification, exact odds replay of the training sample, then average-policy
+odds/nearest pairs at0513/0514,100k focusedseat2 deals. Four nice10 workersCPU0–3
+only after the UTG child is confirmed finished. Hold only the own H24 C supervisor
+after its resource gate, leaving its7-worker trainer running; that supervisor
+already holds H12, so the model phase remains C. Guard boot/start time/command
+and resume the same supervisor in finally, cleaning up any owned child. Total
+7training+4fullC+4diagnosis <=15. These duplicate registered cells are priority
+diagnosis only; no pooling or relaxation of the full final-model/strength gates.
+
+**UTG priority diagnosis completed.** Buffered/direct archive verification and
+exact training-score/miss/diagnostic replay passed. Average extraction,100k
+focusedseat2 deals per fixed seed:
+
+| Seed | Odds | Nearest |
+| --- | ---: | ---: |
+| 2026110513 | +963.074 ±147.886 | −3,579.304 ±177.145 |
+| 2026110514 | +1,002.732 ±147.263 | −3,564.941 ±175.914 |
+
+Raw odds→nearest: +977.624 ±183.801→−3,558.224 ±224.019 and
++911.454 ±181.431→−3,691.007 ±221.680. Both corrected/raw improvement gates
+pass, with no within-matrix regression. The H24 supervisor was resumed successfully;
+its trainer continued throughout, and H12 remains held only by the active H24
+study as registered. This is focused C evidence, not a full-table or S2 bound.
+
+The corrected main-only memo experiment's first fresh-seed pair is exact across
+archives/counters/EV/diagnostics:29.180s baseline versus15.946s cached. This is
+preliminary; all five fixed pairs and repeat checks remain mandatory, and no
+source is retained from one pair.
+
+**Completed adaptive follow-up: nearest rejected.** H24 independently completed
+both 3M-iteration candidate-adaptive studies (C seed97; S2 seed98), exact reload
+and identity checks, and both held-out evaluation seeds. The original scheduler
+was resumed; the earlier held/running status above is superseded. The completed
+`hardening-24/adaptive-review-v1/decision.json` rejects `nearest` and retains no
+policy. For argmax extraction, 100k duplicate deals per seed, full-six-seat
+profile folding outside the trained blinds, attacker AIVAT mbb/game (95% CI):
+
+| Target / seed | Snap | Nearest |
+| --- | ---: | ---: |
+| C / 2026110704 | −529.376 ±44.980 | +64.509 ±45.565 |
+| S2 / 2026110714 | −406.322 ±43.170 | +249.430 ±43.855 |
+
+The other S2 held-out seed2026110713 also profits against nearest:
++265.413 ±44.197. These adapted attacks overturn the favorable earlier frozen
+attacker evidence; nearest is not eligible for promotion. Full commands,
+source/binary/model/archive identities, all32 evaluation cells and raw/corrected
+regression decisions are preserved in the two H24 study directories and reviewer.
+This is a finite attacker lower bound, not a claim about maximum exploitability.
+
+**Completed main-only memo timing: inconclusive, not retained.** H22
+`ctx-cache-main-performance-v2/performance-decision.json` reports all five paired
+speedups:1.829916,0.673309,3.656916,0.555692,2.914242. Geometric mean1.488073,
+paired log-t95% CI[0.516776,4.284954]; the preregistered lower-bound>1.20
+performance gate fails. The first favorable pair above was preliminary and does
+not justify keeping this main-only optimization. The earlier experimental-guard
+workload speedup remains a separate, narrower result. No main-only cache source
+or nearest policy is committed or deployed.
+
 ### Public arena privacy shutdown (2026-11-05)
 
 The user requested that the displayed bot/reference standings no longer be public.
@@ -1612,7 +1702,7 @@ paths and correction schemes; no final-S2 near-all-in result is available.
 The measured mixed-odds candidate is not retained on main because its remaining
 final-model and normal-strength gates were unfinished when the user stopped the loop.
 
-**The leak.** A competition entry ("sombra", submitted 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
+**The leak.** An external test bot ("sombra", evaluated 2026-11-03) scored **+5,231 ± 494 mbb/game** over a verified 20,004-hand run against five copies of the leaderboard blueprint (C@2e10, no search). It does not play better poker. It replicates our action translation from the public code and:
 
 1. bets less than the smallest abstract size. With `BelowMenu::Check` (the old default) the blueprint read that bet as a check, which closed the street in its shadow game but not at the table;
 2. once the shadow lost the real game, the policy fell back to check/call for the rest of the hand (`BpPlayer::dist`), with any cards;

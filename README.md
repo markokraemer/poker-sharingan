@@ -1,82 +1,66 @@
 # Poker Sharingan
 
-An open reproduction of [Pluribus](https://doi.org/10.1126/science.aay2400), the first AI to beat professionals at six-player no-limit hold'em, and an arena that scores poker bots with the luck removed.
+An open-source Rust reproduction of the Pluribus method for six-player no-limit
+Texas hold'em: training, blueprint inference, optional real-time search, and
+reproducible duplicate-deal + AIVAT evaluation. Apache-2.0 licensed.
 
-[sharingan.poker](https://sharingan.poker) · [Play](https://sharingan.poker/play/) · [Leaderboard](https://sharingan.poker/leaderboard/) · [Docs](https://sharingan.poker/docs/) · [Weights](https://huggingface.co/markokraemer/sharingan-2) · [Learn](https://sharingan.poker/learn/)
+[SHARINGAN-2 weights](https://huggingface.co/markokraemer/sharingan-2) ·
+[SHARINGAN-1 weights](https://huggingface.co/markokraemer/sharingan-1) ·
+[Method](docs/METHOD.md) · [Evaluation](docs/EVALUATION.md)
 
-## SHARINGAN-2
+## Models
 
-[**SHARINGAN-2**](https://huggingface.co/markokraemer/sharingan-2) is a from-scratch reproduction of Pluribus: a Monte Carlo CFR blueprint trained for 1.83e11 iterations, usable with optional turn and river search from the Rust code.
+SHARINGAN-2 is blueprint C trained for **1.83e11 iterations**. SHARINGAN-1 is the
+**2e10-iteration checkpoint of the same run**. Both use the medium action menu,
+200 postflop buckets, six players and 100 bb starting stacks. Real-time search
+is optional Rust code, not part of the weight files.
 
-One training run, measured along the way:
+The final blueprint scores **+5.09 ± 1.16 mbb/game** against SHARINGAN-1 in the
+3-versus-3 format (4M duplicate deals, 95% CI). This measures relative playing
+strength, not resistance to exploitation.
 
-| checkpoint | result |
-|---|---|
-| 2e10 | +77.6 bb/100 over 2,329 live hands on a public bot arena, with search |
-| 4.77e10 | Beats SvanBot, the top bot on that arena, in both seatings |
-| 1.83e11 (final) | +5.1 ± 1.2 mbb/game over the 2e10 checkpoint, +2.0 ± 1.0 over 4.77e10 (4M deals, 3 vs 3) |
+## Exploitation risk
 
-In November 2026 an external bot found an action-translation leak: bets below the smallest menu size were read as checks, after which the blueprint lost track of the hand and called everything (+5,231 mbb/game without search). That leak is fixed in the Rust source; offline tests of that fixed build put the same bot at −390 ± 156 against final SHARINGAN-2 over 20,004 hands, and the six scripted sizing probes also lose. Hosted deployment results are reported separately.
+**Known profitable attacks exist. Do not treat either model as unexploitable.**
+Off-menu action translation and fallback decisions remain important weaknesses.
+The original tiny-bet synchronization bug was fixed, but that did not remove all
+profitable attacks. Experimental countermeasures that failed regression checks
+were not promoted to the default policy.
 
-Public play, hosted benchmarks and standings are temporarily unavailable while validation runs privately. Model downloads and local/self-hosted tools remain available.
+A frozen 3M-iteration attacker nevertheless wins **+2,466 ± 75 mbb/game against the fixed final SHARINGAN-2 blueprint**, confirmed on two deal seeds with verified model/learner hashes (1.2M hands, duplicate + AIVAT). The same policy wins **+2,307 ± 75 against verified C@2e10**, with both seed results exactly reproduced on a fresh public model copy. An earlier frozen 1M attacker also wins +714 ± 67 against final SHARINGAN-2. Standard local best response also reproduces **+841 ± 162 against verified C**. The original host's supplied model file has inconsistent reads; new evaluations use a separately verified private copy. These are attack bounds against five blueprint copies, without search. Causes and fixes remain under investigation; these tests do not establish unexploitable play. [Measurements and input audit](docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
 
-A frozen 3M-iteration attacker nevertheless wins **+2,466 ± 75 mbb/game against the fixed final SHARINGAN-2 blueprint**, confirmed on two deal seeds with verified model/learner hashes (1.2M hands, duplicate + AIVAT). The same policy wins **+2,307 ± 75 against verified C@2e10**, with both seed results exactly reproduced on a fresh public model copy. An earlier frozen 1M attacker also wins +714 ± 67 against final SHARINGAN-2. Standard local best response also reproduces **+841 ± 162 against verified C**. The original host's supplied model file has inconsistent reads; new evaluations use a separately verified private copy. These are attack bounds against five blueprint copies, without search. Causes and fixes remain under investigation; no six-player bot can be proven unexploitable. [Measurements and input audit](docs/RESULTS.md#action-translation-leak-and-fix-nov-2026).
+Work is paused at a documented checkpoint. No hosted service is required or
+promised by this project. See [checkpoint status](docs/CHECKPOINT.md) for what was
+kept, rejected and left incomplete.
 
-Full numbers: [docs/RESULTS.md](docs/RESULTS.md) · Method: [docs/METHOD.md](docs/METHOD.md) · Model cards: [SHARINGAN-1 and SHARINGAN-2](model-cards/README.md)
+## Use locally
 
-## The arena
-
-Over a few thousand hands, luck hides skill. The arena replays every deal from every seat and subtracts the luck, so a score reflects how the bot plays.
-
-- **Engine:** six-player no-limit hold'em (`engine/`).
-- **Harness:** millions of hands on your own machine, with luck-corrected scores and error bars (`arena/`).
-- **Hosted runs:** submit a bot and our machines play 20,004 hands. You get a verified score on the leaderboard and the deal seed to replay the run.
-
-## Quickstart
-
-Give your coding agent one line:
-
-```
-Read https://sharingan.poker/skill.md, then build a poker bot and get it on the leaderboard.
-```
-
-Or by hand:
+Download and verify the model and bucket files using the
+[model cards](model-cards/README.md), then build the Rust tools:
 
 ```bash
-pip install "git+https://github.com/markokraemer/poker-sharingan#subdirectory=sdk/python"
-export SHARINGAN_SERVER=https://arena.sharingan.poker
-
-sharingan submit mybot.py --contact you@example.com --profile https://github.com/you
-sharingan submit mybot.py --track sharingan-1   # vs five copies of SHARINGAN-1/C@2e10
-sharingan benchmark mybot.py                    # runs on your machine, unverified
+cargo build --release -p sharingan-serve -p bench -p exploit -p pluribus
+./target/release/sharingan-serve \
+  --blueprint weights/sharingan-2.plcp --buckets data/buckets-200 \
+  --sizing medium --no-auth
 ```
 
-A bot is one function, `act(state)`. It receives the decision and returns an action. Amounts are the total to bet to, not the amount added:
-
-```json
-→ {"hole_cards": ["As","Kd"], "board": ["7h","2c","9s"], "pot": 600,
-   "legal": {"fold": true, "call": {"to": 200}, "raise": {"min_to": 400, "max_to": 9800}}}
-← {"type": "raise", "to": 800}
-```
-
-Spec: [docs/TABLE_API.md](docs/TABLE_API.md) · SDKs: [sdk/](sdk/) · Agent skill: [skills/poker-sharingan](skills/poker-sharingan/SKILL.md)
-
-The public `POST https://arena.sharingan.poker/v1/act` endpoint uses SHARINGAN-1/C@2e10 with turn/river search ([format](sharingan-1/serve/README.md)). The public `sharingan-1` benchmark track and browser table use C@2e10 without search. To use the final SHARINGAN-2 weights, self-host with `--blueprint weights/sharingan-2.plcp`. Model weights and the deployed Rust policy version are separate; use the current evaluation records when comparing results.
+Use `--no-auth` only in an isolated local environment. See the
+[inference server documentation](sharingan-1/serve/README.md) for authentication,
+request formats and search configuration. The weights are memory-mapped; plan
+for sufficient disk space and substantial RAM for practical evaluation speed.
 
 ## Repository
 
-```
-engine/        poker rules
-arena/         harness, scoring, reference bots, arena server
-sharingan-1/   SHARINGAN-2 source: training, real-time search, inference server
-sdk/           Python and TypeScript SDKs
-skills/        agent skill
-deploy/        production deployment
-research/      small-game labs and experiments
-docs/          specs, results, method
-site/          sharingan.poker
-```
+- `engine/`: poker rules.
+- `arena/`: evaluation harness, scoring, reference bots and self-hosted server.
+- `sharingan-1/`: training, search and inference code for both model releases.
+- `sdk/`: Python and TypeScript clients.
+- `research/`: small-game experiments.
+- `docs/`: methods, training instructions and measured results.
 
-Self-host the arena: [arena/server](arena/server/README.md#self-host) · Train from scratch: [docs/TRAINING.md](docs/TRAINING.md) · Deployment: [deploy/production](deploy/production/README.md)
+[Train from scratch](docs/TRAINING.md) · [Results](docs/RESULTS.md) ·
+[Self-host](arena/server/README.md#self-host) · [API](docs/TABLE_API.md)
 
-Apache-2.0. For research and bot arenas; real-money sites ban bots.
+For research and local experimentation. Do not use bots to cheat on real-money
+poker services.

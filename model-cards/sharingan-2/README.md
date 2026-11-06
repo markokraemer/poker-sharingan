@@ -33,21 +33,16 @@ means the Rust crates `blueprint` and `bench` read the PLCP1 files; there is no
 Transformers or PyTorch loader. Real-time turn/river search is optional code,
 not part of the weight file. The checkpoint comparisons below use **no search**.
 
-Public play, hosted benchmarks and standings are temporarily unavailable. The weights and local/self-hosted tooling remain available.
+## Release status and risk
 
-## Public arena and model names
-
-The public **`sharingan-1` track uses five copies of C@2e10 (SHARINGAN-1), without
-search**. The browser play page uses that checkpoint too. The public `/v1/act`
-configuration uses C@2e10 with turn/river search. Download and self-host the final
-file below to use the full SHARINGAN-2 blueprint. The track ID remains
-`sharingan-1`; it is not the model's training budget or a promise about the deployed
-Rust revision.
-
-Model weights, action-translation code and deployed worker versions are separate.
-A local fixed-build result must not be presented as a live hosted result. Record
-the model checksum, sizing, buckets, code revision and tracking options with every
-evaluation; the arena's blueprint fingerprint alone does not establish all of them.
+This is an open-source research release for local inference and evaluation.
+No hosted service is required. Both releases have confirmed profitable attacks;
+training budget and head-to-head strength do not establish robustness.
+Action translation and fallback behavior remain exploitable surfaces.
+Model weights and Rust policy versions are separate: record the full model
+checksum, buckets, sizing, code revision and tracking options for each run.
+Hardening is paused; rejected experimental countermeasures are not defaults.
+See the [checkpoint](https://github.com/markokraemer/poker-sharingan/blob/main/docs/CHECKPOINT.md).
 
 ## Results
 

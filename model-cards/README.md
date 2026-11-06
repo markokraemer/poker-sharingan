@@ -6,8 +6,8 @@
 | SHARINGAN-2 | C@1.83e11, 169.9 GB | [source](sharingan-2/README.md) | [weights](https://huggingface.co/markokraemer/sharingan-2) |
 
 Both use the `medium` action menu and `buckets-200`. Search is optional Rust code,
-not part of the weight files. The public `sharingan-1` track uses C@2e10 without
-search; it does not serve the full SHARINGAN-2 release.
+not part of the weight files. Both are research releases with known profitable
+attacks; see [checkpoint status](../docs/CHECKPOINT.md).
 
 Publish only the corresponding README after signing in locally with `hf auth login`:
 
