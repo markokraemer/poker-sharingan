@@ -137,13 +137,17 @@ probabilities (`0.909804`, `0.066667`, ...). An answer that really comes from th
 * `source`: `search` only when the answer comes from the turn/river search average; `blueprint` (no search needed:
   preflop/flop, or search disabled, or the search was skipped/empty, see below), `fallback` (search timed out / slot
   busy / panicked, or the hand could not be mapped; `fallback_reason` says why).
-  A fallback still returns the blueprint action, or a passive legal action if the blueprint cannot be used.
+  Search failure returns the blueprint action. If replay cannot stay synchronized or the policy returns no distribution,
+  the fallback uses the real hand state, cards and pot odds to choose a legal action.
 * `source: "blueprint"` with a `fallback_reason` on a turn/river spot:
   * `off_policy_history`: the hero's earlier actions have ~zero likelihood under the hero's own strategy (typically
     a replayed foreign hand), so the subgame has no mass for the hero's hand. The search is **skipped** (instant answer).
   * `no_search_mass`: a search ran, but its average strategy has nothing for the hero's hand; the answer is the blueprint's.
-* `probs`: the bot's distribution over real legal actions (before the stack guard); `notes`: lenient history repairs and
-  stack-guard rewrites.
+* `probs`: the mixed strategy over real legal actions after mapping, stack guards and legality checks. Actions that
+  collapse onto the same real action have their probabilities combined. A deterministic fallback reports its returned
+  action with probability one. With `sample: false`, action selection is deterministic; `probs` still describes the mixed
+  strategy, so it must not be used as the sampling law for AIVAT in that mode.
+* `notes`: lenient history repairs and stack-guard rewrites.
 
 ### Batch
 

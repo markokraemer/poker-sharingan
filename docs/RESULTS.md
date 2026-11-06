@@ -987,6 +987,321 @@ The new learner-mode suite/release build also completes 209 reported passes /
 40 suites, zero failed/ignored (192 executed after the same 17 fixture returns),
 with documented captured-output checker recovery. No feature code is retained.
 
+**Cache scheduling and final-model retention follow-up.** Before any new C
+coordinator scoring, replace its idle v2 process with v3 (no children/commands
+existed; preserve scheduler-replaced.json). V3 releases only C. The new sole S2
+coordinator waits for all original S2 measurements, both final-model SDK matrices,
+and final-model extraction measurements, including when no handoff survives C.
+This prevents optional S2 work from racing an early h2h cache transition; no
+poker result or threshold changes.
+
+For C-qualified candidates not rejected by S2 SDK/extraction, final confirmation
+uses all four old frozen archives at seeds 2026110548/549, both extractions,
+100k deals; the transferred pressure archive at 2026110527/528, both extractions,
+100k deals; H12's four new archives at 2026110513/514, both extractions and their
+original conditional trained-seat estimates; and fresh 20k-deal weak/strong LBR,
+seed5, 300 samples. All gates use actual raw and corrected CIs, except raw-only
+LBR. Exact original S2 disabled/reference replays are mandatory. Previously fully
+hashed learner inputs require stable stat and manifest identity before reuse.
+
+Fixed final-model blind attacks: 500/4000/8330 chips left, seeds 2026110541/542,
+100k duplicate deals, all four variants. Snap must significantly improve over
+odds at left500, nearest over snap at left4000, in raw and corrected estimates
+at both seeds; any disjoint defender regression rejects retention. Eleven
+nice-10 workers CPU0–10 after all other S2 scoring, so no competing model phase.
+Driver: native_full_s2_clean_v1.py; receipts: hardening-13/native-full-s2-clean-v1.
+It records survivors and releases scheduling only. Independent stronger boundary
+learner review, full normal-strength and final clean main composition remain
+required; no automatic source retention or deployment.
+
+**Normal-strength protocol registered before h2h.** Only C/S2 attack survivors,
+also accepted against the independent new 3M boundary attacker, proceed. Transfer
+only the completed secondary worker's sixteen held-out JSON results/commands and
+input/source/reload/reference proofs; verify every checksum, runtime option,
+seed/menu/seating and independently recompute every raw/corrected CI gate before
+import.done. A resource-aborted or incomplete attacker is not a passed gate.
+
+Serialize after the older odds-only h2h controller. Its explicitly documented
+odds-only candidate rejection remains valid; unexpected I/O/input/test/baseline
+failures stop the new controller. For each qualified combined candidate, use
+200-deal mechanical smoke and then 4,000,000 deals per format, seed1, all three
+formats against unchanged verified C. First run a fresh current-main S2/C
+baseline and require its mixed-format interval to overlap +5.09 ± 1.16. Reject
+any disjoint raw/corrected normal-strength regression, reversing the sign for
+the mirror five-vs-one format. Only this sole 12-worker nice-10 process may map
+both models on the original host. No additional scoring child remains at release.
+Receipts: hardening-14/boundary-s2-{export,import}-v1,
+hardening-13/native-h2h-final-v1; drivers export_boundary_s2_v1.py,
+import_boundary_s2_v1.py, native_h2h_final_v1.py. Final clean main composition and
+full tests/replays remain mandatory after all gates; nothing deploys itself.
+
+**Complete real private-worker C control matrix.** All nine profiles × four
+arms finish, 20,004 hands/cell, seed ab-20004, matching per-profile deal digests,
+zero forfeit/crash/timeout/illegal-action counts and no disjoint corrected-CI
+regression against any earlier arm. The independently replayed frozen control
+and original Sombra pre-fix positive control pass first. Official-worker raw
+point estimates remain preserved; it does not export raw CIs.
+
+| attacker | main | odds | snap | nearest |
+|---|---:|---:|---:|---:|
+| Sombra | −152 ± 129 | −167 ± 128 | −169 ± 128 | −131 ± 132 |
+| quickstart offline | −596 ± 135 | −628 ± 137 | −647 ± 138 | −647 ± 138 |
+| TAG | −466 ± 119 | −464 ± 118 | −466 ± 117 | −466 ± 117 |
+| bracket edges | −4,451 ± 579 | −4,559 ± 583 | −5,156 ± 582 | −6,493 ± 582 |
+| min bet | −5,983 ± 637 | −6,803 ± 641 | −6,686 ± 631 | −6,686 ± 631 |
+| min-raise war | −8,938 ± 736 | −9,373 ± 743 | −9,407 ± 738 | −9,407 ± 738 |
+| overbet | −662 ± 197 | −672 ± 196 | −794 ± 197 | −845 ± 199 |
+| random size | −6,031 ± 492 | −6,506 ± 488 | −7,554 ± 493 | −8,911 ± 486 |
+| tiny shove | −1,802 ± 353 | −1,921 ± 352 | −1,923 ± 352 | −1,923 ± 352 |
+
+Nearest significantly improves over main on bracket-edge and random-size
+profiles. Sombra's nearest interval includes zero; do not claim a proven loss
+there. These are C-only worker controls, not the independent native-adapter
+results or a completed native retention gate. Native SDK/builtin controls and
+trained/frozen/LBR/S2/normal-strength checks remain running/pending.
+
+Correct serve/README's stale pre-guard probability and passive-fallback wording
+to describe the already retained a51a377/899e09b behavior. Clarify that with
+sample:false, mixed-strategy metadata is not the deterministic action law for
+AIVAT. This documentation correction changes no API response or selection.
+
+**Native adapter metadata leak found; affected matrix stopped.** Read-only
+inspection finds the private native SDK helper used the PolicyFactory seed as
+its outward hand ID (and for worker routing). That seed is an invertible mix of
+the deal seed: with the public seat/rotation one can reconstruct every hidden
+card without knowing the job seed. This is a measurement-adapter defect, not a
+new house action or an assertion that Sombra used it. Inspected Sombra uses the
+ID as a memory key; its RNG streams use fixed independent constants. Its partial
+legacy native baseline is +209.7 ± 103.9, which remains recorded as provisional,
+not hidden or claimed to reproduce the real worker's negative score.
+
+Stop only the affected native matrix's process group and idle dependent
+coordinators (no other stopped process had children). Preserve adapter-id-hold.json
+and all partial scores. Actual arena-worker nine-bot results are unaffected: its
+nonpublic-seed IDs already use opaque SHA-based handles. All native trained/frozen
+learners and model/source certificates are unaffected. No live service changes.
+
+Replace both outward IDs and process routing with independent 16-byte OS entropy;
+ignore the private factory seed entirely. Keep every decision of a hand on its
+assigned process; fail closed if entropy cannot be read. New deterministic tests
+reconstruct all cards from 6,144 legacy handles, assert new ID/routing generation
+consumes only independent bytes, and reject an entropy failure. Fresh helper source
+sdk_policy_opaque_v1.rs SHA256
+d896eaedebc474eae4b567bfe314b065eed5d3732d8d27599499d9605745dbe6;
+source-bound fresh build target native-sdk-opaque-build-v1. The underlying H17
+seven-package source remains unchanged and certified by all 205 release passes.
+
+Rerun the entire native C/S2 15-profile/four-arm matrices at their same registered
+cards/seeds/sample counts; first exact native positive-reference replays remain
+mandatory. OS-random handles/routing deliberately contain no deal-seed dependency;
+stateful bot histories remain a distinct statistically evaluated attack. Real
+worker comparisons are not pooled with it. Fresh native directories become
+native-sdk-controls-{c,s2}-opaque-v1; idle C/S2/full/h2h registries become
+native-full-c-clean-v4, native-full-s2-clean-v2, native-h2h-final-v2. Keep all old
+registrations, scores and hold receipts; no phase-release or retention marker is
+forged for an interrupted matrix. All original C/S2/no-regression gates remain.
+
+**Native identity tests pass; clean feature-only composition prepared.** All
+three new opaque-adapter release tests pass, zero failed/ignored: legacy IDs
+recover all 6,144 complete deals; new IDs/routing depend only on independent
+entropy; entropy failure aborts. The new adapter builds, exactly replays the
+native positive reference, and reproduces completed deterministic quickstart/TAG
+statistics before fresh Sombra/probe/builtin measurements. Underlying source and
+house policy remain unchanged. No confidence claim uses the interrupted matrix.
+
+Prepare the optional frozen-learner extraction feature alone on main ad5b35b,
+without any native handoff/odds/menu/cache changes. Archive
+462b55b981d238588b9303782b66003de9ada76d45939cc901775e5ab7d702cf
+changes only exploit::abr/cli and adds four tests. Build only if the registered
+C feature-gain gate passes, otherwise record an explicit skip. After C opaque
+SDK and C extraction stages finish, seven nice-10 build workers CPU15–21 plus
+original11/additionalC4 stay within22. Fresh target/full seven-package release
+suite and exact source hashes are mandatory; final S2 gain/default and selected
+main-arm replays still precede any commit. Driver build_learner_fallback_main_v1.py;
+receipts hardening-19/learner-fallback-main-build-v1. This prepares a reviewable
+composition; neither it nor any native policy code is retained yet.
+
+**Use the existing observational audit while measuring frozen attacks.** Before
+any full-coordinator scoring starts, add the already tested --audit-handoffs
+flag to its frozen evaluations. It preserves decisions/estimates and reconstructs
+public histories to attribute raw payoff and fallback reasons by attacker seat
+and first handoff street. These descriptive conditional means have no independent
+CIs and are not causal effects; missing-infoset fallbacks are excluded. Exact
+old/new/pressure replay assertions remain mandatory, so altered scoring stops.
+Only idle C/S2/full/h2h registries are superseded: native-full-c-clean-v5,
+native-full-s2-clean-v3, native-h2h-final-v3. No old score is repeated/reselected,
+no model/defender/attacker weight changes, and no extra inference job is added.
+This supplies street/seat diagnostics for the next remaining leak within the
+registered scoring budget, rather than collecting only an aggregate score.
+
+**Recovered final-model pressure matrix completed; broad-menu resource failure.**
+Both full S2 hashes match 0f57b2…, and the frozen 1M control exactly reproduces
++680.907618 ± 94.105321. All twelve original frozen pressure-v1 S2 cells complete
+under the recovered boot; no C score or training was repeated. Results/commands
+remain in hardening-14/pressure-s2-continuation-v1 for full reporting below.
+
+The newly registered 15-size boundary learner logs 4,096 iterations / 170s,
+24 it/s. Its five-minute >=100-it/s resource gate stops it. No 3M archive or
+usable attacker score exists; preserve resource-rejected.json and aborted marker.
+Its export is explicitly resource-rejected, not a passed independent attacker
+or a release of the original-host retention gate.
+
+**New performance experiment registered before timing.** The nearest guard now
+hands off moderate off-menu bets too, increasing repeated deterministic preflop
+400-sample fallback work relative to the earlier snap-only cache experiment.
+Keep that earlier 1.17x CI[0.60,2.30] experiment rejected. On this new workload,
+compare the exact H17 source/executable with that source plus only the existing
+exhaustively tested bench.bp cache; source
+f212560d6f4998e3abc2295cd0d8308e09d2241f6a4c2143a7b6ec101e776431.
+Fresh target and full seven-package 207-pass/40-suite release gate precede timing.
+No policy/menu/equity formula changes; all 6,630 card/opponent keys must be bit-exact.
+
+Fixed five paired seeds 81–85, alternating old/cached order, 512 iterations each,
+one worker CPU12, 5-GB store, blind seats, pressure-boundary-v2, verified S2 with
+odds/snap/nearest enabled. Measure full subprocess wall time, including table
+warmup, model/allocator, training, evaluation and archive writes; retain actual
+training seconds as secondary metadata. The 256-deal seed2026110686 evaluation
+is solely an exactness witness, not an attacker-strength result. Require every
+native archive hash, learner counter/miss rate, EV and target diagnostic to match
+bit-for-bit per pair. Repeat seed81 once per arm afterward as a deterministic
+archive check, excluded from the five timing pairs. First exact frozen S2 1M
+reference is mandatory. Paired log-speedup Student-t 95% lower bound must exceed
+1.20 (df4); otherwise no cache or accelerated full run is kept. No sample tuning.
+
+Only the task-owned secondary worker is used; the aborted trainer and all prior
+S2 scoring have ended, with no other model job. Drivers build_boundary_cache_v1.py
+and boundary_cache_performance_v1.py, receipts hardening-20/boundary-cache-{build,
+performance}-v1. Full training, final composition/strength and any source retention
+still require separate validation; no poker gain is claimed by this timing study.
+
+**Complete preflop-table cache rejected again on the broad workload.** Full
+207 release passes/40 suites and frozen S2 reference pass. Every timed/repeated
+learner archive, counter, EV and target diagnostic is exact. Five full-process
+512-iteration speed ratios are 2.1683/0.4682/2.3692/0.4972/2.0834; geometric
+1.2003x, paired log-t 95% CI [0.4264,3.3789]. The lower bound fails 1.20; retain
+no global cache or accelerated 3M run. First runs at each seed take about 57–68s,
+second runs 28–29s regardless of source; repeated seed81 is old29.32/cached29.50s.
+This demonstrates order sensitivity, not its cause. Preserve the rejected result.
+
+**Per-sampled-deal memo experiment registered before building/timing.** A new
+approach caches all streets' deterministic fallback equity inside one CFR deal,
+keyed by actual actor, street and remaining-opponent count: 120 OnceLock cells,
+about 2KB per private traversal context. Recalculate state-dependent price/action
+each time. No global precomputation, no cross-hand cache, no live/API private-card
+timing state; benchmark and serving fallback still use the original calculation.
+Source c864920543b48079d2f70f8701226867312aac3318b568eb1fca92e630e72577
+changes only bench.bp and exploit.abr relative to H17. New tests cover real cards,
+all streets/prices/player counts, exact equity bits, repeats and separate deal
+lifetimes; retain existing training-versus-evaluation parity tests. Fresh full
+seven-package207/40 release gate precedes inference.
+
+Fixed five new paired seeds91–95, 512iterations, one worker CPU12, 5GB, blind seats,
+pressure-boundary-v2, same verified S2/three guards. One untimed baseline priming
+run per seed precedes both timed arms to evaluate warmed-model computation
+explicitly; do not reuse/reselect prior cold timings. Alternate old/cached order,
+repeat91onceperarm afterward, excluded from the estimate. All priming/timed/repeat
+native archive hashes, learner counters, EV and target diagnostics must match,
+as must the frozen S2 control. Measure full process time including model open,
+allocator, training, evaluation and writes; retain child CPU/system time, major/
+minor faults and I/O blocks to assess order effects. Require paired log-t95%
+lower speedup>1.20(df4); otherwise no memo or accelerated run is kept. The
+256-deal seed2026110686 sample is an exactness witness, not an attacker bound.
+No concurrent computation on this task worker. Drivers build_ctx_cache_v1.py and
+ctx_cache_performance_v1.py; fresh hardening-22/ctx-cache-{build,performance}-v1.
+No source retention or model-strength claim follows merely from a timing win.
+
+**Guaranteed-chop leak reproduced in unchanged code.** A separate direct engine
+witness links explicit SHA-pinned baseline libraries, whose bench.bp matches
+current main. Ten legal river nodes (2–6 players, 50/99BB bets, royal board) all
+make fallback fold: −100 chips versus zero by calling, an exact conditional
++1,000mbb/node. This is a local payoff witness, not an unconditional model score
+or statistical CI. Receipt: hardening-21/locked-board-discovery-v1, command
+`nice -n 10 taskset -c 18 witness`, with source/explicit library hashes recorded.
+
+Prepare a separate main-only fallback guard for universally shared river boards:
+royal flushes, rainbow Broadway (at most two of a suit), and quads with the highest
+remaining kicker. Three new native tests enumerate all2,598,960boards, verify all
+709,136 possible holdings on the656recognized boards, reject near-locks, and
+check exact chip payoffs plus every legal continuation of the constructed
+50/99BB river family, including unequal-stack sidepots. A new authenticated
+HTTP/batch test covers30+30decisions at five chip scales and three board classes.
+Source3e33488a2789ffb284d0b2296e5f7eb78d33cb398f7201f9e18b5fe68992c38a
+changes only bench.bp and the new HTTP test relative to main; no native/menu/cache
+prototype is copied. This source is prepared but unbuilt/unretained; full remote
+checks, model controls and normal-strength validation remain before any commit.
+
+**Recovery checkpoint, 2026-11-06.** Detached original-host jobs survived the
+agent interruption. The first new 3M blind-seat residual attacker completed and
+reloaded exactly: +11,655.916 ± 254.174 against the odds prototype on seed0513.
+Main at seeds0513/0514 scores +15,931.668 ± 261.750 / +15,969.609 ± 260.899.
+These are focused trained-seat estimates, not all-six-seat tournament scores.
+The full coordinator must still test snap/nearest against these frozen weights;
+no claim that the remaining leak is fixed is justified.
+
+The isolated optional learner-fallback composition passed189 reported tests in40
+suites (17 existing fixture early returns), zero failed/ignored. Before retaining
+it, replay its default reference and selected adaptive1m/argmax strength/passive
+main-arm cells at both held-out seeds0661/0662, 100k deals each. Require exact
+exploitation, miss rate and target diagnostics against the certified H19 outputs.
+Driver replay_learner_fallback_main_c_v1.py uses3 nice10 workers CPU15–17 while
+C cache remains active; total18 workers. S2 gain/composition checks remain pending.
+
+Queue build_locked_river_v1.py on the task-owned secondary worker after the
+registered memo timing experiment completely ends, avoiding timing interference.
+Use a fresh source-bound target, full seven-package release tests/builds,
+expected189 reported tests across41 suites, zero failed/ignored, and mandatory
+exhaustive board/payoff/API tests. Twelve nice10 build workers; no other secondary
+compute during these builds. This authorizes validation only, not source retention.
+
+**Priority residual diagnosis, registered before new arms.** Since the new
+3M blind-seat attacker remains strongly profitable, run its already registered
+snap/nearest cells sooner in hardening-23/residual-priority-c-v1. First certify
+the full archive with buffered/direct hashes and exactly replay odds seed0513.
+Then average/argmax × seeds0513/0514 × snap/nearest,100k focused deals each,
+with handoff audits. Four nice10 workers CPU18–21:11training+4fullC+3clean-main
+replay+4priority=22 maximum. These duplicate registered full-C cells are diagnosis,
+not independent samples; never pool them or skip full S2/strength gates. Driver
+residual_priority_c_v1.py emits no cache-release marker or source promotion.
+
+**Completed independent narrower-pressure S2 continuation.** The original
+pressure-v1 3M archive (seven residual sizes, outside-blind seats fold) completed
+all12 final-model cells after full buffered/direct hash checks and an exact
+historical frozen reference replay. This is the recovered old pressure study,
+not the resource-aborted15-size boundary study. Each row uses100k duplicate
+deals, all-six-seat average,95% corrected CI; no cross-row pooling.
+
+| Frozen extraction / seed | Main | Odds | Snap handoff |
+| --- | ---: | ---: | ---: |
+| average / 2026110527 | +107.09 ±31.98 | −6.67 ±30.95 | −126.39 ±30.14 |
+| average / 2026110528 | +99.79 ±32.51 | −14.47 ±31.42 | −121.88 ±30.54 |
+| argmax / 2026110527 | +85.60 ±27.14 | +6.62 ±26.36 | +6.97 ±26.19 |
+| argmax / 2026110528 | +84.96 ±27.47 | +3.44 ±26.63 | −6.17 ±26.28 |
+
+The frozen attack profits significantly against main in every row. Snap's argmax
+intervals still include zero. This table establishes neither a profitable attack
+on snap nor an upper exploitability bound. Exact commands, raw CIs and per-seat
+estimates remain in hardening-14/pressure-s2-continuation-v1; all-studies.done
+records completion. Native policy promotion still waits for the broader gates.
+
+The priority driver v1 stopped before inference: it looked for the source hash in
+the binary receipt, while this clean build records it in input-identity.json.
+Preserve that KeyError and use v2 with the same binary hash plus the correct
+source-manifest assertion, matching the existing full-C validation. Fresh output
+residual-priority-c-v2; no measurements or gates were changed or discarded.
+
+**Conditional stronger-attacker recovery registered before training.** If and
+only if H22's fixed five-pair exactness/performance gate passes, use its identical
+policy/weight computation for a fresh3M boundary-menu attacker, training seed96,
+5GB store,12workers, blinds0/1, against all three experimental guards. Wait for
+the separate locked-river build to finish first; that policy change is not used.
+Keep the original five-minute100it/s resource floor; abort honestly if it fails.
+Focused exact reload uses seed2026110692; held-out average/argmax × four defender
+arms use seeds2026110693/0694,100k all-seat duplicate deals, fold outside blinds.
+The original seed68 resource rejection remains intact. A new source-bound S2
+reference replay must pass first. Driver boundary_s2_study_v2.py, fresh H14
+boundary-s2-study-v2. This is attacker training, not a new defender blueprint.
+No cache timing, negative attack or partial matrix authorizes policy promotion.
+
 ### Public arena privacy shutdown (2026-11-05)
 
 The user requested that the displayed bot/reference standings no longer be public.
