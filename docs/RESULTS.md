@@ -1302,6 +1302,151 @@ reference replay must pass first. Driver boundary_s2_study_v2.py, fresh H14
 boundary-s2-study-v2. This is attacker training, not a new defender blueprint.
 No cache timing, negative attack or partial matrix authorizes policy promotion.
 
+**Per-deal memo performance passed.** Five preregistered warmed training pairs
+speed up5.4938/5.3688/5.5649/5.5287/5.4122×; geometric mean5.4732×,
+paired log-t95%CI[5.3728,5.5754], above the1.20floor. All five priming/timed
+archive hashes, counters, evaluations and target diagnostics match exactly;
+both repeated seed91 arms also match, and the historical S2 reference replays.
+Full207reported release tests/40suites passed,0failed/ignored,17existing fixture
+early returns. This is measured training speed on the specified workload,
+not a stronger defender or universal cold-start claim. Keep old H15/H20 failures.
+
+Isolate only the bounded memo onto main774209a in source
+eddbb8b16b5883fe0a4332a5ea7c55d4af4499a3cf5148787450a41576216d5f.
+Only bench.bp/ABR change; no experimental defender/menu/extraction/locked-board
+code. Queue build_ctx_cache_main_v1.py after the locked-river build and the new
+3M run's five-minute resource gate, so it cannot distort that gate. Four nice10
+workers CPU12–15 plus12training <=16 on the task worker, fresh target, full187
+reported release tests expected across40suites. Exact main C/S2 compatibility
+and composition measurements remain required before retaining this source.
+
+**Locked-board validation found a test assumption error.** Exhaustive board/rank
+and near-lock tests passed, but the continuation enumerator expected a short
+all-in's minimum to exceed its maximum. State::legal explicitly clamps that
+minimum to the maximum (engine/nlhe/src/lib.rs), so a one-action raise range is
+equality. Change only that assertion to equality; no policy logic is changed.
+Preserve the failed full suite. Fresh source61daa3a043f6ba7a62a846e0f0d8487bf59324f42ca7eac6ffadd63b42d13467,
+locked-river-build-v2 repeats the entire release suite in a fresh target.
+The conditional training/cache-build/export queues correctly failed closed on
+this prerequisite. Fresh boundary-s2-study-v3, ctx-cache-main-build-v2 and export
+v3 preserve the same source, training seed96, held-out seeds and gates; no poker
+measurements ran in v2 and no failed marker is overwritten.
+
+**Priority residual average-policy results, two fixed seeds.** The new 3M
+blind-seat attacker archive passes full buffered/direct verification and exact
+odds replay in H23 v2. Focused blind-seat estimates,100k duplicate deals each,
+corrected95%CI (not full-table scores):
+
+| Seed | Main | Odds | Snap | Nearest |
+| --- | ---: | ---: | ---: | ---: |
+| 2026110513 | +15,931.67 ±261.75 | +11,655.92 ±254.17 | −14,055.48 ±152.80 | −14,068.71 ±152.84 |
+| 2026110514 | +15,969.61 ±260.90 | +11,687.17 ±252.93 | −14,163.04 ±152.25 | −14,181.10 ±152.38 |
+
+Raw nearest estimates are−13,914.54 ±280.51 /−14,074.37 ±282.61; the improvement
+is not specific to AIVAT. Snap and nearest do not separate significantly from
+each other here. Argmax cells, broader native controls, independently adapted
+final-model attack and normal-strength gates remain pending. These are frozen
+weights trained against odds: no claim they are a best response to either handoff.
+
+All five optional-attacker clean-main C replays passed exactly: default+419.452
+±95.368; adaptive1m/argmax strength−451.417 ±37.659 /−496.320 ±37.693;
+same-archive passive−1,187.257 ±45.638 /−1,223.633 ±45.494. Match full EV,
+miss rates, diagnostics and mode labels to H19's measured main arms. This verifies
+composition, not a new independent strength sample. S2 remains required.
+
+**Clean-main memo retention gate registered.** H22's5.47× gain used experimental
+handoff guards; it does not establish a gain on current main. After the secondary
+boundary study finishes (or its declared resource abort), run isolated main memo
+versus the certified baseline with all prototype guards disabled: adversarial
+menu,blindseats0/1,4,096iterations,5GB,one worker, seeds101–105. Prime once per
+seed, alternate both timed arms, repeat101once per arm outside timing. Require
+exact full archives/counters/EV/diagnostics, exact historical S2 reference, and
+paired log-t95%lower speedup>1.20. Evaluation256deals seed0696 is only an
+exactness witness. No concurrent secondary compute; no main cache retention
+without this test and C compatibility. Driver ctx_cache_main_performance_v1.py,
+fresh H22 ctx-cache-main-performance-v1. This avoids retaining a claimed speedup
+that only exists under experimental defender options absent from main.
+
+**Broader S2 recovery failed its unchanged resource gate.** After the exact
+S2 reference replay, seed96's memoized run reached only21 iterations/second at
+the five-minute check. It stopped without an accepted learner archive or score.
+Sampled workers were blocked in folio_wait_bit_common; process reads exceeded
+5.99GB while CPU utilization was low. Thus the demonstrated warmed computation
+gain did not solve this run's model-read bottleneck. Preserve the resource receipt
+and reject this attempt; do not relax the gate or import/export nonexistent results.
+
+Next resource hypothesis: use the original larger host with its active verified
+C model. Compile the unchanged source c8649205… in fresh H24 ctx-cache-c-build-v1,
+full207-report/40-suite release checks,7 nice10 workers CPU15–21 after H23 ends;
+original11+fullC4+build7 <=22. No S2 model load on this host during its C phase.
+A subsequent candidate-adaptive C training run must hold the existing original
+C scheduler while active and release it in a guarded finally block, preventing
+a cache-phase transition during this additional work. No live service is touched.
+The failed final-model adaptive requirement remains outstanding, not satisfied
+by a future C-only result. Main-only cache build/performance proceeds independently
+on the task-owned secondary worker after its aborted S2 stage.
+
+**Candidate-adaptive C recovery registration.** After H24's clean build, train
+the fifteen-size boundary attacker for3M iterations on C against all three
+guards, fresh seed97,5GB,7workers CPU15–21. Exactly replay the certified old1M
+C reference first. Keep the five-minute100it/s floor; exact focused reload seed
+2026110702; average/argmax × main/odds/snap/nearest held-outs use0703/0704,
+100k all-seat duplicate deals with outside-blind folds. Driver
+hardening-24/boundary_c_study_v1.py; no automatic retention or phase release.
+
+Its supervisor checks boot, start time and exact command line, then holds only
+our original H12 scheduler while leaving its current training child running.
+This prevents C-to-S2 cache transition during the added C work. A finally block
+terminates any still-running owned child and resumes that same scheduler on
+success, failure or handled termination. CPU cap remains11+4+7=22. The current
+UTG run is preserved; no live process/service is signalled. Any new defender
+regression must be included in final retention review, even if older matrices
+pass. This cannot replace the still-missing independently adapted S2 result.
+
+**Guarded final-model recovery queued on the larger host.** If H24 C adaptation
+completes, boundary_s2_original_v1.py waits for H12 to finish every C job and pass
+its final-model frozen reference, then holds only that same scheduler before its
+S2 measurements-complete marker. Its current child may finish, but downstream
+SDK/full-model queues cannot start while the scheduler is held. This allows7
+workers CPU15–21 alongside at most11 original workers, S2 only. Boot/start-time/
+command checks and the same finally-resume/child-cleanup guard apply.
+
+Fresh seed98 trains3M iterations,5GB,all three native guards, fifteen-size menu;
+the five-minute100it/s floor is unchanged. Exact focused reload0712; held-out
+average/argmax × four defender variants use0713/0714,100k all-seat duplicate
+deals with outside-blind folds. If the C prerequisite resource attempt fails,
+record an explicit skip. If the S2 insertion point was missed, stop instead of
+risking overlap. This is the registered recovery for the missing adaptive final-
+model evidence; old failed secondary attempts and their import markers stay failed.
+
+**Final gate wiring updated for the resource recovery.** The old independent
+import waited for the failed secondary seed68 archive, which must never be
+fabricated. Preserve it as superseded, stop only that idle owned importer and the
+idle v3 final-h2h coordinator, and use review_adaptive_original_v1.py plus h2h v4.
+The new reviewer requires both H24 C/S2 studies complete, both schedulers resumed,
+source/binary/model/archive identities, resource floors, exact references/reloads,
+and all32 held-out rows. It recomputes every raw/corrected disjoint-CI gate and
+rejects candidates with any newly found regression. Resource failure fails closed.
+
+Normal-strength v4 changes only that prerequisite: all prior full C/S2 controls,
+the older odds-only h2h completion-or-explicit-rejection check, main historical
++5.09 ±1.16 overlap,200-deal smokes and4M all-format same-seed measurements remain
+mandatory. No candidate or incomplete adaptive run can bypass these gates.
+No code promotion or deployment is automated by this wiring.
+
+**Completed current validations.** H21 locked-river v2 passed189 reported
+release tests across41 suites,0failed/ignored,17existing fixture early returns;
+all exhaustive card/continuation and authenticated HTTP/batch checks executed.
+H22 clean-main memo v2 passed187 reported tests across40 suites,0failed/ignored,
+17fixture early returns, and completed its separate release build. Its registered
+main-configuration S2 timing/reference experiment has started; no source is kept
+on the basis of the earlier experimental-policy timing result alone.
+
+H23 priority residual diagnosis completed all eight snap/nearest cells with no
+raw/corrected disjoint regression within that matrix. Argmax nearest at the registered seeds2026110513/0514, giving−14,015.02 ±149.36
+and−14,161.77 ±148.86. These complete the focused C frozen-policy evidence only;
+the newly queued adapted C/final-model studies and normal strength remain required.
+
 ### Public arena privacy shutdown (2026-11-05)
 
 The user requested that the displayed bot/reference standings no longer be public.
