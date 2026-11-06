@@ -8,7 +8,7 @@ SHARINGAN-1 = C@2e10 + turn/river search. The inference API (`/v1/act`) plays it
 and the browser play page use the released C@2e10 blueprint without search. The search results below (+87 vs the blueprint, Open Poker live) are the search bot.
 ## Action-translation leak and fix (Nov 2026)
 
-### Hardening continuation — finish gates and expand API attacks (2026-11-05)
+### Hardening continuation — finish gates and expand API attacks (2026-11-05–06)
 
 The user resumed autonomous hardening; public access remains disabled. Resume the
 immutable iteration-8 candidate without changing its formula, gates or old results.
@@ -626,6 +626,366 @@ establish robustness. Full exact commands, hashes, raw CIs and all controls:
 ~/fix/hardening-11/api-{c-v1,s2-v3}, with composed current-main receipts under
 ~/fix/hardening-12/api-realstate-final-v2. Original checker/continuation failures
 remain preserved alongside their explicit recovery receipts.
+
+API action repair committed and pushed as 899e09b; source and all measurements
+above remain private and undeployed. The nearest-handoff v2 recovery wrapper
+itself rejected Rust 1.99's reformulated E0382 wording before compilation; v3
+checks the actual error code, test location and moved-value note instead.
+The corrected source remains 953528d4cdb37df82652090ed8b0a4f7d97a1cb3e5028e130f8933c0718b5651;
+all previous failed build/study receipts remain preserved. No poker run has
+been repeated or reselected for this candidate.
+
+**Cache prototype rejected after exactness passed.** All 6,630 keys, complete
+single-thread archive hashes/counters/estimates, old/new repeatability and each
+of five paired seeds are exact. End-to-end paired speedups are
+1.9942/0.6280/1.6341/0.6757/1.5977; geometric mean 1.1718×, paired-log Student-t
+95% interval [0.5967, 2.3012]. Startup is included. The preregistered lower-bound
+>1.20 gate fails, so retain no cache production code; skip its unnecessary S2
+retention check and preserve every timing/archive receipt. No speed or EV gain
+is claimed. The separate pressure study has completed all twelve C cells with
+no significant raw/corrected regression; review finds no C inference child, and
+explicitly releases only that worker to S2 for its full identity/reference and
+frozen-matrix checks. The original Ubuntu host remains in its separate C phase.
+
+| frozen pressure policy / seed | main C | mixed-passive | plus snap handoff |
+|---|---:|---:|---:|
+| average / 2026110527 | +55.09 ± 32.91 | −52.05 ± 32.05 | −239.47 ± 30.88 |
+| average / 2026110528 | +73.20 ± 33.31 | −36.27 ± 32.35 | −213.79 ± 31.20 |
+| argmax / 2026110527 | +30.68 ± 28.18 | −42.75 ± 27.51 | −97.63 ± 26.90 |
+| argmax / 2026110528 | +51.58 ± 28.41 | −24.66 ± 27.68 | −83.60 ± 26.86 |
+
+Each cell: 100k duplicate deals / 600k actual full-table hands, learned policy in
+blinds and folds elsewhere. Focused training evaluation is a different estimand
+(−718 ± 92 across only the two learned positions), not pooled with this table.
+All full-table raw estimates/CIs and miss rates remain in the private receipts.
+These finite adaptive bounds do not negate the profitable separate 40-BB probe.
+
+**Broader adaptive menu prepared before training:** pressure-boundary-v1 retains
+fold/check/call, shoves and residual chips
+1/2/10/100/500/1000/3300/4000/5000/8000/8505/8506/9150. It includes the known
+40-BB leak, the exact nearest-all-in cutoff on both sides, and the ordinary
+8.5-BB menu raise. Existing pressure-v1 and residual-v1 action lists/manifests
+remain byte-identical. Test all three archive definitions/rejection, legal
+sorted unique actions/caps across 2–6 players, and the real six-seat outside-fold
+wrapper. Compose only the retained API repair plus unchanged experimental native
+flags; the rejected cache is excluded. Compilation uses four original-host
+workers on CPUs 18–21, alongside eleven training and seven native-test workers
+on CPUs 0–17 (at most 22 computing CPUs total). No boundary training or quality
+result is claimed yet. Source SHA256 9741cb7871bd58d9006b6aaee74d8e6aecb8677a7eb42d73a912e7d789fed797;
+receipts: ~/fix/hardening-17/boundary-build-v1.
+
+The first boundary-menu builder stops at cargo fetch because its clean HOME
+has no configured Rust toolchain. Preserve that failure; v2 points CARGO_HOME
+and RUSTUP_HOME at the existing Ubuntu installation and fetches offline. Source,
+flags, test/gate definitions and seeds are unchanged; no training or poker
+measurement occurred. Fresh receipts: ~/fix/hardening-17/boundary-build-v2.
+
+The nearest v3 suite then reaches the second expanded parity fixture and finds
+the same test-only Arc move in exploit::abr. Clone that bucketer too; no production
+policy code changes. Full release tests/builds remain required. Fresh nearest
+v4 source SHA256 cd05f918c9b475e88a6510b7dabc063cad63ac77f2b80dd34585a900da0f5a72,
+receipts: ~/fix/hardening-16/nearest-{build,study}-v4. The boundary v2 builder's
+all-platform offline fetch requests an unused wasm dependency and stops before
+compilation; remove that redundant fetch, retaining fully offline mandatory
+native release tests/builds. Boundary v3 includes the same test-only Arc clone;
+source SHA256 a725148784cf6a5d1463472cb81625510ff04e6ae3ad18f2c285410e21b73934. All earlier failure logs remain.
+
+**Private real-worker SDK follow-up registered before running:** after the
+nearest fixed-attack stage and boundary-menu release builds, exactly replay the
+original native frozen 1M C reference with every new option disabled, including
+all estimates/miss rate/target diagnostics. Require Sombra's original pre-sync
+positive control lower CI >+1000. Then run the original nine SDK controls/probes
+(quickstart, TAG, Sombra and all six probes) through `sharingan eval --local`,
+track sharingan-1 unchanged, 20,004 hands, four lanes, seed ab-20004 per arm.
+Variants: main, mixed-passive, snap handoff, and nearest guard only if its fresh
+registered primary/grid/holdouts pass. Compare every later variant with earlier
+variants, identical deal digests, reject a disjoint corrected-CI regression;
+require zero crashes/forfeits/illegal actions/timeouts or bridge tracebacks.
+The worker exports raw duplicate means but no raw CI, so retain those means
+without claiming a raw significance gate. Native frozen/adaptive/LBR raw and
+corrected gates, final S2 and normal strength remain mandatory for retention.
+
+Run only as ubuntu/nice10, no-new-privs, empty HOME and whitelisted credential-free
+environment. The CLI uses local pipes, no hosted endpoint, submission or account.
+Use CPUs 11–21 only after both other experiment builds/initial probes finish,
+alongside eleven original-host training workers on CPUs 0–10. Initial directory:
+~/fix/hardening-16/e2e-controls-c-v1; no overall C phase-release marker is written
+by this SDK-only stage. No public row or live service is touched.
+
+**Additional native SDK/builtin controls registered:** after the official SDK
+worker stage completes, compile an isolated native CompactPolicy harness with
+the unchanged SDK bridge/adapter. First exactly reproduce the original all-seat
+500-chip-residual C sample (seed 2026110516), including all existing raw/corrected
+statistics and target diagnostics, before accepting any new SDK score. Report
+this adapter's preserved per-hand memory/history as a distinct attack from the
+original worker; do not merge their Sombra scores. The target exposes its actual
+native probabilities, and SDK bot actions stay unexposed.
+
+Fresh seed 2026110545, 3,334 duplicate deals / 20,004 hands per arm: original nine
+SDK bots plus nit/TAG/LAG/maniac/station/random, main/mixed-passive/snap and nearest
+only if its fixed stage passed. Compare every later variant against earlier
+ones; reject disjoint raw or corrected 95% regression. Abort on reference mismatch,
+SDK errors/timeouts/substitution/traceback, model metadata/boot changes or C phase
+release. Four match workers plus at most four SDK workers use CPUs 11–18, after
+the other SDK stage, alongside original 11-worker training. No live pipeline is
+used or changed; all other frozen/adaptive/LBR/S2/strength gates remain mandatory.
+Helper SHA256 d8958f3638941d112b56c1756a5cc8f7b0137437448ac46f6df08be2ae2cb815;
+receipts: ~/fix/hardening-16/native-sdk-{build,controls}-v1.
+
+**Boundary expectation failure investigated before poker inference.** The nearest
+v4 release suite fails its new 1495-chip expectation. The production guard is
+using the existing pseudo-harmonic formula correctly; the test assumed a plain
+harmonic midpoint. For pot fractions a=3 and b=39.6, p_lower=0.5 occurs at
+(2ab+a+b)/(2+a+b), corresponding to raise-to 1670.6278 chips. Assert the analytic
+formula and both integer sides (1670 follows / 1671 hands off); 1494 and 1495 both
+follow. No defending production code or gate threshold is changed, and no poker
+measurement has run for this candidate. Preserve the failed suite and dependent
+waiting-stage failures. Run the targeted boundary test before the full suite to
+catch such fixture errors promptly. V5 source SHA256
+34749d8077575d7352e9a66c76c3f2abb15a0491102ec9f05e2098ed6b1684cf;
+fresh receipts: ~/fix/hardening-16/nearest-{build,study}-v5.
+
+Before any native grid measurement, add actual 8329/8330-chip residual boundaries
+to the original registered size grid, retaining every original case and all
+seeds/counts/selection/retention gates. Before any adaptive training, give the
+broader menu a new pressure-boundary-v2 identity with the same two added sizes
+(15 residual sizes, 18 root actions); old pressure-v1/residual-v1 remain exact.
+The earlier boundary-v1 was compiled/tested only, never trained for a quality
+result. New source SHA256 bc4ed6932aa03742e20c68f4e1dd59aed4991451ffe0a739eb992bfe17bb3bfd;
+fresh builder: ~/fix/hardening-17/boundary-build-v4. SDK/control v2 queues use these
+new completed-build prerequisites with unchanged hands/seeds/policy gates.
+
+**Cargo artifact reuse failure; new policy measurements held.** The corrected
+boundary source is byte-identical on both build roots (SHA256
+32fa76b2fdab551ee9c894267b0789ae59905d8c609b991b99afded000a87e8a).
+The nearest build compiles and passes its corrected analytic/1670/1671 test,
+but the boundary build reports Finished in 0.15 seconds and executes the previous
+1495-chip test binary, including its old assertion line. A shared Cargo target
+across extracted source roots is not a valid provenance gate. Stop only owned
+experimental build/queues before candidate poker inference, preserve every log,
+and use a new target directory per exact source archive and separate targets
+for baseline/candidate roots. Source hashes alone do not prove binary provenance.
+
+Independently revalidate committed API 899e09b from unchanged archive
+46230576424c70e93122b8647a469830b7622c5c41687d24424924700b59c4d6 with fresh,
+separate targets, all seven release packages, mandatory HTTP/fuzz/known-payoff
+checks and all twelve exact C poker replays. Its earlier primary improvements
+were directly witnessed, but require the clean current-main source audit too.
+Fresh receipts: ~/fix/hardening-18/api-realstate-clean-v1. Rebuild nearest source
+34749d8077575d7352e9a66c76c3f2abb15a0491102ec9f05e2098ed6b1684cf in
+~/fix/hardening-16/nearest-clean-build-v1 with its own new target, targeted boundary
+then the full suite, before a fresh unchanged grid/holdout stage. Keep the
+separate H12 immutable training and unique-target PTXP H14 model checks running;
+no service, live build, model or /srv file is touched. CPUs: 11 training + 7 native
+build + 4 clean API build, at most 22. No new native defending change is retained.
+
+The clean nearest target compiles and passes the corrected boundary unit test.
+The full suite is running. The separate boundary clean builder waits for the
+clean API audit, nearest build and frozen-learner transfer before starting its
+own fresh target (seven workers); no old target is copied or cleaned in place.
+Fresh SDK queues retain the exact registered bots, seeds, counts and gates and
+wait for those clean artifacts. Directories: hardening-17/boundary-clean-build-v1,
+hardening-16/e2e-controls-c-clean-v1 and native-sdk-{clean-build,controls-c-clean}-v1.
+Archive sources and hypotheses are unchanged. All old interrupted/failed queues
+remain preserved, and no native candidate score has been accepted from them.
+
+Stale-build evidence is preserved under hardening-11/cargo-stale-evidence-v1:
+corrected assertion is at source line 1089, while the reused binary reports old
+line 1083; the dependency file uses relative source paths. Record its exact binary
+hash and failed log rather than attributing an unverified upstream cause. The
+new isolated targets cannot contain that old artifact. Clean API known-payoff
+fixture checks at 1/2/4 workers pass; full release suites remain in progress.
+
+**Additional full native C gates registered before measurements.** After both
+clean SDK matrices, screen out handoff candidates with any significant regression;
+nearest additionally requires its clean fixed-attack primary/grid/holdouts. Keep
+main and mixed-passive as controls. For each surviving handoff, hash each native
+learner with buffered/direct reads against its original manifest, then run the
+old 1M / 3M / price-trained 1M / odds-trained 1M archives, average and argmax,
+fresh seeds 2026110548/2026110549, 100k duplicate deals / 600k hands per cell.
+Compare every later variant with earlier variants, retaining raw/corrected CIs.
+
+Transfer only the task-created pressure archive (native SHA aaca3fb65243987442d24e75b24aa4f710c3b1f2575613a4cb518d90ffaf335e)
+through the Mac, without credentials. Verify compressed/native hashes and all
+four identical bucket files; explicitly relocate only the bucket path in a copied
+manifest. Exactly replay all twelve old C pressure cells across hosts before
+interpreting the new nearest arm at the same frozen seeds/extractions. Preserve
+the original evidence bundle SHA bf0a44863636ea7ab94b784463779b357406f2ccf999e6bafe7a14faf69f8ab9.
+
+Run fresh standard weak/strong profile LBR for controls and surviving handoffs,
+20k deals, CLI seed 5, 300 Monte Carlo samples, default/richer menu. LBR reports
+actual raw returns; do not label these AIVAT-corrected. As each of the four newly
+registered H12 3M learners finishes and passes archive reload, hash it anew,
+exactly replay its original first mixed-passive average sample, reuse its completed
+main/odds baseline cells explicitly, then evaluate surviving handoffs on both
+original seeds 2026110513/2026110514 and both extractions. Those focused-seat
+estimates remain conditional and are not pooled with full-table scores.
+
+Any disjoint 95% raw/corrected regression rejects that candidate; LBR uses its
+actual raw-only CI. Propagate any main-to-odds regression to the existing old
+candidate rejection flag so normal-strength work cannot silently promote it.
+Complete/screen the C stage before releasing the original host's model cache;
+mark S2 skipped only if every additional handoff is rejected, explicitly saying
+no policy was kept. C survivors still require full S2 and normal-strength gates.
+Four nice-10 workers use CPUs 11–14 after the SDK stages, alongside eleven original
+training/evaluation workers. Driver/receipts: hardening-13/native-full-c-clean-v1.
+No deployment or automatic policy retention occurs.
+
+**Clean audit and native fixed-attack results.** The isolated current-main API
+audit completes 185 reported passes / 40 suites (zero failed/ignored; the same
+17 fixture-dependent early returns leave 168 actually executed tests), all
+release builds, and all twelve exact primary/boundary/canonical C replays.
+Both A/B arms have separate fresh targets. The committed API repair's original
+C/S2 improvements are reproduced, not replaced or reselected.
+
+The clean nearest-all-in guard passes its full required release suite/builds,
+exactly replays the old snap-only reference, and passes all registered initial
+C fixed-attack gates. All 52 candidate discovery configurations' corrected upper
+95% endpoints are negative; the largest is −1,099.1. The selected boundary is
+8330 chips left (raise-to 1670), blind-only. Independent holdouts, each 100k
+duplicate deals / 600k hands per arm:
+
+| seed / chips left | snap-restricted handoff | plus nearest guard |
+|---|---:|---:|
+| 2026110541 / 4000 | +1,515.1 ± 63.3 | −4,854.5 ± 51.3 |
+| 2026110542 / 4000 | +1,487.0 ± 63.3 | −4,817.5 ± 51.5 |
+| 2026110541 / 8330 | −1,197.4 ± 51.7 | −1,430.7 ± 51.9 |
+| 2026110542 / 8330 | −1,271.7 ± 52.0 | −1,490.9 ± 52.1 |
+
+Primary raw holdouts respectively +1,515.8 ± 92.8 → −4,874.8 ± 108.2 and
++1,491.7 ± 92.8 → −4,766.8 ± 107.4; raw/corrected primary intervals are disjoint,
+with no registered significant regression. This is an initial C result, not
+policy retention or final-model robustness. SDK/frozen/adaptive/LBR/S2/normal
+strength gates remain. The transferred learner's compressed/native hashes and
+all four bucket hashes pass on the original host; only its copied manifest's
+bucket path changes. Delete only the task-created 1.3-GB Mac transfer temporary;
+identical files/receipts remain on both workers.
+
+**New attacker-extraction hypothesis, before measurements:** unseen learner
+infosets currently play uniformly during training and check/call during frozen
+evaluation. That documented mismatch may weaken finite attacks. Add evaluation-only
+passive/uniform/strength choices, default passive unchanged; learned-node average
+and argmax probabilities and native weights stay unchanged. Strength uses the
+existing real-state heuristic and can emit legal off-menu raises. Reject invalid
+extraction/missing-mode enum values before model I/O and report the actual two
+selected modes in each result. This changes no house policy or training update.
+
+Tests cover royal-flush/weak-hand behavior with real chips/cards, legal exposed
+uniform probabilities, fork preservation, bit-exact learned distributions for
+both extractions under every missing mode, actual CLI play rather than labels,
+and default-versus-explicit-passive equality. Run all seven required release
+packages from a new source-bound target before any poker comparison. Source
+18b9f5ea2861a18bd0a12f79af69b72a0b533d90c1438c8b63a6c16d357336f9
+changes only exploit::abr/cli relative to the current native prototype. Three
+nice-10 build/evaluation workers use CPUs 19–21; 11 original workers plus at most
+eight SDK workers plus these three stay within 22. Source/receipts:
+hardening-19/learner-fallback-build-v1. No attacker feature is kept yet.
+
+The clean boundary source completes 205 reported passes across 40 suites,
+zero failed/ignored (the existing 17 fixture early returns remain). Its final
+mandatory-name checker falsely rejects the archive test because --nocapture
+prints its JSON and intentional caught panic between the name and final `ok`.
+Preserve the failure; verify every unchanged source hash, all passing summaries
+and module-qualified mandatory entries, then recheck that deterministic test
+with captured output before continuing only unfinished release builds. No poker
+score or retention gate is relaxed. Apply the same explicit recovery if the
+running new learner-mode suite hits the same checker limitation; actual test
+failures stop it. Stable source-bound targets are reused only for the same
+unchanged snapshot, never another root or A/B arm.
+
+**Next frozen-extraction experiment registered before scoring (2026-11-06).**
+Use the four certified old 1M/3M/adaptive/odds archives, both average and argmax,
+and passive/uniform/strength missing-node modes against the nearest guard.
+Discovery: seed 2026110660, 3,334 deals per cell (24 cells). Select the nondefault
+mode with the highest corrected attacker mean; deterministic ties prefer the
+existing archive order, average, then uniform. Proceed only if it exceeds the
+best passive discovery mean. Freeze that selection before two held-out seeds
+2026110661/662, 100,000 duplicate deals each. Compare selected extraction,
+same-archive passive extraction, and best passive profile, across all four
+main/odds/snap/nearest defenders. A feature gain requires disjoint raw and
+corrected intervals against both passive controls on both nearest holdouts.
+This is a finite attacker comparison, never an exploitability upper bound.
+Record all defender regressions and import them into the native retention gate.
+Fresh source-bound build, default exact historical replay, per-run model/archive
+identity checks, and final S2/feature-only composition remain mandatory.
+Commands: `nice -n 10 python3 -I -u hardening-11/learner_fallback_study_c_v1.py`;
+receipts: hardening-19/learner-fallback-study-c-v1. Three workers on CPUs 19–21.
+
+The captured boundary archive recheck and remaining release builds complete;
+source bc4ed6… is unchanged. Restart the previously failed prerequisite queues
+in fresh `e2e-controls-c-clean-v2`, `native-sdk-clean-build-v2`, and
+`native-sdk-controls-c-clean-v2` directories, preserving their v1 failures.
+The additional C coordinator becomes `native-full-c-clean-v2` and explicitly
+waits for/imports the new extraction study before releasing the C cache phase.
+No test, confidence rule, policy default, or historical score changes.
+
+**Secondary-worker interruption investigated.** Its boot changed from f2666d63…
+to e68db1f4… while hashing S2. No S2 poker cell or completed checksum exists.
+The 3M attacker and all twelve completed C measurements survive and were already
+independently transferred/verified. Read-only diagnostics show autopilot disabled,
+the task worker running with its volume saved, and no remaining study process;
+the restart cause is unestablished. Resume only in a new directory, validating
+binary/source, learner/buckets, and full S2 hashes under the new boot before any
+inference. Do not repeat/select C scores or retrain the preserved attacker.
+The original large-memory host retains the same boot and its training continues.
+
+**Stronger final-model adaptive attacker registered before training.** After
+the recovered H14 S2 matrix finishes, use the clean boundary executable/source
+bc4ed6… on the task-owned secondary worker. Train `pressure-boundary-v2` for
+3,000,000 iterations, 5-GB store, blind seats 0/1, seed 68, against experimental
+mixed-passive + snap + nearest handoff. Its 15 residual sizes include the known
+40-BB exploit and both sides of the exact 1670/1671 translation cutoff; the older
+seven-size pressure menu/archive remains unchanged. Require at least 100 it/s
+at five minutes or stop with no accepted model/score. No retry or menu tuning
+based on held-out results. Freeze the archive and verify native/direct hashes,
+then exact-reload its focused training evaluation (seed 2026110672).
+
+Held-out seeds 2026110673/674, 100,000 duplicate deals each, average and argmax,
+all four main/odds/snap/nearest defenders, full-table blind policy with folds in
+other seats. Keep every raw/corrected CI, miss rate and store-full diagnostic;
+any disjoint defender regression rejects retention. Frozen 1M S2 replay must be
+exact before training, under the fresh-boot full S2 input certificate. Only 12
+nice-10 workers CPU0–11; serialized after H14, no competing model on this worker.
+The target remains experimental. This study cannot establish unexploitable play
+or promote a defender. Command: `nice -n 10 python3 -I -u
+hardening-14/boundary_s2_study_v1.py`; receipts: hardening-14/boundary-s2-study-v1.
+
+**Final-model continuation gates registered before measurement.** On the
+original host, serialize S2 SDK/extraction work after all H12 S2 measurements,
+while its coordinator waits for the additional S2 phase release. Use the same
+certified boundary/SDK executables and independently exact S2 frozen/probe
+replays; no changed source or shared Cargo target is introduced. Repeat the nine
+original bots through the actual private worker (seed ab-20004, 20,004 hands),
+then the 15 native SDK/builtin profiles (seed 2026110545, 20,004 hands), all four
+main/odds/snap/nearest arms and the existing raw/corrected gates. The worker
+exports only a raw mean, so no raw confidence interval is invented for it.
+
+Independently discover S2 unseen-node extraction profiles at seed 2026110675,
+3,334 deals per cell across the same four frozen archives/two extractions/three
+missing modes. Freeze selection before seeds 2026110676/677, 100,000 duplicate
+deals per arm, comparing selected/same-profile-passive/best-passive against all
+four defenders. Require disjoint raw and corrected gains over both passive
+controls at both seeds to call this an S2 attacker feature gain; independent C
+gain and clean feature-only composition remain required to retain its code.
+Import every actual defender regression before native retention/phase release.
+Eight SDK workers plus three extraction workers stay below 22, and run only S2.
+Drivers: native_e2e_controls_s2_clean_v1.py,
+reuse_native_sdk_s2_clean_v1.py, native_sdk_controls_s2_clean_v1.py,
+learner_fallback_study_s2_v1.py; fresh receipts in hardening-16/*s2-clean-v1 and
+hardening-19/learner-fallback-study-s2-v1. No deployment or automatic retention.
+
+**Private-worker checkpoint, not a completed native gate.** Fresh C positive
+control gives original Sombra +5,484.0 ± 511.5 with pre-sync-fix, then current main
+−152.1 ± 129.5 (20,004 hands, seed ab-20004). The old frozen 1M replay is exact.
+Quickstart main −596.4 ± 135.2 / odds −628.4 ± 136.7 / snap and nearest both
+−646.6 ± 138.0; TAG main −465.6 ± 118.5 / odds −463.8 ± 118.3 / snap and nearest
+about −465.6 ± 116.7. These completed controls show no disjoint regression;
+Sombra's remaining arms and probes are pending. Original submission process
+history makes this a distinct fresh private sample, not an exact reproduction of
+an old board row. All numbers are the official worker's corrected estimates.
+The new learner-mode suite/release build also completes 209 reported passes /
+40 suites, zero failed/ignored (192 executed after the same 17 fixture returns),
+with documented captured-output checker recovery. No feature code is retained.
 
 ### Public arena privacy shutdown (2026-11-05)
 
