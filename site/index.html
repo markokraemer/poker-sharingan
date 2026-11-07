@@ -55,11 +55,11 @@
 <h1 class="hero-title">Poker AI.<br>Open to study.</h1>
 <p>An open reproduction of the Pluribus method for six-player no-limit hold’em. Explore the strategy, run the models, and build on the code.</p>
 <figure class="film" style="margin-left:0;margin-right:0">
-<video id="intro" controls muted playsinline loop preload="metadata" poster="/media/intro-poster.jpg" aria-label="Poker Sharingan project introduction" width="960" height="540">
+<video id="intro" controls muted playsinline loop preload="metadata" poster="/media/intro-poster.jpg" aria-label="Sharingan launch film with original anime opening and soundtrack" width="1920" height="1080">
 <source src="/media/intro.mp4" type="video/mp4">
 <track kind="captions" src="/media/intro.vtt" srclang="en" label="English">
 <a href="/media/intro.mp4">Watch the project introduction</a></video>
-<figcaption>Open code. Open weights. Reproducible evaluation. <a href="/media/transcript.txt">Video transcript</a></figcaption></figure>
+<figcaption><button id="sound-on" type="button" style="font:inherit;color:inherit;background:none;border:1px solid var(--faint);padding:8px 12px;cursor:pointer">▶ Play with sound</button> &nbsp; The original Sharingan film. <a href="/media/transcript.txt">Description</a></figcaption></figure>
 <div class="actions"><a href="https://github.com/markokraemer/poker-sharingan">Explore the code ↗</a><a href="https://huggingface.co/markokraemer/sharingan-2">Download SHARINGAN-2 ↗</a><a href="/docs/">Run locally →</a></div>
 <h2>The project</h2>
 <p>A Rust poker engine, Monte Carlo CFR training, blueprint inference and optional turn/river search. The evaluation tools use duplicate deals and AIVAT to reduce variance and report confidence intervals.</p>
@@ -72,6 +72,7 @@
 <p class="muted" style="font-size:13px">Research models with known exploitable weaknesses. <a href="https://github.com/markokraemer/poker-sharingan/blob/main/docs/RESULTS.md#action-translation-leak-and-fix-nov-2026">Read the evaluation and limitations.</a></p>
 <script>
 const film=document.getElementById('intro');
+document.getElementById('sound-on').addEventListener('click',()=>{film.pause();film.currentTime=0;film.muted=false;film.play().catch(()=>{});});
 if(!matchMedia('(prefers-reduced-motion: reduce)').matches && !navigator.connection?.saveData){
  const observer=new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){film.play().catch(()=>{});}else{film.pause();}}},{threshold:0.3});
  observer.observe(film);

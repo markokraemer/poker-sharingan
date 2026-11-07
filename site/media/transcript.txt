@@ -1,9 +1,10 @@
-Poker Sharingan — project introduction (18 seconds, silent)
+Sharingan launch film — original anime opening and soundtrack (24.9 seconds)
 
-An open reproduction of the Pluribus method.
-Six seats. Hidden information.
-Blueprint strategy and optional real-time search.
-Open the black box: Rust code, trained weights, and duplicate-deal + AIVAT evaluation.
-Study. Build. Evaluate.
-sharingan.poker
-Research models; known limitations documented.
+The original cinematic eye opens, glows red and transitions into the Sharingan symbol.
+A recorded six-player hand shows the table, cards, decisions and strategy probabilities.
+Open code. Open weights. Local evaluation.
+Study. Build. Play.
+The original closing Sharingan symbol and sharingan.poker address return.
+
+Instrumental music and sound effects; no spoken narration.
+The hand replay is illustrative historical footage, not a performance guarantee.
